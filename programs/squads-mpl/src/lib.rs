@@ -1,14 +1,26 @@
 use anchor_lang::prelude::*;
 
+use state::ms::*;
+
+pub mod state;
+
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 #[program]
 pub mod squads_mpl {
     use super::*;
-    pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
-        Ok(())
+    pub fn create(ctx: Context<Create>, threshold:u16, members: Vec<Pubkey>) -> Result<()> {
+        ctx.accounts.multisig.init(threshold, ctx.accounts.creator.key(), members)
     }
 }
 
 #[derive(Accounts)]
-pub struct Initialize {}
+pub struct Create<'info> {
+    #[account(init, payer = creator, space = 8 + Ms::MAXIMUM_SIZE)]
+    pub multisig: Account<'info, Ms>,
+    #[account(mut)]
+    pub creator: Signer<'info>,
+    pub system_program: Program<'info, System>
+}
+
+
