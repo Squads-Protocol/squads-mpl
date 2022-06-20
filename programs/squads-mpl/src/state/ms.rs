@@ -15,12 +15,12 @@ pub struct Ms {
 
 impl Ms {
     pub const MAXIMUM_SIZE: usize = 4 + (32 * 10) + // initial space for 10 keys 
-    2 +  // threshold value
-    2 +  // authority index
-    4 +  // transaction index
-    4 +  // processed transaction index
-    1 +  // PDA bump
-    32;  // creator
+        2 +  // threshold value
+        2 +  // authority index
+        4 +  // transaction index
+        4 +  // processed transaction index
+        1 +  // PDA bump
+        32;  // creator
 
     pub fn init (&mut self, threshold: u16, creator: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
         self.threshold = threshold;
@@ -36,14 +36,53 @@ impl Ms {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum MsTransactionStatus {
+    Draft,
+    Active,
+    ExecuteReady,
+    Executed,
+    Rejected
+}
+
+
+#[account]
 pub struct MsTransaction {
-    pub owner: Pubkey,
+    pub creator: Pubkey,
     pub transaction_index: u32,
     pub authority_index: u32,
-    pub draft: bool,
-    pub executed: bool,
+    pub authority_bump: u8,
+    pub status: MsTransactionStatus,
     pub instruction_index: u8,
-    pub instructions: Vec<MsInstruction>
+    pub bump: u8,
+    pub approved: Vec<Pubkey>,
+    pub rejected: Vec<Pubkey>,
+}
+
+impl MsTransaction {
+    // the minimum size without the approved/rejected vecs
+    pub const MINIMUM_SIZE: usize = 32 +    // the creator pubkey
+        4 +                                 // the transaction index
+        4 +                                 // the authority index (for this proposal)
+        1 +                                 // the authority bump
+        (1 + 12) +                          // the enum size
+        1;                                  // the number of instructions (attached)
+
+    pub fn initial_size_with_members(members_len: usize) -> usize {
+        MsTransaction::MINIMUM_SIZE + (2 * members_len)
+    }
+
+    pub fn init(&mut self, creator: Pubkey, transaction_index: u32, bump: u8) -> Result<()>{
+        self.creator = creator;
+        self.transaction_index = transaction_index;
+        self.authority_index = 0;
+        self.authority_bump = bump;
+        self.status = MsTransactionStatus::Draft;
+        self.instruction_index = 0;
+        self.approved = Vec::new();
+        self.rejected = Vec::new();
+        self.bump = bump;
+        Ok(())
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
