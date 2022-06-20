@@ -21,4 +21,4 @@ jobs:
       # uses: mrgnlabs/anchor-test-action@d137eeab2158ba96c2ee38f875622d13de55b35c
       uses: mrgnlabs/anchor-test-action@v0.5
       with:
-        workspace_dir: squads-mpl
+        workspace_dir: .
