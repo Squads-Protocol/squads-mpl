@@ -4,13 +4,13 @@ use num_traits::*;
 
 #[account]
 pub struct Ms {
-    pub keys: Vec<Pubkey>,
     pub threshold: u16,
     pub authority_index: u16,
     pub transaction_index: u32,
     pub processed_index: u32,
     pub bump: u8,
-    pub creator: Pubkey
+    pub creator: Pubkey,
+    pub keys: Vec<Pubkey>
 }
 
 impl Ms {
@@ -34,6 +34,7 @@ impl Ms {
         Ok(())
     }
 }
+
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum MsTransactionStatus {
@@ -85,14 +86,26 @@ impl MsTransaction {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+#[account]
 pub struct MsInstruction {
     pub program_id: Pubkey,
     pub keys: Vec<MsAccountMeta>,
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
+    pub instruction_index: u8,
+    pub bump: u8,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+impl MsInstruction {
+    pub const MAXIMUM_SIZE: usize = 1280;
+
+    pub fn init(&mut self, instruction_index: u8, _instruction_data: Vec<u8>, bump: u8) -> Result<()> {
+        self.bump = bump;
+        self.instruction_index = instruction_index;
+        Ok(())
+    }
+}
+
+#[account]
 pub struct MsAccountMeta {
     pub pubkey: Pubkey,
     pub is_signer: bool,

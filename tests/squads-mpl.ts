@@ -4,7 +4,6 @@ import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
 import { SquadsMpl } from '../target/types/squads_mpl';
 import { PublicKey } from '@solana/web3.js';
-import BN from "bn.js";
 
 describe('squads-mpl', async () => {
 
@@ -15,6 +14,7 @@ describe('squads-mpl', async () => {
   const programProvider = program.provider as anchor.AnchorProvider;
 
   const creator = programProvider.wallet;
+  // the Multisig PDA to use for the test run
   const [msPDA] = await PublicKey.findProgramAddress([
     anchor.utils.bytes.utf8.encode("squad"),
     creator.publicKey.toBuffer(),
@@ -43,9 +43,10 @@ describe('squads-mpl', async () => {
 
   it(`Create Transaction draft - MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
+    // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
     // increment the transaction index
-    const newTxIndex = new BN(msState.transactionIndex + 1, 10);
+    const newTxIndex = new anchor.BN(msState.transactionIndex + 1, 10);
     // generate the tx pda
     const [txPDA] = await PublicKey.findProgramAddress([
       anchor.utils.bytes.utf8.encode("squad"),
@@ -70,4 +71,50 @@ describe('squads-mpl', async () => {
     msState = await program.account.ms.fetch(msPDA);
     expect(txState.transactionIndex).to.equal(msState.transactionIndex);
   });
+
+  it(`Create transaction draft and add ix - MS: ${msPDA.toBase58()}`, async () => {
+     // create an transaction draft
+     // get the state of the MS
+     let msState = await program.account.ms.fetch(msPDA);
+     // increment the transaction index
+     const newTxIndex = new anchor.BN(msState.transactionIndex + 1, 10);
+     // generate the tx pda
+     const [txPDA] = await PublicKey.findProgramAddress([
+       anchor.utils.bytes.utf8.encode("squad"),
+       msPDA.toBuffer(),
+       newTxIndex.toBuffer("le",4),
+       anchor.utils.bytes.utf8.encode("transaction")
+     ], program.programId);
+ 
+     await program.methods.createTransaction()
+       .accounts({
+         multisig: msPDA,
+         transaction: txPDA,
+         creator: creator.publicKey
+       })
+       .rpc();
+ 
+     let txState = await program.account.msTransaction.fetch(txPDA);
+     // check the transaction indexes match
+     msState = await program.account.ms.fetch(msPDA);
+     const newIxIndex = new anchor.BN(txState.instructionIndex + 1, 10);
+     // create the instruction pda
+     const [ixPDA] = await PublicKey.findProgramAddress([
+      anchor.utils.bytes.utf8.encode("squad"),
+      txPDA.toBuffer(),
+      newIxIndex.toBuffer("le",4),
+      anchor.utils.bytes.utf8.encode("instruction")
+    ], program.programId);
+
+    // add the instruction to the transaction
+    await program.methods.addInstruction(anchor.utils.bytes.utf8.encode("instruction"))
+      .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        instruction: ixPDA,
+        creator: creator.publicKey
+      })
+      .rpc();
+  });
+
 });
