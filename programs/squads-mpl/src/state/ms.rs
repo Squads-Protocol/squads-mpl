@@ -37,11 +37,11 @@ impl Ms {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum MsTransactionStatus {
-    Draft,
-    Active,
-    ExecuteReady,
-    Executed,
-    Rejected
+    Draft,          // Transaction default state
+    Active,         // Transaction is live and ready
+    ExecuteReady,   // Transaction has been approved and is pending execution
+    Executed,       // Transaction has been executed
+    Rejected        // Transaction has been rejected
 }
 
 
