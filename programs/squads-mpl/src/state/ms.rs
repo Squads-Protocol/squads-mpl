@@ -9,18 +9,28 @@ pub struct Ms {
     pub authority_index: u16,
     pub transaction_index: u32,
     pub processed_index: u32,
+    pub bump: u8,
+    pub creator: Pubkey
 }
 
 impl Ms {
-    pub const MAXIMUM_SIZE: usize = 4 + (32 * 10) + 2 + 2 + 4 + 4;
+    pub const MAXIMUM_SIZE: usize = 4 + (32 * 10) + // initial space for 10 keys 
+    2 +  // threshold value
+    2 +  // authority index
+    4 +  // transaction index
+    4 +  // processed transaction index
+    1 +  // PDA bump
+    32;  // creator
 
-    pub fn init (&mut self, threshold: u16, creator: Pubkey, members: Vec<Pubkey>) -> Result<()> {
+    pub fn init (&mut self, threshold: u16, creator: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
         self.threshold = threshold;
         self.keys = members;
         self.keys.push(creator);
         self.authority_index = 0;
         self.transaction_index = 0;
         self.processed_index = 0;
+        self.bump = bump;
+        self.creator = creator;
         Ok(())
     }
 }
