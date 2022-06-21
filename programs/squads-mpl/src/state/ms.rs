@@ -2,13 +2,13 @@ use anchor_lang::prelude::*;
 
 #[account]
 pub struct Ms {
-    pub threshold: u16,
-    pub authority_index: u16,
-    pub transaction_index: u32,
-    pub processed_index: u32,
-    pub bump: u8,
-    pub creator: Pubkey,
-    pub keys: Vec<Pubkey>
+    pub threshold: u16,         // threshold for signatures
+    pub authority_index: u16,   // index to seed other authorities under this multisig
+    pub transaction_index: u32, // look up and seed reference for transactions
+    pub processed_index: u32,   // the last executed/closed transaction
+    pub bump: u8,               // bump for the multisig seed
+    pub creator: Pubkey,        // creator of multisig, used for seed
+    pub keys: Vec<Pubkey>       // keys of the members
 }
 
 impl Ms {
@@ -54,15 +54,15 @@ pub enum MsTransactionStatus {
 
 #[account]
 pub struct MsTransaction {
-    pub creator: Pubkey,
-    pub transaction_index: u32,
-    pub authority_index: u32,
-    pub authority_bump: u8,
-    pub status: MsTransactionStatus,
-    pub instruction_index: u8,
-    pub bump: u8,
-    pub approved: Vec<Pubkey>,
-    pub rejected: Vec<Pubkey>,
+    pub creator: Pubkey,                // creator, used to seed pda
+    pub transaction_index: u32,         // used for seed
+    pub authority_index: u32,           // index to use for other pdas (?)
+    pub authority_bump: u8,             // the bump corresponding to the bespoke authority
+    pub status: MsTransactionStatus,    // the status of the transaction
+    pub instruction_index: u8,          // index of this instruction
+    pub bump: u8,                       // bump for the seed
+    pub approved: Vec<Pubkey>,          // keys that have approved/signed
+    pub rejected: Vec<Pubkey>,          // keys that have rejected
 }
 
 impl MsTransaction {
@@ -91,28 +91,38 @@ impl MsTransaction {
         Ok(())
     }
 
+    // change status to Active
     pub fn activate(&mut self)-> Result<()>{
         self.status = MsTransactionStatus::Active;
         Ok(())
     }
 
+    // change status to ExecuteReady
     pub fn ready_to_execute(&mut self)-> Result<()>{
         self.status = MsTransactionStatus::ExecuteReady;
         Ok(())
     }
 
+    pub fn set_rejected(&mut self) -> Result<()>{
+        self.status = MsTransactionStatus::Rejected;
+        Ok(())
+    }
+
+    // sign off on a transaction
     pub fn sign(&mut self, member: Pubkey) -> Result<()>{
         self.approved.push(member);
         self.approved.sort();
         Ok(())
     }
 
+    // reject the transaction
     pub fn reject(&mut self, member: Pubkey) -> Result<()> {
         self.rejected.push(member);
         self.rejected.sort();
         Ok(())
     }
 
+    // check if a user has voted already
     pub fn has_voted(&self, member: Pubkey) -> bool {
         let approved = match self.approved.binary_search(&member) {
             Ok(..)=> true,

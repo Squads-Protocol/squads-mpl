@@ -54,7 +54,15 @@ pub mod squads_mpl {
     }
 
     pub fn reject_transaction(ctx: Context<RejectTransaction>) -> Result<()> {
-        ctx.accounts.transaction.reject(ctx.accounts.member.key())
+        // reject the transaction
+        ctx.accounts.transaction.reject(ctx.accounts.member.key())?;
+        // ie total members 7, threshold 3, cutoff = 4
+        // ie total member 8, threshold 6, cutoff = 2
+        let cutoff = ctx.accounts.multisig.keys.len() - usize::from(ctx.accounts.multisig.threshold);
+        if ctx.accounts.transaction.rejected.len() > cutoff {
+            ctx.accounts.transaction.set_rejected()?;
+        }
+        Ok(())
     }
 
 }
