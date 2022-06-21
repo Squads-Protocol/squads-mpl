@@ -103,7 +103,7 @@ impl MsInstruction {
     }
 }
 
-#[account]
+#[derive(AnchorSerialize,AnchorDeserialize, Copy, Clone)]
 pub struct MsAccountMeta {
     pub pubkey: Pubkey,
     pub is_signer: bool,

@@ -17,5 +17,3 @@ default = []
 
 [dependencies]
 anchor-lang = "0.24.2"
-num-traits = "0.2"
-num-derive = "0.3"
