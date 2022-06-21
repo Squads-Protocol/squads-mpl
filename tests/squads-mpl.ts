@@ -217,7 +217,7 @@ describe('squads-mpl', () => {
     expect(txState.status).to.have.property("active");
 
     let ixState = await program.account.msInstruction.fetch(ixPDA);
-    console.log(ixState);
+    expect(ixState.programId.toBase58()).to.equal(testIx.programId.toBase58());
  });
 
 });

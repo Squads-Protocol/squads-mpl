@@ -41,6 +41,15 @@ pub mod squads_mpl {
             *ctx.bumps.get("instruction").unwrap()
         )
     }
+
+    pub fn approve_transaction(ctx: Context<ApproveTransaction>) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn reject_transaction(ctx: Context<RejectTransaction>) -> Result<()> {
+        Ok(())
+    }
+
 }
 
 #[derive(Accounts)]
@@ -91,7 +100,6 @@ pub struct CreateTransaction<'info> {
 #[derive(Accounts)]
 pub struct AddInstruction<'info> {
     #[account(
-        mut,
         seeds = [
             b"squad",
             multisig.creator.as_ref(),
@@ -135,7 +143,6 @@ pub struct AddInstruction<'info> {
 #[derive(Accounts)]
 pub struct ActivateTransaction<'info> {
     #[account(
-        mut,
         seeds = [
             b"squad",
             multisig.creator.as_ref(),
@@ -160,5 +167,69 @@ pub struct ActivateTransaction<'info> {
 
     #[account(mut)]
     pub creator: Signer<'info>,
+    pub system_program: Program<'info, System> 
+}
+
+#[derive(Accounts)]
+pub struct ApproveTransaction<'info> {
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.creator.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+    )]
+    pub multisig: Account<'info, Ms>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ], bump = transaction.bump,
+        constraint = transaction.status == MsTransactionStatus::Active,
+        constraint = multisig.keys.binary_search(&member.key()).is_ok(),
+        constraint = transaction.approved.binary_search(&member.key()).is_err(),
+        constraint = transaction.rejected.binary_search(&member.key()).is_err(),
+    )]
+    pub transaction: Account<'info, MsTransaction>,
+
+    #[account(mut)]
+    pub member: Signer<'info>,
+    pub system_program: Program<'info, System> 
+}
+
+#[derive(Accounts)]
+pub struct RejectTransaction<'info> {
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.creator.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+    )]
+    pub multisig: Account<'info, Ms>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ], bump = transaction.bump,
+        constraint = transaction.status == MsTransactionStatus::Active,
+        constraint = multisig.keys.binary_search(&member.key()).is_ok(),
+        constraint = transaction.approved.binary_search(&member.key()).is_err(),
+        constraint = transaction.rejected.binary_search(&member.key()).is_err(),
+    )]
+    pub transaction: Account<'info, MsTransaction>,
+
+    #[account(mut)]
+    pub member: Signer<'info>,
     pub system_program: Program<'info, System> 
 }
