@@ -29,13 +29,14 @@ pub mod squads_mpl {
     }
 
     pub fn add_instruction(ctx: Context<AddInstruction>, serialized_instruction: Vec<u8>) -> Result<()> {
-        let tx = &mut ctx.accounts.transaction;
-        tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
-        ctx.accounts.instruction.init(
-            tx.instruction_index,
-            serialized_instruction,
-            *ctx.bumps.get("instruction").unwrap()
-        )
+        // let tx = &mut ctx.accounts.transaction;
+        // tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
+        // ctx.accounts.instruction.init(
+        //     tx.instruction_index,
+        //     serialized_instruction,
+        //     *ctx.bumps.get("instruction").unwrap()
+        // )
+        Ok(())
     }
 }
 
@@ -87,6 +88,7 @@ pub struct CreateTransaction<'info> {
 #[derive(Accounts)]
 pub struct AddInstruction<'info> {
     #[account(
+        mut,
         seeds = [
             b"squad",
             multisig.creator.as_ref(),
@@ -97,6 +99,7 @@ pub struct AddInstruction<'info> {
     pub multisig: Account<'info, Ms>,
 
     #[account(
+        mut,
         seeds = [
             b"squad",
             multisig.key().as_ref(),
@@ -120,6 +123,7 @@ pub struct AddInstruction<'info> {
         ], bump
     )]
     pub instruction: Account<'info, MsInstruction>,
+
     #[account(mut)]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System> 
