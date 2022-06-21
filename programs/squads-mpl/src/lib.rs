@@ -28,15 +28,18 @@ pub mod squads_mpl {
         )
     }
 
-    pub fn add_instruction(ctx: Context<AddInstruction>, serialized_instruction: Vec<u8>) -> Result<()> {
-        // let tx = &mut ctx.accounts.transaction;
-        // tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
-        // ctx.accounts.instruction.init(
-        //     tx.instruction_index,
-        //     serialized_instruction,
-        //     *ctx.bumps.get("instruction").unwrap()
-        // )
-        Ok(())
+    pub fn activate_transaction(ctx: Context<ActivateTransaction>) -> Result<()> {
+        ctx.accounts.transaction.activate()
+    }
+
+    pub fn add_instruction(ctx: Context<AddInstruction>, incoming_instruction: IncomingInstruction) -> Result<()> {
+        let tx = &mut ctx.accounts.transaction;
+        tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
+        ctx.accounts.instruction.init(
+            tx.instruction_index,
+            incoming_instruction,
+            *ctx.bumps.get("instruction").unwrap()
+        )
     }
 }
 
@@ -123,6 +126,37 @@ pub struct AddInstruction<'info> {
         ], bump
     )]
     pub instruction: Account<'info, MsInstruction>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+    pub system_program: Program<'info, System> 
+}
+
+#[derive(Accounts)]
+pub struct ActivateTransaction<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.creator.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+    )]
+    pub multisig: Account<'info, Ms>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ], bump = transaction.bump,
+        constraint = creator.key() == transaction.creator,
+        constraint = transaction.status == MsTransactionStatus::Draft
+    )]
+    pub transaction: Account<'info, MsTransaction>,
 
     #[account(mut)]
     pub creator: Signer<'info>,

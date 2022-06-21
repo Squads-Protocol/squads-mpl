@@ -82,6 +82,12 @@ impl MsTransaction {
         self.bump = bump;
         Ok(())
     }
+
+    pub fn activate(&mut self) -> Result <()>{
+        self.status = MsTransactionStatus::Active;
+        Ok(())
+    }
+
 }
 
 #[account]
@@ -96,9 +102,12 @@ pub struct MsInstruction {
 impl MsInstruction {
     pub const MAXIMUM_SIZE: usize = 1280;
 
-    pub fn init(&mut self, instruction_index: u8, _instruction_data: Vec<u8>, bump: u8) -> Result<()> {
+    pub fn init(&mut self, instruction_index: u8, incoming_instruction: IncomingInstruction, bump: u8) -> Result<()> {
         self.bump = bump;
         self.instruction_index = instruction_index;
+        self.program_id = incoming_instruction.program_id;
+        self.keys = incoming_instruction.keys;
+        self.data = incoming_instruction.data;
         Ok(())
     }
 }
@@ -108,4 +117,11 @@ pub struct MsAccountMeta {
     pub pubkey: Pubkey,
     pub is_signer: bool,
     pub is_writable: bool
+}
+
+#[derive(AnchorSerialize,AnchorDeserialize, Clone)]
+pub struct IncomingInstruction {
+    pub program_id: Pubkey,
+    pub keys: Vec<MsAccountMeta>,
+    pub data: Vec<u8>
 }
