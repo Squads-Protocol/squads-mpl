@@ -34,9 +34,6 @@ impl Ms {
     }
 
     pub fn is_member(&self, member: Pubkey) -> bool {
-        msg!("members in keys {:?}", self.keys);
-        msg!("Member key to check {:?}", member);
-        msg!("found member {:?}", self.keys.binary_search(&member));
         match self.keys.binary_search(&member) {
             Ok(..)=> true,
             _ => false
