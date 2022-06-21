@@ -24,12 +24,23 @@ impl Ms {
         self.threshold = threshold;
         self.keys = members;
         self.keys.push(creator);
+        self.keys.sort();
         self.authority_index = 0;
         self.transaction_index = 0;
         self.processed_index = 0;
         self.bump = bump;
         self.creator = creator;
         Ok(())
+    }
+
+    pub fn is_member(&self, member: Pubkey) -> bool {
+        msg!("members in keys {:?}", self.keys);
+        msg!("Member key to check {:?}", member);
+        msg!("found member {:?}", self.keys.binary_search(&member));
+        match self.keys.binary_search(&member) {
+            Ok(..)=> true,
+            _ => false
+        }
     }
 }
 
@@ -67,7 +78,7 @@ impl MsTransaction {
         1;                                  // the number of instructions (attached)
 
     pub fn initial_size_with_members(members_len: usize) -> usize {
-        MsTransaction::MINIMUM_SIZE + (2 * members_len)
+        MsTransaction::MINIMUM_SIZE + (2 * (4 + (members_len * 32) ) )
     }
 
     pub fn init(&mut self, creator: Pubkey, transaction_index: u32, bump: u8) -> Result<()>{
@@ -83,9 +94,38 @@ impl MsTransaction {
         Ok(())
     }
 
-    pub fn activate(&mut self) -> Result <()>{
+    pub fn activate(&mut self)-> Result<()>{
         self.status = MsTransactionStatus::Active;
         Ok(())
+    }
+
+    pub fn ready_to_execute(&mut self)-> Result<()>{
+        self.status = MsTransactionStatus::ExecuteReady;
+        Ok(())
+    }
+
+    pub fn sign(&mut self, member: Pubkey) -> Result<()>{
+        self.approved.push(member);
+        self.approved.sort();
+        Ok(())
+    }
+
+    pub fn reject(&mut self, member: Pubkey) -> Result<()> {
+        self.rejected.push(member);
+        self.rejected.sort();
+        Ok(())
+    }
+
+    pub fn has_voted(&self, member: Pubkey) -> bool {
+        let approved = match self.approved.binary_search(&member) {
+            Ok(..)=> true,
+            _ => false
+        };
+        let rejected = match self.approved.binary_search(&member) {
+            Ok(..)=> true,
+            _ => false
+        };
+        approved || rejected 
     }
 
 }

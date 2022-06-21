@@ -31,8 +31,6 @@ describe('squads-mpl', () => {
     anchor.utils.bytes.utf8.encode("multisig")
   ], program.programId);
 
-  console.log("msPDA", msPDA.toBase58());
-
   it(`Create multisig - MS: ${msPDA.toBase58()}`, async () => {
     const member1 = anchor.web3.Keypair.generate();
     const member2 = anchor.web3.Keypair.generate();
@@ -148,7 +146,7 @@ describe('squads-mpl', () => {
 
   });
 
-  it(`Create transaction draft, add ix, then activate - MS: ${msPDA.toBase58()}`, async () => {
+  it(`Create transaction draft, add ix, activate MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
@@ -218,6 +216,21 @@ describe('squads-mpl', () => {
 
     let ixState = await program.account.msInstruction.fetch(ixPDA);
     expect(ixState.programId.toBase58()).to.equal(testIx.programId.toBase58());
+
+    try {
+    await program.methods.approveTransaction()
+       .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        member: creator.publicKey
+       })
+       .rpc();
+    } catch (e) {
+      console.log(e);
+    }
+    
+    txState = await program.account.msTransaction.fetch(txPDA);
+    expect(txState.approved.length).to.equal(1);
  });
 
 });

@@ -43,11 +43,18 @@ pub mod squads_mpl {
     }
 
     pub fn approve_transaction(ctx: Context<ApproveTransaction>) -> Result<()> {
+        // sign/approve the transaction
+        ctx.accounts.transaction.sign(ctx.accounts.member.key())?;
+
+        // if current number of signers reaches threshold, mark the transaction as execute ready
+        if ctx.accounts.transaction.approved.len() >= usize::from(ctx.accounts.multisig.threshold) {
+            ctx.accounts.transaction.ready_to_execute()?;
+        }
         Ok(())
     }
 
     pub fn reject_transaction(ctx: Context<RejectTransaction>) -> Result<()> {
-        Ok(())
+        ctx.accounts.transaction.reject(ctx.accounts.member.key())
     }
 
 }
@@ -191,9 +198,8 @@ pub struct ApproveTransaction<'info> {
             b"transaction"
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::Active,
-        constraint = multisig.keys.binary_search(&member.key()).is_ok(),
-        constraint = transaction.approved.binary_search(&member.key()).is_err(),
-        constraint = transaction.rejected.binary_search(&member.key()).is_err(),
+        constraint = multisig.is_member(member.key()) @MsError::KeyNotInMultisig,
+        constraint = transaction.has_voted(member.key()) ==  false
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -223,13 +229,18 @@ pub struct RejectTransaction<'info> {
             b"transaction"
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::Active,
-        constraint = multisig.keys.binary_search(&member.key()).is_ok(),
-        constraint = transaction.approved.binary_search(&member.key()).is_err(),
-        constraint = transaction.rejected.binary_search(&member.key()).is_err(),
+        constraint = multisig.is_member(member.key()) @MsError::KeyNotInMultisig,
+        constraint = transaction.has_voted(member.key()) == false
     )]
     pub transaction: Account<'info, MsTransaction>,
 
     #[account(mut)]
     pub member: Signer<'info>,
     pub system_program: Program<'info, System> 
+}
+
+#[error_code]
+pub enum MsError {
+    KeyNotInMultisig,
+    InvalidTransactionState
 }
