@@ -24,7 +24,7 @@ pub mod squads_mpl {
 
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
         let ms = &mut ctx.accounts.multisig;
-        let (authority_pda, authority_bump) = Pubkey::find_program_address(&[
+        let (_, authority_bump) = Pubkey::find_program_address(&[
             b"squad",
             ms.key().as_ref(),
             &authority_index.to_le_bytes(),
@@ -58,16 +58,10 @@ pub mod squads_mpl {
     // sign/approve the transaction
     pub fn approve_transaction(ctx: Context<ApproveTransaction>) -> Result<()> {
         // if they have previously voted to reject, remove that item (change vote check)
-        match ctx.accounts.transaction.has_voted_reject(ctx.accounts.member.key()) {
-            Some(ind) => ctx.accounts.transaction.remove_reject(ind)?,
-            _ => {}
-         };
+        if let Some(ind) = ctx.accounts.transaction.has_voted_reject(ctx.accounts.member.key()) { ctx.accounts.transaction.remove_reject(ind)?; }
 
         // if they haven't already approved
-        match ctx.accounts.transaction.has_voted_approve(ctx.accounts.member.key()) {
-           None => ctx.accounts.transaction.sign(ctx.accounts.member.key())?,
-          _ => {}
-        };
+        if ctx.accounts.transaction.has_voted_approve(ctx.accounts.member.key()) == None { ctx.accounts.transaction.sign(ctx.accounts.member.key())?; }
 
         // if current number of signers reaches threshold, mark the transaction as execute ready
         if ctx.accounts.transaction.approved.len() >= usize::from(ctx.accounts.multisig.threshold) {
@@ -79,15 +73,9 @@ pub mod squads_mpl {
     // reject the transaction
     pub fn reject_transaction(ctx: Context<RejectTransaction>) -> Result<()> {
         // if they have previously voted to approve, remove that item (change vote check)
-        match ctx.accounts.transaction.has_voted_approve(ctx.accounts.member.key()) {
-            Some(ind) => ctx.accounts.transaction.remove_approve(ind)?,
-            None => {}
-         };
+        if let Some(ind) = ctx.accounts.transaction.has_voted_approve(ctx.accounts.member.key()) { ctx.accounts.transaction.remove_approve(ind)?; }
 
-        match ctx.accounts.transaction.has_voted_reject(ctx.accounts.member.key()) {
-            None => ctx.accounts.transaction.reject(ctx.accounts.member.key())?,
-            _=> {}
-        };
+        if ctx.accounts.transaction.has_voted_reject(ctx.accounts.member.key()) == None { ctx.accounts.transaction.reject(ctx.accounts.member.key())?; }
 
         // ie total members 7, threshold 3, cutoff = 4
         // ie total member 8, threshold 6, cutoff = 2
@@ -100,10 +88,8 @@ pub mod squads_mpl {
 
     // cancel the transaction
     pub fn cancel_transaction(ctx: Context<CancelTransaction>) -> Result<()> {
-        match ctx.accounts.transaction.has_cancelled(ctx.accounts.member.key()) {
-            None => ctx.accounts.transaction.cancel(ctx.accounts.member.key())?,
-           _ => {}
-        };
+        // if they haven't cancelled yet
+        if ctx.accounts.transaction.has_cancelled(ctx.accounts.member.key()) == None { ctx.accounts.transaction.cancel(ctx.accounts.member.key())? }
 
         // if current number of signers reaches threshold, mark the transaction as execute ready
         if ctx.accounts.transaction.cancelled.len() >= usize::from(ctx.accounts.multisig.threshold) {
@@ -122,13 +108,16 @@ pub mod squads_mpl {
             return Ok(());            
         }
 
+        // use for derivations
+        let ms_key = ctx.accounts.multisig.key();
+
         if ctx.remaining_accounts[0].owner != ctx.program_id {
             return err!(MsError::InvalidInstructionAccount);
         }
 
-        let ms_key = ctx.accounts.multisig.key().clone();
+
         // get the authority pda
-        let (authority_pda, authority_pda_bump) = Pubkey::find_program_address(&[
+        let (_, authority_pda_bump) = Pubkey::find_program_address(&[
             b"squad",
             ms_key.as_ref(),
             &ctx.accounts.transaction.authority_index.to_le_bytes(),
@@ -139,14 +128,19 @@ pub mod squads_mpl {
 
         let first_ix = MsInstruction::try_deserialize(&mut ix_account_data)?;
 
-        let (ix_pda, ix_pda_bump) = Pubkey::find_program_address(&[
+        // get the instruction account pda
+        let (ix_pda, _) = Pubkey::find_program_address(&[
             b"squad",
             ctx.accounts.transaction.key().as_ref(),
             &first_ix.instruction_index.to_le_bytes(),
             b"instruction"],
             ctx.program_id
         );
+        // check the instruction
         if ix_pda != ctx.remaining_accounts[0].key() {
+            return err!(MsError::InvalidInstructionAccount);
+        }
+        if ctx.accounts.transaction.authority_bump != authority_pda_bump {
             return err!(MsError::InvalidInstructionAccount);
         }
 

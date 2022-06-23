@@ -34,10 +34,7 @@ impl Ms {
     }
 
     pub fn is_member(&self, member: Pubkey) -> bool {
-        match self.keys.binary_search(&member) {
-            Ok(..)=> true,
-            _ => false
-        }
+        matches!(self.keys.binary_search(&member), Ok(..))
     }
 
     pub fn set_processed_index(&mut self, index: u32) -> Result<()>{
@@ -155,14 +152,8 @@ impl MsTransaction {
 
     // check if a user has voted already
     pub fn has_voted(&self, member: Pubkey) -> bool {
-        let approved = match self.approved.binary_search(&member) {
-            Ok(..)=> true,
-            _ => false
-        };
-        let rejected = match self.rejected.binary_search(&member) {
-            Ok(..)=> true,
-            _ => false
-        };
+        let approved = matches!(self.approved.binary_search(&member), Ok(..));
+        let rejected = matches!(self.rejected.binary_search(&member), Ok(..));
         approved || rejected 
     }
 
