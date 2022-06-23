@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 
 #[account]
 pub struct Ms {
@@ -39,6 +39,12 @@ impl Ms {
             _ => false
         }
     }
+
+    pub fn set_processed_index(&mut self, index: u32) -> Result<()>{
+        self.processed_index = index;
+        Ok(())
+    }
+
 }
 
 
@@ -48,7 +54,9 @@ pub enum MsTransactionStatus {
     Active,         // Transaction is live and ready
     ExecuteReady,   // Transaction has been approved and is pending execution
     Executed,       // Transaction has been executed
-    Rejected        // Transaction has been rejected
+    Rejected,       // Transaction has been rejected
+    Failed,         // Transaction failed
+    Cancelled,      // Transaction has been cancelled
 }
 
 
@@ -63,6 +71,7 @@ pub struct MsTransaction {
     pub bump: u8,                       // bump for the seed
     pub approved: Vec<Pubkey>,          // keys that have approved/signed
     pub rejected: Vec<Pubkey>,          // keys that have rejected
+    pub cancelled: Vec<Pubkey>          // keys that have cancelled (ExecuteReady only)
 }
 
 impl MsTransaction {
@@ -78,11 +87,11 @@ impl MsTransaction {
         MsTransaction::MINIMUM_SIZE + (2 * (4 + (members_len * 32) ) )
     }
 
-    pub fn init(&mut self, creator: Pubkey, transaction_index: u32, bump: u8) -> Result<()>{
+    pub fn init(&mut self, creator: Pubkey, transaction_index: u32, bump: u8, authority_index: u32, authority_bump: u8) -> Result<()>{
         self.creator = creator;
         self.transaction_index = transaction_index;
-        self.authority_index = 0;
-        self.authority_bump = bump;
+        self.authority_index = authority_index;
+        self.authority_bump = authority_bump;
         self.status = MsTransactionStatus::Draft;
         self.instruction_index = 0;
         self.approved = Vec::new();
@@ -94,6 +103,7 @@ impl MsTransaction {
     // change status to Active
     pub fn activate(&mut self)-> Result<()>{
         self.status = MsTransactionStatus::Active;
+        self.approved.push(self.creator);
         Ok(())
     }
 
@@ -103,24 +113,45 @@ impl MsTransaction {
         Ok(())
     }
 
+    // set status to Rejected
     pub fn set_rejected(&mut self) -> Result<()>{
         self.status = MsTransactionStatus::Rejected;
         Ok(())
     }
 
-    // sign off on a transaction
+    pub fn set_cancelled(&mut self) -> Result<()>{
+        self.status = MsTransactionStatus::Cancelled;
+        Ok(())
+    }
+
+    // set status to executed
+    pub fn set_executed(&mut self) -> Result<()>{
+        self.status = MsTransactionStatus::Executed;
+        Ok(())
+    }
+
+
+    // sign to approve a transaction
     pub fn sign(&mut self, member: Pubkey) -> Result<()>{
         self.approved.push(member);
         self.approved.sort();
         Ok(())
     }
 
-    // reject the transaction
+    // sign to reject the transaction
     pub fn reject(&mut self, member: Pubkey) -> Result<()> {
         self.rejected.push(member);
         self.rejected.sort();
         Ok(())
     }
+
+    // sign to cancel the transaction if execute_ready
+    pub fn cancel(&mut self, member: Pubkey) -> Result<()> {
+        self.cancelled.push(member);
+        self.cancelled.sort();
+        Ok(())
+    }
+
 
     // check if a user has voted already
     pub fn has_voted(&self, member: Pubkey) -> bool {
@@ -128,15 +159,50 @@ impl MsTransaction {
             Ok(..)=> true,
             _ => false
         };
-        let rejected = match self.approved.binary_search(&member) {
+        let rejected = match self.rejected.binary_search(&member) {
             Ok(..)=> true,
             _ => false
         };
         approved || rejected 
     }
 
+    // check if a user has signed to approve
+    pub fn has_voted_approve(&self, member: Pubkey) -> Option<usize> {
+        match self.approved.binary_search(&member) {
+            Ok(ind)=> Some(ind),
+            _ => None
+        }
+    }
+
+    // check if a use has signed to reject
+    pub fn has_voted_reject(&self, member: Pubkey) -> Option<usize> {
+        match self.rejected.binary_search(&member) {
+            Ok(ind)=> Some(ind),
+            _ => None
+        }
+    }
+
+    // check if a user has signed to cancel
+    pub fn has_cancelled(&self, member: Pubkey) -> Option<usize> {
+        match self.cancelled.binary_search(&member) {
+            Ok(ind)=> Some(ind),
+            _ => None
+        }
+    }
+
+    pub fn remove_reject(&mut self, index: usize) -> Result<()>{
+        self.rejected.remove(index);
+        Ok(())
+    }
+
+    pub fn remove_approve(&mut self, index: usize) -> Result<()>{
+        self.approved.remove(index);
+        Ok(())
+    }
+
 }
 
+// the internal instruction schema, similar to Instruction but with extra metadata
 #[account]
 pub struct MsInstruction {
     pub program_id: Pubkey,
@@ -146,6 +212,7 @@ pub struct MsInstruction {
     pub bump: u8,
 }
 
+// map the incoming instruction to internal instruction schema
 impl MsInstruction {
     pub const MAXIMUM_SIZE: usize = 1280;
 
@@ -159,6 +226,25 @@ impl MsInstruction {
     }
 }
 
+impl From<MsInstruction> for Instruction {
+    fn from(instruction: MsInstruction) -> Self {
+        Instruction {
+            program_id: instruction.program_id,
+            accounts: instruction
+                .keys
+                .iter()
+                .map(|account| AccountMeta {
+                    pubkey: account.pubkey,
+                    is_signer: account.is_signer,
+                    is_writable: account.is_writable,
+                })
+                .collect(),
+            data: instruction.data.clone(),
+        }
+    }  
+}
+
+// internal AccountMeta serialization schema
 #[derive(AnchorSerialize,AnchorDeserialize, Copy, Clone)]
 pub struct MsAccountMeta {
     pub pubkey: Pubkey,
@@ -166,6 +252,7 @@ pub struct MsAccountMeta {
     pub is_writable: bool
 }
 
+// serialization schema for incoming instructions to be attached to transaction
 #[derive(AnchorSerialize,AnchorDeserialize, Clone)]
 pub struct IncomingInstruction {
     pub program_id: Pubkey,
