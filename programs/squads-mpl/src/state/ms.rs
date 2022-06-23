@@ -127,6 +127,11 @@ impl MsTransaction {
         Ok(())
     }
 
+    // set status to executed
+    pub fn set_failed(&mut self) -> Result<()>{
+        self.status = MsTransactionStatus::Failed;
+        Ok(())
+    }
 
     // sign to approve a transaction
     pub fn sign(&mut self, member: Pubkey) -> Result<()>{

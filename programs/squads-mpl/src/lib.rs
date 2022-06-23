@@ -10,6 +10,7 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 #[program]
 pub mod squads_mpl {
+
     use anchor_lang::solana_program::program::invoke_signed;
 
     use super::*;
@@ -75,6 +76,7 @@ pub mod squads_mpl {
         // if they have previously voted to approve, remove that item (change vote check)
         if let Some(ind) = ctx.accounts.transaction.has_voted_approve(ctx.accounts.member.key()) { ctx.accounts.transaction.remove_approve(ind)?; }
 
+        // if they haven't already voted reject
         if ctx.accounts.transaction.has_voted_reject(ctx.accounts.member.key()) == None { ctx.accounts.transaction.reject(ctx.accounts.member.key())?; }
 
         // ie total members 7, threshold 3, cutoff = 4
@@ -100,7 +102,7 @@ pub mod squads_mpl {
     }
 
     pub fn execute_transaction(ctx: Context<ExecuteTransaction>) -> Result<()> {
-        // check that we are provided the correct number of accounts
+        // check that we are provided at least one instruction
         if ctx.accounts.transaction.instruction_index < 1 {
             // if no instructions were found, for whatever reason, mark it as executed and move on
             ctx.accounts.transaction.set_executed()?;
@@ -108,50 +110,20 @@ pub mod squads_mpl {
             return Ok(());            
         }
 
-        // use for derivations
+        // use for derivation for the authority
         let ms_key = ctx.accounts.multisig.key();
-
-        if ctx.remaining_accounts[0].owner != ctx.program_id {
-            return err!(MsError::InvalidInstructionAccount);
-        }
-
-
-        // get the authority pda
+        // get the authority pda - its implied it was already set earlier for the tx
         let (_, authority_pda_bump) = Pubkey::find_program_address(&[
             b"squad",
             ms_key.as_ref(),
             &ctx.accounts.transaction.authority_index.to_le_bytes(),
             b"authority"
         ],ctx.program_id);
-
-        let mut ix_account_data: &[u8] = &ctx.remaining_accounts[0].try_borrow_mut_data()?;
-
-        let first_ix = MsInstruction::try_deserialize(&mut ix_account_data)?;
-
-        // get the instruction account pda
-        let (ix_pda, _) = Pubkey::find_program_address(&[
-            b"squad",
-            ctx.accounts.transaction.key().as_ref(),
-            &first_ix.instruction_index.to_le_bytes(),
-            b"instruction"],
-            ctx.program_id
-        );
-        // check the instruction
-        if ix_pda != ctx.remaining_accounts[0].key() {
-            return err!(MsError::InvalidInstructionAccount);
-        }
+        // it should match the one saved earlier
         if ctx.accounts.transaction.authority_bump != authority_pda_bump {
             return err!(MsError::InvalidInstructionAccount);
         }
-
-        let ix: Instruction = Instruction::from(first_ix);
-        msg!("This should be system program {:?}", ctx.remaining_accounts[1].key);
-        msg!("This should be sender/auth {:?}", ctx.remaining_accounts[2].key);
-        msg!("This should be payee {:?}", ctx.remaining_accounts[3].key);
-        msg!("Instruction keys {:?}", ix.accounts);
-        msg!("Instruction program_id {:?}", ix.program_id);
-        msg!("Instruction {:?}", ix);
-
+        // used for the ix cpis
         let authority_seeds = [
             b"squad",
             ms_key.as_ref(),
@@ -159,18 +131,71 @@ pub mod squads_mpl {
             b"authority",
             &[authority_pda_bump]
         ];
-        // execute the singular test ix
-        invoke_signed(&ix, &[
-            ctx.remaining_accounts[1].clone(),  // program account
-            ctx.remaining_accounts[2].clone(),  // sender / auth PDA
-            ctx.remaining_accounts[3].clone(),  // payee
-            ], &[
-                &authority_seeds
-            ])?;
 
-        ctx.accounts.transaction.set_executed()?;
+        // iterator for remaining accounts
+        let ix_iter = &mut ctx.remaining_accounts.iter();
+        let max_ix_index = ctx.accounts.transaction.instruction_index + 1;
+        let res = (1..max_ix_index).try_for_each(|i| {
+            // each ix block starts with the ms_ix account
+            let ms_ix_account: &AccountInfo = next_account_info(ix_iter)?;
+
+            if ms_ix_account.owner != ctx.program_id {
+                return err!(MsError::InvalidInstructionAccount);  
+            }
+    
+            // deserialize the msIx
+            let mut ix_account_data: &[u8] = &ms_ix_account.try_borrow_mut_data()?;
+            let ms_ix: MsInstruction = MsInstruction::try_deserialize(&mut ix_account_data)?;
+
+            // get the instruction account pda - seeded from transaction account + the transaction accounts instruction index
+            let (ix_pda, _) = Pubkey::find_program_address(&[
+                b"squad",
+                ctx.accounts.transaction.key().as_ref(),
+                &i.to_le_bytes(),
+                b"instruction"],
+                ctx.program_id
+            );
+            // check the instruction
+            if &ix_pda != ms_ix_account.key {
+                return err!(MsError::InvalidInstructionAccount);
+            }
+            // get the instructions program account
+            let ix_program_info: &AccountInfo = next_account_info(ix_iter)?;
+            if &ms_ix.program_id != ix_program_info.key {
+                return err!(MsError::InvalidInstructionAccount);       
+            }
+
+            let mut ix_account_infos: Vec<AccountInfo> = Vec::<AccountInfo>::new();
+
+            // add the program account needed for the ix
+            ix_account_infos.push(ix_program_info.clone());
+            for _ in 0..ms_ix.keys.len() {
+                let ix_account_info = next_account_info(ix_iter)?;
+                ix_account_infos.push(ix_account_info.clone());
+            }
+            // create the instruction to invoke from the saved ms ix account
+            let ix: Instruction = Instruction::from(ms_ix);            
+    
+            // execute the singular test ix
+            invoke_signed(
+                &ix, 
+                &ix_account_infos, 
+                &[&authority_seeds]
+            )?;
+
+            Ok(())
+        });
+
+        match res {
+            Ok(_) => {
+                ctx.accounts.transaction.set_executed()?;
+            },
+            Err(_) => {
+                ctx.accounts.transaction.set_failed()?;
+            }
+        }
+
         ctx.accounts.multisig.set_processed_index(ctx.accounts.transaction.transaction_index)?;
-        msg!("Tx had {:?} accounts", ctx.remaining_accounts.len());
         Ok(())
     }
 

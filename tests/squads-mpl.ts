@@ -5,11 +5,11 @@ import { BorshCoder, Program } from '@project-serum/anchor';
 import { SquadsMpl } from '../target/types/squads_mpl';
 import { AccountMeta, Connection, PublicKey, Transaction } from '@solana/web3.js';
 
-const createTestTransferTransaction = async (authority: PublicKey, recipient: PublicKey) => {
+const createTestTransferTransaction = async (authority: PublicKey, recipient: PublicKey, amount = 1000000) => {
   return anchor.web3.SystemProgram.transfer(
     {
       fromPubkey: authority,
-      lamports: 1000000,
+      lamports: amount,
       toPubkey: recipient
     }
   );
@@ -27,7 +27,6 @@ const createExecuteTransactionTx = async (program, keys, feePayer) => {
   
   const sig = anchor.utils.sha256.hash("global:execute_transaction");
   const ixDiscriminator = Buffer.from(sig, "hex");
-  console.log(program.programId.toBase58());
   const executeIx = new anchor.web3.TransactionInstruction({
     programId: program.programId,
     keys,
@@ -86,7 +85,7 @@ describe('Basic functionality', () => {
   });
 
 
-  it.skip(`Create Tx draft - MS: ${msPDA.toBase58()}`, async () => {
+  it(`Create Tx draft - MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
@@ -115,7 +114,7 @@ describe('Basic functionality', () => {
     expect(txState.transactionIndex).to.equal(msState.transactionIndex);
   });
 
-  it.skip(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
+  it(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
      // create an transaction draft
      // get the state of the MS
      let msState = await program.account.ms.fetch(msPDA);
@@ -173,7 +172,7 @@ describe('Basic functionality', () => {
 
   });
 
-  it.skip(`Tx Activate MS: ${msPDA.toBase58()}`, async () => {
+  it(`Tx Activate MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
@@ -236,7 +235,7 @@ describe('Basic functionality', () => {
 
  });
 
-  it.skip(`Tx Sign MS: ${msPDA.toBase58()}`, async () => {
+  it(`Tx Sign MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
@@ -314,7 +313,7 @@ describe('Basic functionality', () => {
     expect(txState.status).to.have.property("executeReady");
   });
 
-  it(`Tx Execute MS: ${msPDA.toBase58()}`, async () => {
+  it(`Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
     // create authority to use (Vault, index 1)
     const authorityIndexBN = new anchor.BN(1,10);
     const [authorityPDA] = await PublicKey.findProgramAddress([
@@ -354,7 +353,6 @@ describe('Basic functionality', () => {
     // create the instruction pda
     const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
 
-    console.log("FIRST IX PDA", ixPDA.toBase58());
     // the test transfer instruction
     const testPayee = anchor.web3.Keypair.generate();
     const testIx = await createTestTransferTransaction( authorityPDA, testPayee.publicKey);
@@ -391,8 +389,6 @@ describe('Basic functionality', () => {
 
     // transfer lamports to the authorityPDA
     let testPayeeAccount= await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
-    console.log("testPayee address", testPayee.publicKey.toBase58());
-    console.log("testPayee initial account", testPayeeAccount.value);
     // move funds to auth/vault
     const moveFundsToMsPDAIx =  await createTestTransferTransaction(creator.publicKey, authorityPDA);
     const {blockhash} = await program.provider.connection.getLatestBlockhash();
@@ -404,8 +400,6 @@ describe('Basic functionality', () => {
       await programProvider.sendAndConfirm(moveFundsToMsPDATx);
       const msPDAFunded = await program.provider.connection.getAccountInfo(authorityPDA);
       expect(msPDAFunded.lamports).to.equal(1000000);
-      console.log("authority pda", authorityPDA.toBase58());
-      console.log("authorityAccount funded with: ", msPDAFunded.lamports);
     }
     catch (e) {
       console.log(e);
@@ -468,7 +462,6 @@ describe('Basic functionality', () => {
     creator.signTransaction(executeTx);
     try {
      const res = await programProvider.sendAndConfirm(executeTx);
-     console.log(res);
     } catch (e) {
       console.log(e);
     }
@@ -480,6 +473,190 @@ describe('Basic functionality', () => {
     expect(txState.status).to.have.property("executed");
     testPayeeAccount = await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
     expect(testPayeeAccount.value.lamports).to.equal(1000000);
+  });
+
+  it(`2X Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
+    // create authority to use (Vault, index 1)
+    const authorityIndexBN = new anchor.BN(1,10);
+    const [authorityPDA] = await PublicKey.findProgramAddress([
+      anchor.utils.bytes.utf8.encode("squad"),
+      msPDA.toBuffer(),
+      authorityIndexBN.toBuffer("le",4),  // note instruction index is a u8 (1 byte)
+      anchor.utils.bytes.utf8.encode("authority")
+    ], program.programId);
+  
+    // get the state of the MS
+    let msState = await program.account.ms.fetch(msPDA);
+    
+    // increment the transaction index
+    const newTxIndex = msState.transactionIndex + 1;
+    const newTxIndexBN = new anchor.BN(newTxIndex, 10);
+
+    // generate the tx pda
+    const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+
+    await program.methods.createTransaction(1)
+      .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        creator: creator.publicKey
+      })
+      .rpc();
+
+    let txState = await program.account.msTransaction.fetch(txPDA);
+    
+    // check the transaction indexes match
+    msState = await program.account.ms.fetch(msPDA);
+
+    // person/entity who gets paid
+    const testPayee = anchor.web3.Keypair.generate();
+
+    ////////////////////////////////////////////////////////
+    // add the first transfer
+    // increment the instruction index for this transaction (for new PDA)
+    const newIxIndex = txState.instructionIndex + 1;
+    const newIxIndexBN = new anchor.BN(newIxIndex, 10);
+
+    // create the instruction pda
+    const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+
+    // the test transfer instruction
+    const testIx = await createTestTransferTransaction( authorityPDA, testPayee.publicKey);
+
+    await program.methods.addInstruction(testIx)
+      .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        instruction: ixPDA,
+        creator: creator.publicKey
+      })
+      .rpc();
+
+    //////////////////////////////////////////////////////////
+    // add the second transfer ix
+    txState = await program.account.msTransaction.fetch(txPDA);
+    const newIx2xIndex = txState.instructionIndex + 1;
+    const newIx2xIndexBN = new anchor.BN(newIx2xIndex, 10);
+
+    // create the instruction pda for ix 2x
+    const [ix2xPDA] = await getIxPDA(txPDA, newIx2xIndexBN, program.programId);
+
+    const testIx2x = await createTestTransferTransaction( authorityPDA, testPayee.publicKey);
+    await program.methods.addInstruction(testIx2x)
+      .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        instruction: ix2xPDA,
+        creator: creator.publicKey
+      })
+      .rpc();
+
+    await program.methods.activateTransaction()
+      .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        creator: creator.publicKey
+      })
+      .rpc();
+
+    try {
+      await program.methods.approveTransaction()
+        .accounts({
+          multisig: msPDA,
+          transaction: txPDA,
+          member: creator.publicKey
+        })
+        .rpc();
+    } catch (e) {
+      console.log(e);
+    }
+
+    // transfer lamports to the authorityPDA
+    let testPayeeAccount = await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
+    // move funds to auth/vault
+    const moveFundsToMsPDAIx =  await createTestTransferTransaction(creator.publicKey, authorityPDA, 3000000);
+    const {blockhash} = await program.provider.connection.getLatestBlockhash();
+    const lastValidBlockHeight = await program.provider.connection.getBlockHeight();
+    const moveFundsToMsPDATx = new anchor.web3.Transaction({blockhash, lastValidBlockHeight});
+    moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
+    try {      
+      creator.signTransaction(moveFundsToMsPDATx);
+      await programProvider.sendAndConfirm(moveFundsToMsPDATx);
+      const msPDAFunded = await program.provider.connection.getAccountInfo(authorityPDA);
+      expect(msPDAFunded.lamports).to.equal(3000000);
+    }
+    catch (e) {
+      console.log(e);
+    }
+
+    // get the TX
+    txState = await program.account.msTransaction.fetch(txPDA);
+
+    const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {
+      const ixIndexBN = new anchor.BN(i + 1,10);
+      const [ixKey] =  await getIxPDA(txPDA, ixIndexBN, program.programId);
+      const ixAccount= await program.account.msInstruction.fetch(ixKey);
+      return {pubkey: ixKey, ixItem: ixAccount};
+    }));
+
+    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {      
+      const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
+
+      const formattedKeys = ixKeys.map((ixKey,keyInd) => {
+        return {
+          pubkey: ixKey.pubkey,
+          isSigner: false,
+          isWritable: ixKey.isWritable
+        };
+      });
+
+      return [
+        {pubkey, isSigner: false, isWritable: false},
+        {pubkey: ixItem.programId, isSigner: false, isWritable: false},
+        ...formattedKeys
+      ];
+    }).reduce((p,c) => p.concat(c),[])
+
+    let executeKeys = [
+    {
+      pubkey: msPDA,
+      isSigner: false,
+      isWritable: true
+    },
+    {
+      pubkey: txPDA,
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: creator.publicKey,
+      isSigner: true,
+      isWritable: true,
+    },
+    {
+      pubkey: anchor.web3.SystemProgram.programId,
+      isSigner: false,
+      isWritable: false
+    }
+  ];
+    executeKeys = executeKeys.concat(ixKeysList);
+  
+    const executeTx = await createExecuteTransactionTx(program, executeKeys, creator.publicKey);
+
+    creator.signTransaction(executeTx);
+    try {
+     const res = await programProvider.sendAndConfirm(executeTx);
+    } catch (e) {
+      console.log(e);
+    }
+
+    msState = await program.account.ms.fetch(msPDA);
+    txState = await program.account.msTransaction.fetch(txPDA);
+
+    expect(msState.processedIndex).to.equal(txState.transactionIndex);
+    expect(txState.status).to.have.property("executed");
+    testPayeeAccount = await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
+    expect(testPayeeAccount.value.lamports).to.equal(2000000);
   });
 
 });
