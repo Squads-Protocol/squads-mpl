@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 
 #[account]
@@ -33,12 +35,42 @@ impl Ms {
         Ok(())
     }
 
-    pub fn is_member(&self, member: Pubkey) -> bool {
-        matches!(self.keys.binary_search(&member), Ok(..))
+    pub fn is_member(&self, member: Pubkey) -> Option<usize> {
+        match self.keys.binary_search(&member) {
+            Ok(ind)=> Some(ind),
+            _ => None
+        }
     }
 
     pub fn set_processed_index(&mut self, index: u32) -> Result<()>{
         self.processed_index = index;
+        Ok(())
+    }
+
+    pub fn add_member(&mut self, member: Pubkey) -> Result<()>{
+        if matches!(self.is_member(member), None) {
+            self.keys.push(member);
+            self.keys.sort();
+        }
+        Ok(())
+    }
+
+    pub fn remove_member(&mut self, member: Pubkey) -> Result<()>{
+        if let Some(ind) = self.is_member(member) {
+            self.keys.remove(ind);
+        }
+        Ok(())
+    }
+
+    pub fn change_threshold(&mut self, threshold: u16) -> Result<()>{
+        if self.keys.len() < usize::from(threshold) {
+            let new_threshold: u16 = self.keys.len().try_into().unwrap();
+            self.threshold = new_threshold;
+        } else if threshold <= 0 {
+            self.threshold = 1;
+        } else {
+            self.threshold = threshold;
+        }
         Ok(())
     }
 

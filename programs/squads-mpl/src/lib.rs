@@ -23,6 +23,18 @@ pub mod squads_mpl {
         )
     }
 
+    pub fn add_member(ctx: Context<MsAuth>, new_member: Pubkey) -> Result<()> {
+        ctx.accounts.multisig.add_member(new_member)
+    }
+
+    pub fn remove_member(ctx: Context<MsAuth>, old_member: Pubkey) -> Result<()> {
+        ctx.accounts.multisig.remove_member(old_member)
+    }
+
+    pub fn change_threshold(ctx: Context<MsAuth>, new_threshold: u16) -> Result<()> {
+        ctx.accounts.multisig.change_threshold(new_threshold)
+    }
+
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
         let ms = &mut ctx.accounts.multisig;
         let (_, authority_bump) = Pubkey::find_program_address(&[
@@ -340,7 +352,7 @@ pub struct ApproveTransaction<'info> {
             b"transaction"
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
-        constraint = multisig.is_member(member.key()) @MsError::KeyNotInMultisig,
+        constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -370,7 +382,7 @@ pub struct RejectTransaction<'info> {
             b"transaction"
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
-        constraint = multisig.is_member(member.key()) @MsError::KeyNotInMultisig,
+        constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -401,7 +413,7 @@ pub struct CancelTransaction<'info> {
             b"transaction"
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
-        constraint = multisig.is_member(member.key()) @MsError::KeyNotInMultisig,
+        constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -438,4 +450,19 @@ pub struct ExecuteTransaction<'info> {
     #[account(mut)]
     pub member: Signer<'info>,
     pub system_program: Program<'info, System> 
+}
+
+#[derive(Accounts)]
+pub struct MsAuth<'info> {
+    #[account(mut)]
+    multisig: Box<Account<'info, Ms>>,
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.creator.as_ref(),
+            b"multisig"
+        ], bump = multisig.bump
+    )]
+    pub multisig_auth: Signer<'info>,
+
 }
