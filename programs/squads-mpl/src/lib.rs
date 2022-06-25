@@ -32,17 +32,27 @@ pub mod squads_mpl {
     }
 
     pub fn change_threshold(ctx: Context<MsAuth>, new_threshold: u16) -> Result<()> {
+        msg!("changing threshold to {:?}", new_threshold);
         ctx.accounts.multisig.change_threshold(new_threshold)
     }
 
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
         let ms = &mut ctx.accounts.multisig;
-        let (_, authority_bump) = Pubkey::find_program_address(&[
-            b"squad",
-            ms.key().as_ref(),
-            &authority_index.to_le_bytes(),
-            b"authority"
-        ], ctx.program_id);
+        let authority_bump = match authority_index  {
+           1.. => {
+                let (_, auth_bump) = Pubkey::find_program_address(&[
+                    b"squad",
+                    ms.key().as_ref(),
+                    &authority_index.to_le_bytes(),
+                    b"authority"
+                ], ctx.program_id);
+                auth_bump
+            },
+
+            //eeds = [b"squad", creator.key().as_ref(), b"multisig"], bump)]
+            0 => ms.bump
+        };
+
 
         ms.transaction_index =  ms.transaction_index.checked_add(1).unwrap();
         ctx.accounts.transaction.init(
@@ -52,6 +62,7 @@ pub mod squads_mpl {
             authority_index,
             authority_bump,
         )
+
     }
 
     pub fn activate_transaction(ctx: Context<ActivateTransaction>) -> Result<()> {
@@ -113,7 +124,7 @@ pub mod squads_mpl {
         Ok(())
     }
 
-    pub fn execute_transaction(ctx: Context<ExecuteTransaction>) -> Result<()> {
+    pub fn execute_transaction<'info>(ctx: Context<'_,'_,'_,'info,ExecuteTransaction<'info>>) -> Result<()> {
         // check that we are provided at least one instruction
         if ctx.accounts.transaction.instruction_index < 1 {
             // if no instructions were found, for whatever reason, mark it as executed and move on
@@ -124,6 +135,7 @@ pub mod squads_mpl {
 
         // use for derivation for the authority
         let ms_key = ctx.accounts.multisig.key();
+
         // get the authority pda - its implied it was already set earlier for the tx
         let (_, authority_pda_bump) = Pubkey::find_program_address(&[
             b"squad",
@@ -131,17 +143,21 @@ pub mod squads_mpl {
             &ctx.accounts.transaction.authority_index.to_le_bytes(),
             b"authority"
         ],ctx.program_id);
-        // it should match the one saved earlier
-        if ctx.accounts.transaction.authority_bump != authority_pda_bump {
-            return err!(MsError::InvalidInstructionAccount);
-        }
-        // used for the ix cpis
+
+        // default authority seeds to auth index > 0
         let authority_seeds = [
             b"squad",
             ms_key.as_ref(),
             &ctx.accounts.transaction.authority_index.to_le_bytes(),
             b"authority",
             &[authority_pda_bump]
+        ];
+        // if auth index < 1
+        let ms_authority_seeds = [
+            b"squad",
+            ctx.accounts.multisig.creator.as_ref(),
+            b"multisig",
+            &[ctx.accounts.multisig.bump]
         ];
 
         // iterator for remaining accounts
@@ -188,13 +204,23 @@ pub mod squads_mpl {
             // create the instruction to invoke from the saved ms ix account
             let ix: Instruction = Instruction::from(ms_ix);            
     
-            // execute the singular test ix
-            invoke_signed(
-                &ix, 
-                &ix_account_infos, 
-                &[&authority_seeds]
-            )?;
-
+            // execute the ix
+            match ctx.accounts.transaction.authority_index {
+                0 => {
+                    invoke_signed(
+                        &ix, 
+                        &ix_account_infos, 
+                        &[&ms_authority_seeds]
+                    )?;
+                },
+                1.. => {
+                    invoke_signed(
+                        &ix, 
+                        &ix_account_infos, 
+                        &[&authority_seeds]
+                    )?;
+                }
+            }
             Ok(())
         });
 
@@ -205,9 +231,10 @@ pub mod squads_mpl {
             Err(_) => {
                 ctx.accounts.transaction.set_failed()?;
             }
-        }
-
-        ctx.accounts.multisig.set_processed_index(ctx.accounts.transaction.transaction_index)?;
+        };
+        let tx_index = ctx.accounts.transaction.transaction_index;
+        ctx.accounts.multisig.reload()?;
+        ctx.accounts.multisig.set_processed_index(tx_index)?;
         Ok(())
     }
 
@@ -433,7 +460,7 @@ pub struct ExecuteTransaction<'info> {
         ],
         bump = multisig.bump,
     )]
-    pub multisig: Account<'info, Ms>,
+    pub multisig: Box<Account<'info, Ms>>,
 
     #[account(
         mut,
@@ -457,6 +484,7 @@ pub struct MsAuth<'info> {
     #[account(mut)]
     multisig: Box<Account<'info, Ms>>,
     #[account(
+        mut,
         seeds = [
             b"squad",
             multisig.creator.as_ref(),

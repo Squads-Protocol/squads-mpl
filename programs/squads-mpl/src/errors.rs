@@ -6,4 +6,5 @@ pub enum MsError {
     InvalidTransactionState,
     InvalidNumberOfAccounts,
     InvalidInstructionAccount,
+    InvalidAuthorityIndex,
 }

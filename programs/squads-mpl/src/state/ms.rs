@@ -69,6 +69,7 @@ impl Ms {
         } else if threshold <= 0 {
             self.threshold = 1;
         } else {
+            msg!("set new threshold!");
             self.threshold = threshold;
         }
         Ok(())
