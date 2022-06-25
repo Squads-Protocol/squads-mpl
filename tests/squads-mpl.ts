@@ -68,6 +68,7 @@ describe('Basic functionality', () => {
   // the Multisig PDA to use for the test run
   const [msPDA] = getMsPDA(creator.publicKey, program.programId); 
 
+  let txCount = 0;
   it(`Create Multisig - MS: ${msPDA.toBase58()}`, async () => {
     const member1 = anchor.web3.Keypair.generate();
     const member2 = anchor.web3.Keypair.generate();
@@ -106,6 +107,7 @@ describe('Basic functionality', () => {
       .rpc();
 
     let txState = await program.account.msTransaction.fetch(txPDA);
+    txCount++;
     expect(txState.instructionIndex).to.equal(0);
     expect(txState.creator.toBase58()).to.equal(creator.publicKey.toBase58());
 
@@ -114,7 +116,7 @@ describe('Basic functionality', () => {
     expect(txState.transactionIndex).to.equal(msState.transactionIndex);
   });
 
-  it.skip(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
+  it(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
      // create an transaction draft
      // get the state of the MS
      let msState = await program.account.ms.fetch(msPDA);
@@ -135,10 +137,10 @@ describe('Basic functionality', () => {
        .rpc();
  
       let txState = await program.account.msTransaction.fetch(txPDA);
-      
+      txCount++;
       // check the transaction indexes match
       msState = await program.account.ms.fetch(msPDA);
-      expect(msState.transactionIndex).to.equal(txState.transactionIndex); 
+      expect(msState.transactionIndex).to.equal(txCount); 
       expect(txState.instructionIndex).to.equal(0);
       expect(txState.status).to.have.property("draft");
 
@@ -172,7 +174,7 @@ describe('Basic functionality', () => {
 
   });
 
-  it.skip(`Tx Activate MS: ${msPDA.toBase58()}`, async () => {
+  it(`Tx Activate MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
@@ -193,7 +195,7 @@ describe('Basic functionality', () => {
       .rpc();
 
      let txState = await program.account.msTransaction.fetch(txPDA);
-     
+     txCount++;
      // check the transaction indexes match
      msState = await program.account.ms.fetch(msPDA);
 
@@ -229,13 +231,12 @@ describe('Basic functionality', () => {
 
     txState = await program.account.msTransaction.fetch(txPDA);
     expect(txState.status).to.have.property("active");
-
     let ixState = await program.account.msInstruction.fetch(ixPDA);
     expect(ixState.programId.toBase58()).to.equal(testIx.programId.toBase58());
 
  });
 
-  it.skip(`Tx Sign MS: ${msPDA.toBase58()}`, async () => {
+  it(`Tx Sign MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
@@ -256,7 +257,7 @@ describe('Basic functionality', () => {
       .rpc();
 
     let txState = await program.account.msTransaction.fetch(txPDA);
-    
+    txCount++;
     // check the transaction indexes match
     msState = await program.account.ms.fetch(msPDA);
 
@@ -313,7 +314,7 @@ describe('Basic functionality', () => {
     expect(txState.status).to.have.property("executeReady");
   });
 
-  it.skip(`Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
+  it(`Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
     // create authority to use (Vault, index 1)
     const authorityIndexBN = new anchor.BN(1,10);
     const [authorityPDA] = await PublicKey.findProgramAddress([
@@ -342,7 +343,7 @@ describe('Basic functionality', () => {
       .rpc();
 
     let txState = await program.account.msTransaction.fetch(txPDA);
-    
+    txCount++;
     // check the transaction indexes match
     msState = await program.account.ms.fetch(msPDA);
 
@@ -475,7 +476,7 @@ describe('Basic functionality', () => {
     expect(testPayeeAccount.value.lamports).to.equal(1000000);
   });
 
-  it.skip(`2X Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
+  it(`2X Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
     // create authority to use (Vault, index 1)
     const authorityIndexBN = new anchor.BN(1,10);
     const [authorityPDA] = await PublicKey.findProgramAddress([
@@ -504,7 +505,7 @@ describe('Basic functionality', () => {
       .rpc();
 
     let txState = await program.account.msTransaction.fetch(txPDA);
-    
+    txCount++;
     // check the transaction indexes match
     msState = await program.account.ms.fetch(msPDA);
 
@@ -681,6 +682,7 @@ describe('Basic functionality', () => {
     
     // get the current tx state
     let txState = await program.account.msTransaction.fetch(txPDA);
+    txCount++;
     const newIxIndex = txState.instructionIndex + 1;
     const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
@@ -799,7 +801,7 @@ describe('Basic functionality', () => {
 
     msState = await program.account.ms.fetch(msPDA);
     txState = await program.account.msTransaction.fetch(txPDA);
-    expect(msState.processedIndex).to.equal(2);
+    expect(msState.processedIndex).to.equal(txState.transactionIndex);
     expect(msState.threshold).to.equal(2);
     expect(txState.status).to.have.property("executed");
 
