@@ -7,4 +7,7 @@ pub enum MsError {
     InvalidNumberOfAccounts,
     InvalidInstructionAccount,
     InvalidAuthorityIndex,
+    TransactionAlreadyExecuted,
+    CannotRemoveSoloMember,
+    InvalidThreshold
 }

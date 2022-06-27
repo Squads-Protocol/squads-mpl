@@ -10,17 +10,19 @@ pub struct Ms {
     pub processed_index: u32,   // the last executed/closed transaction
     pub bump: u8,               // bump for the multisig seed
     pub creator: Pubkey,        // creator of multisig, used for seed
-    pub keys: Vec<Pubkey>       // keys of the members
+    pub keys: Vec<Pubkey>,      // keys of the members
+    pub root: Option<Pubkey>    // root owner
 }
 
 impl Ms {
     pub const MAXIMUM_SIZE: usize = 4 + (32 * 10) + // initial space for 10 keys 
-        2 +  // threshold value
-        2 +  // authority index
-        4 +  // transaction index
-        4 +  // processed transaction index
-        1 +  // PDA bump
-        32;  // creator
+        2 +         // threshold value
+        2 +         // authority index
+        4 +         // transaction index
+        4 +         // processed transaction index
+        1 +         // PDA bump
+        32 +        // creator
+        (1 + 32);   // Optional root
 
     pub fn init (&mut self, threshold: u16, creator: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
         self.threshold = threshold;
@@ -32,6 +34,7 @@ impl Ms {
         self.processed_index = 0;
         self.bump = bump;
         self.creator = creator;
+        self.root = None;
         Ok(())
     }
 
@@ -58,20 +61,20 @@ impl Ms {
     pub fn remove_member(&mut self, member: Pubkey) -> Result<()>{
         if let Some(ind) = self.is_member(member) {
             self.keys.remove(ind);
+            if self.keys.len() < usize::from(self.threshold) {
+                self.threshold = self.keys.len().try_into().unwrap();
+            }
         }
         Ok(())
     }
 
     pub fn change_threshold(&mut self, threshold: u16) -> Result<()>{
-        if self.keys.len() < usize::from(threshold) {
-            let new_threshold: u16 = self.keys.len().try_into().unwrap();
-            self.threshold = new_threshold;
-        } else if threshold <= 0 {
-            self.threshold = 1;
-        } else {
-            msg!("set new threshold!");
-            self.threshold = threshold;
-        }
+        self.threshold = threshold;
+        Ok(())
+    }
+
+    pub fn set_root(&mut self, root: Pubkey) -> Result<()>{
+        self.root = Some(root);
         Ok(())
     }
 

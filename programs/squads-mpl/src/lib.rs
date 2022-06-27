@@ -11,6 +11,8 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 #[program]
 pub mod squads_mpl {
 
+    use std::convert::TryInto;
+
     use anchor_lang::solana_program::program::invoke_signed;
 
     use super::*;
@@ -28,12 +30,35 @@ pub mod squads_mpl {
     }
 
     pub fn remove_member(ctx: Context<MsAuth>, old_member: Pubkey) -> Result<()> {
-        ctx.accounts.multisig.remove_member(old_member)
+        // if there is only one key in this ms, reject the removal
+        if ctx.accounts.multisig.keys.len() == 1 {
+            return err!(MsError::CannotRemoveSoloMember);
+        }
+        ctx.accounts.multisig.remove_member(old_member)?;
+        // if the number of keys is now less than the threshold, adjust it
+        if ctx.accounts.multisig.keys.len() > usize::from(ctx.accounts.multisig.threshold) {
+            let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
+            ctx.accounts.multisig.change_threshold(new_threshold)?
+        }
+        Ok(())
     }
 
     pub fn change_threshold(ctx: Context<MsAuth>, new_threshold: u16) -> Result<()> {
-        msg!("changing threshold to {:?}", new_threshold);
-        ctx.accounts.multisig.change_threshold(new_threshold)
+        // if the new threshold exceeds the number of keys, set it to the max amount
+        if ctx.accounts.multisig.keys.len() < usize::from(new_threshold) {
+            let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
+            ctx.accounts.multisig.change_threshold(new_threshold)
+        // if the new threshol is lte 0 throw error
+        } else if new_threshold <= 0 {
+            return err!(MsError::InvalidThreshold);
+        // threshold value is fine, set it
+        } else {
+            ctx.accounts.multisig.change_threshold(new_threshold)
+        }
+    }
+
+    pub fn add_root(ctx: Context<MsAuth>, root: Pubkey) -> Result<()> {
+        ctx.accounts.multisig.set_root(root)
     }
 
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
@@ -224,6 +249,7 @@ pub mod squads_mpl {
             Ok(())
         });
 
+        // if tx returned failure(s) mark as failed and close
         match res {
             Ok(_) => {
                 ctx.accounts.transaction.set_executed()?;
@@ -232,9 +258,9 @@ pub mod squads_mpl {
                 ctx.accounts.transaction.set_failed()?;
             }
         };
-        let tx_index = ctx.accounts.transaction.transaction_index;
+
         ctx.accounts.multisig.reload()?;
-        ctx.accounts.multisig.set_processed_index(tx_index)?;
+        ctx.accounts.multisig.set_processed_index(ctx.accounts.transaction.transaction_index)?;
         Ok(())
     }
 
@@ -492,5 +518,21 @@ pub struct MsAuth<'info> {
         ], bump = multisig.bump
     )]
     pub multisig_auth: Signer<'info>,
+
+}
+
+#[derive(Accounts)]
+pub struct RootAuth<'info> {
+    #[account(mut)]
+    multisig: Box<Account<'info, Ms>>,
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.creator.as_ref(),
+            b"root"
+        ], bump
+    )]
+    pub root_auth: Signer<'info>,
 
 }
