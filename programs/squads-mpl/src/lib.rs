@@ -26,7 +26,8 @@ pub mod squads_mpl {
     }
 
     pub fn add_member(ctx: Context<MsAuth>, new_member: Pubkey) -> Result<()> {
-        ctx.accounts.multisig.add_member(new_member)
+        ctx.accounts.multisig.add_member(new_member)?;
+        ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
     }
 
     pub fn remove_member(ctx: Context<MsAuth>, old_member: Pubkey) -> Result<()> {
@@ -38,27 +39,26 @@ pub mod squads_mpl {
         // if the number of keys is now less than the threshold, adjust it
         if ctx.accounts.multisig.keys.len() > usize::from(ctx.accounts.multisig.threshold) {
             let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
-            ctx.accounts.multisig.change_threshold(new_threshold)?
+            ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
-        Ok(())
+
+        ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
     }
 
     pub fn change_threshold(ctx: Context<MsAuth>, new_threshold: u16) -> Result<()> {
         // if the new threshold exceeds the number of keys, set it to the max amount
         if ctx.accounts.multisig.keys.len() < usize::from(new_threshold) {
             let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
-            ctx.accounts.multisig.change_threshold(new_threshold)
+            ctx.accounts.multisig.change_threshold(new_threshold)?;
         // if the new threshol is lte 0 throw error
-        } else if new_threshold <= 0 {
+        } else if new_threshold < 1 {
             return err!(MsError::InvalidThreshold);
         // threshold value is fine, set it
         } else {
-            ctx.accounts.multisig.change_threshold(new_threshold)
+            ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
-    }
 
-    pub fn add_root(ctx: Context<MsAuth>, root: Pubkey) -> Result<()> {
-        ctx.accounts.multisig.set_root(root)
+        ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
     }
 
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
@@ -144,7 +144,6 @@ pub mod squads_mpl {
         // if current number of signers reaches threshold, mark the transaction as execute ready
         if ctx.accounts.transaction.cancelled.len() >= usize::from(ctx.accounts.multisig.threshold) {
             ctx.accounts.transaction.set_cancelled()?;
-            ctx.accounts.multisig.set_processed_index(ctx.accounts.transaction.transaction_index)?;
         }
         Ok(())
     }
@@ -154,7 +153,6 @@ pub mod squads_mpl {
         if ctx.accounts.transaction.instruction_index < 1 {
             // if no instructions were found, for whatever reason, mark it as executed and move on
             ctx.accounts.transaction.set_executed()?;
-            ctx.accounts.multisig.set_processed_index(ctx.accounts.transaction.transaction_index)?;
             return Ok(());            
         }
 
@@ -260,7 +258,6 @@ pub mod squads_mpl {
         };
 
         ctx.accounts.multisig.reload()?;
-        ctx.accounts.multisig.set_processed_index(ctx.accounts.transaction.transaction_index)?;
         Ok(())
     }
 
@@ -497,6 +494,7 @@ pub struct ExecuteTransaction<'info> {
             b"transaction"
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -510,6 +508,11 @@ pub struct MsAuth<'info> {
     #[account(mut)]
     multisig: Box<Account<'info, Ms>>,
     #[account(
+        constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
+    )]
+    transaction: Box<Account<'info, MsTransaction>>,
+    #[account(
         mut,
         seeds = [
             b"squad",
@@ -518,21 +521,5 @@ pub struct MsAuth<'info> {
         ], bump = multisig.bump
     )]
     pub multisig_auth: Signer<'info>,
-
-}
-
-#[derive(Accounts)]
-pub struct RootAuth<'info> {
-    #[account(mut)]
-    multisig: Box<Account<'info, Ms>>,
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.creator.as_ref(),
-            b"root"
-        ], bump
-    )]
-    pub root_auth: Signer<'info>,
 
 }

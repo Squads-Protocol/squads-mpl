@@ -7,11 +7,10 @@ pub struct Ms {
     pub threshold: u16,         // threshold for signatures
     pub authority_index: u16,   // index to seed other authorities under this multisig
     pub transaction_index: u32, // look up and seed reference for transactions
-    pub processed_index: u32,   // the last executed/closed transaction
+    pub ms_change_index: u32,   // the last executed/closed transaction
     pub bump: u8,               // bump for the multisig seed
     pub creator: Pubkey,        // creator of multisig, used for seed
     pub keys: Vec<Pubkey>,      // keys of the members
-    pub root: Option<Pubkey>    // root owner
 }
 
 impl Ms {
@@ -31,10 +30,9 @@ impl Ms {
         self.keys.sort();
         self.authority_index = 0;
         self.transaction_index = 0;
-        self.processed_index = 0;
+        self.ms_change_index= 0;
         self.bump = bump;
         self.creator = creator;
-        self.root = None;
         Ok(())
     }
 
@@ -45,8 +43,8 @@ impl Ms {
         }
     }
 
-    pub fn set_processed_index(&mut self, index: u32) -> Result<()>{
-        self.processed_index = index;
+    pub fn set_change_index(&mut self, index: u32) -> Result<()>{
+        self.ms_change_index = index;
         Ok(())
     }
 
@@ -70,11 +68,6 @@ impl Ms {
 
     pub fn change_threshold(&mut self, threshold: u16) -> Result<()>{
         self.threshold = threshold;
-        Ok(())
-    }
-
-    pub fn set_root(&mut self, root: Pubkey) -> Result<()>{
-        self.root = Some(root);
         Ok(())
     }
 

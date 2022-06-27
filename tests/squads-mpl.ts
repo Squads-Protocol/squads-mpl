@@ -482,7 +482,6 @@ describe('Basic functionality', () => {
     msState = await program.account.ms.fetch(msPDA);
     txState = await program.account.msTransaction.fetch(txPDA);
 
-    expect(msState.processedIndex).to.equal(txState.transactionIndex);
     expect(txState.status).to.have.property("executed");
     testPayeeAccount = await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
     expect(testPayeeAccount.value.lamports).to.equal(1000000);
@@ -666,7 +665,6 @@ describe('Basic functionality', () => {
     msState = await program.account.ms.fetch(msPDA);
     txState = await program.account.msTransaction.fetch(txPDA);
 
-    expect(msState.processedIndex).to.equal(txState.transactionIndex);
     expect(txState.status).to.have.property("executed");
     testPayeeAccount = await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
     expect(testPayeeAccount.value.lamports).to.equal(2000000);
@@ -705,6 +703,7 @@ describe('Basic functionality', () => {
     const testChangeThresholdIx = await program.methods.changeThreshold(2)
       .accounts({
         multisig: msPDA,
+        transaction: txPDA,
         multisigAuth: msPDA
       })
       .instruction();
@@ -813,26 +812,10 @@ describe('Basic functionality', () => {
 
     msState = await program.account.ms.fetch(msPDA);
     txState = await program.account.msTransaction.fetch(txPDA);
-    expect(msState.processedIndex).to.equal(txState.transactionIndex);
+
     expect(msState.threshold).to.equal(2);
     expect(txState.status).to.have.property("executed");
 
-  });
-
-  it("Direct MS state change fail", async () => {
-    const ix = await program.methods.changeThreshold(4)
-      .accounts({multisig: msPDA, multisigAuth: msPDA})
-        .instruction();
-    ix.keys.push({pubkey: creator.publicKey, isSigner: true, isWritable: true});
-    const tx = await createBlankTransaction(program, creator.publicKey);
-    tx.add(ix);
-    creator.signTransaction(tx);
-    try {
-      const res = await programProvider.sendAndConfirm(tx);
-    }
-    catch (e){
-      expect(e.message).to.contain("Signature verification failed");
-    }
   });
 
   it("Insufficient approval failure", async() => {    // get the state of the MS
@@ -853,7 +836,7 @@ describe('Basic functionality', () => {
         creator: creator.publicKey
       })
       .rpc();
-    
+
     // get the current tx state
     let txState = await program.account.msTransaction.fetch(txPDA);
     txCount++;
@@ -867,6 +850,7 @@ describe('Basic functionality', () => {
     const testChangeThresholdIx = await program.methods.changeThreshold(2)
       .accounts({
         multisig: msPDA,
+        transaction: txPDA,
         multisigAuth: msPDA
       })
       .instruction();
@@ -937,8 +921,6 @@ describe('Basic functionality', () => {
         ...formattedKeys
       ];
     }).reduce((p,c) => p.concat(c),[])
-
-    // console.log(ixKeysList);
 
     let executeKeys = [
     {

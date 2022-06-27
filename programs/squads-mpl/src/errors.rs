@@ -9,5 +9,6 @@ pub enum MsError {
     InvalidAuthorityIndex,
     TransactionAlreadyExecuted,
     CannotRemoveSoloMember,
-    InvalidThreshold
+    InvalidThreshold,
+    DeprecatedTransaction
 }
