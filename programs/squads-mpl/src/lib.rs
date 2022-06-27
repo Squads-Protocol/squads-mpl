@@ -234,17 +234,17 @@ pub mod squads_mpl {
                         &ix, 
                         &ix_account_infos, 
                         &[&ms_authority_seeds]
-                    )?;
+                    )
                 },
                 1.. => {
                     invoke_signed(
                         &ix, 
                         &ix_account_infos, 
                         &[&authority_seeds]
-                    )?;
+                    )
                 }
-            }
-            Ok(())
+            }.or(err!(MsError::InstructionFailed))
+            
         });
 
         // if tx returned failure(s) mark as failed and close
