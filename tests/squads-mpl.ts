@@ -37,7 +37,7 @@ const createExecuteTransactionTx = async (program, keys, feePayer) => {
     lastValidBlockHeight,
     feePayer
   });
-  
+
   const sig = anchor.utils.sha256.hash("global:execute_transaction");
   const ixDiscriminator = Buffer.from(sig, "hex");
   const executeIx = new anchor.web3.TransactionInstruction({
@@ -79,7 +79,7 @@ describe('Basic functionality', () => {
 
   const creator = programProvider.wallet;
   // the Multisig PDA to use for the test run
-  const [msPDA] = getMsPDA(creator.publicKey, program.programId); 
+  const [msPDA] = getMsPDA(creator.publicKey, program.programId);
 
   let txCount = 0;
   it(`Create Multisig - MS: ${msPDA.toBase58()}`, async () => {
@@ -102,7 +102,7 @@ describe('Basic functionality', () => {
     // create an transaction draft
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
-    
+
     // increment the transaction index
     const newTxIndex = msState.transactionIndex + 1;
     const newTxIndexBN = new anchor.BN(msState.transactionIndex + 1, 10);
@@ -132,14 +132,14 @@ describe('Basic functionality', () => {
      // create an transaction draft
      // get the state of the MS
      let msState = await program.account.ms.fetch(msPDA);
-     
+
      // increment the transaction index
      const newTxIndex = msState.transactionIndex + 1;
      const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
      // generate the tx pda
      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
- 
+
      await program.methods.createTransaction(1)
        .accounts({
          multisig: msPDA,
@@ -147,12 +147,12 @@ describe('Basic functionality', () => {
          creator: creator.publicKey
        })
        .rpc();
- 
+
       let txState = await program.account.msTransaction.fetch(txPDA);
       txCount++;
       // check the transaction indexes match
       msState = await program.account.ms.fetch(msPDA);
-      expect(msState.transactionIndex).to.equal(txCount); 
+      expect(msState.transactionIndex).to.equal(txCount);
       expect(txState.instructionIndex).to.equal(0);
       expect(txState.status).to.have.property("draft");
 
@@ -190,7 +190,7 @@ describe('Basic functionality', () => {
     // create an transaction draft
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
-    
+
     // increment the transaction index
     const newTxIndex = msState.transactionIndex + 1;
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -252,7 +252,7 @@ describe('Basic functionality', () => {
     // create an transaction draft
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
-    
+
     // increment the transaction index
     const newTxIndex = msState.transactionIndex + 1;
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -335,10 +335,10 @@ describe('Basic functionality', () => {
       authorityIndexBN.toBuffer("le",4),  // note instruction index is a u8 (1 byte)
       anchor.utils.bytes.utf8.encode("authority")
     ], program.programId);
-  
+
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
-    
+
     // increment the transaction index
     const newTxIndex = msState.transactionIndex + 1;
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -408,7 +408,7 @@ describe('Basic functionality', () => {
     const lastValidBlockHeight = await program.provider.connection.getBlockHeight();
     const moveFundsToMsPDATx = new anchor.web3.Transaction({blockhash, lastValidBlockHeight});
     moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
-    try {      
+    try {
       creator.signTransaction(moveFundsToMsPDATx);
       await programProvider.sendAndConfirm(moveFundsToMsPDATx);
       const msPDAFunded = await program.provider.connection.getAccountInfo(authorityPDA);
@@ -428,7 +428,7 @@ describe('Basic functionality', () => {
       return {pubkey: ixKey, ixItem: ixAccount};
     }));
 
-    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {      
+    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
       const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
 
       const formattedKeys = ixKeys.map((ixKey,keyInd) => {
@@ -469,7 +469,7 @@ describe('Basic functionality', () => {
     }
   ];
     executeKeys = executeKeys.concat(ixKeysList);
-  
+
     const executeTx = await createExecuteTransactionTx(program, executeKeys, creator.publicKey);
 
     creator.signTransaction(executeTx);
@@ -496,10 +496,10 @@ describe('Basic functionality', () => {
       authorityIndexBN.toBuffer("le",4),  // note instruction index is a u8 (1 byte)
       anchor.utils.bytes.utf8.encode("authority")
     ], program.programId);
-  
+
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
-    
+
     // increment the transaction index
     const newTxIndex = msState.transactionIndex + 1;
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -591,7 +591,7 @@ describe('Basic functionality', () => {
     const lastValidBlockHeight = await program.provider.connection.getBlockHeight();
     const moveFundsToMsPDATx = new anchor.web3.Transaction({blockhash, lastValidBlockHeight});
     moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
-    try {      
+    try {
       creator.signTransaction(moveFundsToMsPDATx);
       await programProvider.sendAndConfirm(moveFundsToMsPDATx);
       const msPDAFunded = await program.provider.connection.getAccountInfo(authorityPDA);
@@ -611,7 +611,7 @@ describe('Basic functionality', () => {
       return {pubkey: ixKey, ixItem: ixAccount};
     }));
 
-    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {      
+    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
       const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
 
       const formattedKeys = ixKeys.map((ixKey,keyInd) => {
@@ -652,7 +652,7 @@ describe('Basic functionality', () => {
     }
   ];
     executeKeys = executeKeys.concat(ixKeysList);
-  
+
     const executeTx = await createExecuteTransactionTx(program, executeKeys, creator.publicKey);
 
     creator.signTransaction(executeTx);
@@ -670,7 +670,7 @@ describe('Basic functionality', () => {
     expect(testPayeeAccount.value.lamports).to.equal(2000000);
   });
 
-  it(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {  
+  it(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
 
@@ -689,7 +689,7 @@ describe('Basic functionality', () => {
         creator: creator.publicKey
       })
       .rpc();
-    
+
     // get the current tx state
     let txState = await program.account.msTransaction.fetch(txPDA);
     txCount++;
@@ -748,7 +748,7 @@ describe('Basic functionality', () => {
     // get the TX
     txState = await program.account.msTransaction.fetch(txPDA);
     expect(txState.status).to.have.property("executeReady");
-  
+
     // get the ix list
     const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {
       const ixIndexBN = new anchor.BN(i + 1,10);
@@ -758,7 +758,7 @@ describe('Basic functionality', () => {
     }));
 
     // get the keys for the ix(s)
-    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {      
+    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
       const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
 
       const formattedKeys = ixKeys.map((ixKey,keyInd) => {
@@ -904,7 +904,7 @@ describe('Basic functionality', () => {
     }));
 
     // get the keys for the ix(s)
-    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {      
+    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
       const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
 
       const formattedKeys = ixKeys.map((ixKey,keyInd) => {
@@ -952,6 +952,6 @@ describe('Basic functionality', () => {
       const res = await programProvider.sendAndConfirm(executeTx);
     } catch (e) {
       expect(e.message).to.contain("Error processing Instruction");
-    }    
+    }
   });
 });

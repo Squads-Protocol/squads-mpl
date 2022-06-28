@@ -118,7 +118,7 @@ pub mod squads_mpl {
         }
         Ok(())
     }
-    
+
     // reject the transaction
     pub fn reject_transaction(ctx: Context<RejectTransaction>) -> Result<()> {
         // if they have previously voted to approve, remove that item (change vote check)
@@ -153,7 +153,7 @@ pub mod squads_mpl {
         if ctx.accounts.transaction.instruction_index < 1 {
             // if no instructions were found, for whatever reason, mark it as executed and move on
             ctx.accounts.transaction.set_executed()?;
-            return Ok(());            
+            return Ok(());
         }
 
         // use for derivation for the authority
@@ -191,9 +191,9 @@ pub mod squads_mpl {
             let ms_ix_account: &AccountInfo = next_account_info(ix_iter)?;
 
             if ms_ix_account.owner != ctx.program_id {
-                return err!(MsError::InvalidInstructionAccount);  
+                return err!(MsError::InvalidInstructionAccount);
             }
-    
+
             // deserialize the msIx
             let mut ix_account_data: &[u8] = &ms_ix_account.try_borrow_mut_data()?;
             let ms_ix: MsInstruction = MsInstruction::try_deserialize(&mut ix_account_data)?;
@@ -213,7 +213,7 @@ pub mod squads_mpl {
             // get the instructions program account
             let ix_program_info: &AccountInfo = next_account_info(ix_iter)?;
             if &ms_ix.program_id != ix_program_info.key {
-                return err!(MsError::InvalidInstructionAccount);       
+                return err!(MsError::InvalidInstructionAccount);
             }
 
             let mut ix_account_infos: Vec<AccountInfo> = Vec::<AccountInfo>::new();
@@ -225,26 +225,26 @@ pub mod squads_mpl {
                 ix_account_infos.push(ix_account_info.clone());
             }
             // create the instruction to invoke from the saved ms ix account
-            let ix: Instruction = Instruction::from(ms_ix);            
-    
+            let ix: Instruction = Instruction::from(ms_ix);
+
             // execute the ix
             match ctx.accounts.transaction.authority_index {
                 0 => {
                     invoke_signed(
-                        &ix, 
-                        &ix_account_infos, 
+                        &ix,
+                        &ix_account_infos,
                         &[&ms_authority_seeds]
                     )
                 },
                 1.. => {
                     invoke_signed(
-                        &ix, 
-                        &ix_account_infos, 
+                        &ix,
+                        &ix_account_infos,
                         &[&authority_seeds]
                     )
                 }
             }.or(err!(MsError::InstructionFailed))
-            
+
         });
 
         // if tx returned failure(s) mark as failed and close
@@ -348,7 +348,7 @@ pub struct AddInstruction<'info> {
 
     #[account(mut)]
     pub creator: Signer<'info>,
-    pub system_program: Program<'info, System> 
+    pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]
@@ -378,7 +378,7 @@ pub struct ActivateTransaction<'info> {
 
     #[account(mut)]
     pub creator: Signer<'info>,
-    pub system_program: Program<'info, System> 
+    pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]
@@ -408,7 +408,7 @@ pub struct ApproveTransaction<'info> {
 
     #[account(mut)]
     pub member: Signer<'info>,
-    pub system_program: Program<'info, System> 
+    pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]
@@ -438,7 +438,7 @@ pub struct RejectTransaction<'info> {
 
     #[account(mut)]
     pub member: Signer<'info>,
-    pub system_program: Program<'info, System> 
+    pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]
@@ -469,7 +469,7 @@ pub struct CancelTransaction<'info> {
 
     #[account(mut)]
     pub member: Signer<'info>,
-    pub system_program: Program<'info, System> 
+    pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]
@@ -500,7 +500,7 @@ pub struct ExecuteTransaction<'info> {
 
     #[account(mut)]
     pub member: Signer<'info>,
-    pub system_program: Program<'info, System> 
+    pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]

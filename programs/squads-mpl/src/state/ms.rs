@@ -14,7 +14,7 @@ pub struct Ms {
 }
 
 impl Ms {
-    pub const MAXIMUM_SIZE: usize = 4 + (32 * 10) + // initial space for 10 keys 
+    pub const MAXIMUM_SIZE: usize = 4 + (32 * 10) + // initial space for 10 keys
         2 +         // threshold value
         2 +         // authority index
         4 +         // transaction index
@@ -188,7 +188,7 @@ impl MsTransaction {
     pub fn has_voted(&self, member: Pubkey) -> bool {
         let approved = matches!(self.approved.binary_search(&member), Ok(..));
         let rejected = matches!(self.rejected.binary_search(&member), Ok(..));
-        approved || rejected 
+        approved || rejected
     }
 
     // check if a user has signed to approve
@@ -266,7 +266,7 @@ impl From<MsInstruction> for Instruction {
                 .collect(),
             data: instruction.data.clone(),
         }
-    }  
+    }
 }
 
 // internal AccountMeta serialization schema
