@@ -243,7 +243,7 @@ pub mod squads_mpl {
                         &[&authority_seeds]
                     )
                 }
-            }.or(err!(MsError::InstructionFailed))
+            }.or_else(|_| err!(MsError::InstructionFailed))
 
         });
 
