@@ -20,8 +20,7 @@ impl Ms {
         4 +         // transaction index
         4 +         // processed transaction index
         1 +         // PDA bump
-        32 +        // creator
-        (1 + 32);   // Optional root
+        32;         // creator
 
     pub fn init (&mut self, threshold: u16, creator: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
         self.threshold = threshold;
