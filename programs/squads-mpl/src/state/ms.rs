@@ -121,6 +121,7 @@ impl MsTransaction {
         self.instruction_index = 0;
         self.approved = Vec::new();
         self.rejected = Vec::new();
+        self.cancelled = Vec::new();
         self.bump = bump;
         Ok(())
     }
