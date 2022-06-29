@@ -106,7 +106,8 @@ impl MsTransaction {
         4 +                                 // the authority index (for this proposal)
         1 +                                 // the authority bump
         (1 + 12) +                          // the enum size
-        1;                                  // the number of instructions (attached)
+        1 +                                 // the number of instructions (attached)
+        1;                                  // space for tx bump
 
     pub fn initial_size_with_members(members_len: usize) -> usize {
         MsTransaction::MINIMUM_SIZE + (3 * (4 + (members_len * 32) ) )
