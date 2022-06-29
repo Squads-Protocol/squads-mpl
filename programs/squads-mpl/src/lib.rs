@@ -373,6 +373,7 @@ pub struct ActivateTransaction<'info> {
         ], bump = transaction.bump,
         constraint = creator.key() == transaction.creator,
         constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
+        constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
