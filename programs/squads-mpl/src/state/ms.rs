@@ -110,7 +110,7 @@ impl MsTransaction {
         1;                                  // the number of instructions (attached)
 
     pub fn initial_size_with_members(members_len: usize) -> usize {
-        MsTransaction::MINIMUM_SIZE + (2 * (4 + (members_len * 32) ) )
+        MsTransaction::MINIMUM_SIZE + (3 * (4 + (members_len * 32) ) )
     }
 
     pub fn init(&mut self, creator: Pubkey, transaction_index: u32, bump: u8, authority_index: u32, authority_bump: u8) -> Result<()>{
