@@ -674,7 +674,8 @@ describe('Basic functionality', () => {
   it('Change ms size with realloc', async () => {
      // get the state of the MS
      let msState = await program.account.ms.fetch(msPDA);
-
+     let msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
+     const startRentLamports = msAccount.value.lamports;
      // increment the transaction index
      const newTxIndex = msState.transactionIndex + 1;
      const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -804,7 +805,10 @@ describe('Basic functionality', () => {
     }
 
     msState = await program.account.ms.fetch(msPDA);
+    msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
+    const endRentLamports = msAccount.value.lamports;
     expect((msState.keys as any[]).length).to.equal(11);
+    expect(endRentLamports).to.be.greaterThan(startRentLamports);
   });
 
   it(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {
