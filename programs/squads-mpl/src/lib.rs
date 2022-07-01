@@ -25,7 +25,19 @@ pub mod squads_mpl {
         )
     }
 
-    pub fn add_member(ctx: Context<MsAuth>, new_member: Pubkey) -> Result<()> {
+    pub fn add_member(ctx: Context<MsAuthRealloc>, new_member: Pubkey) -> Result<()> {
+        // * check if realloc is needed
+        // get the current size
+        // get the size of the data after the key would be added (_+32)
+        // compare
+        // if not enough, add (10 * 32) to size
+        let curr_data_size = ctx.accounts.multisig_realloc.data.borrow().len();
+        let next_len = curr_data_size + 32;
+        let needed_len = curr_data_size + ( 10 * 32 );
+        if next_len > curr_data_size{
+            AccountInfo::realloc(&mut ctx.accounts.multisig_realloc, needed_len, false)?;
+        }
+        ctx.accounts.multisig.reload()?;
         ctx.accounts.multisig.add_member(new_member)?;
         ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
     }
@@ -508,6 +520,33 @@ pub struct ExecuteTransaction<'info> {
 pub struct MsAuth<'info> {
     #[account(mut)]
     multisig: Box<Account<'info, Ms>>,
+    #[account(
+        constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
+    )]
+    transaction: Box<Account<'info, MsTransaction>>,
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.creator.as_ref(),
+            b"multisig"
+        ], bump = multisig.bump
+    )]
+    pub multisig_auth: Signer<'info>,
+
+}
+
+#[derive(Accounts)]
+pub struct MsAuthRealloc<'info> {
+    #[account(mut)]
+    multisig: Box<Account<'info, Ms>>,
+    /// CHECK:
+    #[account(
+        mut,
+        constraint = multisig.key() == *multisig_realloc.key @MsError::InvalidInstructionAccount
+    )]
+    multisig_realloc: AccountInfo<'info>,
     #[account(
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,

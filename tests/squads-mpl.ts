@@ -83,9 +83,10 @@ describe('Basic functionality', () => {
 
   let txCount = 0;
   it(`Create Multisig - MS: ${msPDA.toBase58()}`, async () => {
-    const member2 = anchor.web3.Keypair.generate();
-    const member3 = anchor.web3.Keypair.generate();
-    await program.methods.create(1, [member2.publicKey, member3.publicKey])
+    const memberList = [...new Array(9)].map(()=>{
+      return anchor.web3.Keypair.generate().publicKey;
+    })
+    await program.methods.create(1, memberList)
       .accounts({
         multisig: msPDA,
         creator: creator.publicKey,
@@ -670,6 +671,142 @@ describe('Basic functionality', () => {
     expect(testPayeeAccount.value.lamports).to.equal(2000000);
   });
 
+  it('Change ms size with realloc', async () => {
+     // get the state of the MS
+     let msState = await program.account.ms.fetch(msPDA);
+
+     // increment the transaction index
+     const newTxIndex = msState.transactionIndex + 1;
+     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
+ 
+     // generate the tx pda
+     const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+ 
+    // 1 get the instruction to create a transction
+    // 2 get the instruction to add a member
+    // 3 get the instruction to 'activate' the tx
+    // 4 send over the transaction to the ms program with 1 - 3
+     // use 0 as authority index
+     let createIx = await program.methods.createTransaction(0)
+       .accounts({
+         multisig: msPDA,
+         transaction: txPDA,
+         creator: creator.publicKey
+       }).instruction();
+ 
+    let newMember = anchor.web3.Keypair.generate().publicKey;
+    
+    let addMemberIx = await program.methods.addMember(newMember)
+       .accounts({
+        multisig: msPDA,
+        multisigAuth: msPDA,
+        multisigRealloc: msPDA,
+        transaction: txPDA,
+       })
+       .instruction();
+
+    const newIxIndex = 1;
+    const newIxIndexBN = new anchor.BN(newIxIndex, 10);
+   
+    // create the instruction pda
+    const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+    let attachIx = await program.methods.addInstruction(addMemberIx)
+       .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        instruction: ixPDA,
+        creator: creator.publicKey
+       }).instruction();
+    
+    let activateIx = await program.methods.activateTransaction()
+        .accounts({multisig: msPDA, transaction: txPDA, creator: creator.publicKey})
+        .instruction();
+        
+    let addMemberTx = await createBlankTransaction(program, creator.publicKey);
+    addMemberTx.add(createIx);
+    addMemberTx.add(attachIx);
+    addMemberTx.add(activateIx);
+
+    creator.signTransaction(addMemberTx);
+    try {
+     const res = await programProvider.sendAndConfirm(addMemberTx);
+    }catch(e){
+      console.log(e);
+    }
+
+    await program.methods.approveTransaction()
+      .accounts({multisig: msPDA, transaction: txPDA, member: creator.publicKey})
+      .rpc();
+
+    let txState = await program.account.msTransaction.fetch(txPDA);
+    expect(txState.status).has.property("executeReady");
+
+        // 
+    // get the ix list
+    const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {
+      const ixIndexBN = new anchor.BN(i + 1,10);
+      const [ixKey] =  await getIxPDA(txPDA, ixIndexBN, program.programId);
+      const ixAccount= await program.account.msInstruction.fetch(ixKey);
+      return {pubkey: ixKey, ixItem: ixAccount};
+    }));
+
+    // get the keys for the ix(s)
+    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
+      const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
+
+      const formattedKeys = ixKeys.map((ixKey,keyInd) => {
+        return {
+          pubkey: ixKey.pubkey,
+          isSigner: false,
+          isWritable: ixKey.isWritable
+        };
+      });
+
+      return [
+        {pubkey, isSigner: false, isWritable: false},
+        {pubkey: ixItem.programId, isSigner: false, isWritable: false},
+        ...formattedKeys
+      ];
+    }).reduce((p,c) => p.concat(c),[])
+
+    // console.log(ixKeysList);
+
+    let executeKeys = [
+    {
+      pubkey: msPDA,
+      isSigner: false,
+      isWritable: true
+    },
+    {
+      pubkey: txPDA,
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: creator.publicKey,
+      isSigner: true,
+      isWritable: true,
+    },
+    {
+      pubkey: anchor.web3.SystemProgram.programId,
+      isSigner: false,
+      isWritable: false
+    }
+    ];
+    executeKeys = executeKeys.concat(ixKeysList);
+    const executeTx = await createExecuteTransactionTx(program, executeKeys, creator.publicKey);
+
+    creator.signTransaction(executeTx);
+    try {
+    const res = await programProvider.sendAndConfirm(executeTx);
+    } catch (e) {
+      console.log(e);
+      expect(e.message).contains("Transaction simulation failed");
+    }
+
+    msState = await program.account.ms.fetch(msPDA);
+  });
+
   it(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {
     // get the state of the MS
     let msState = await program.account.ms.fetch(msPDA);
@@ -704,7 +841,7 @@ describe('Basic functionality', () => {
       .accounts({
         multisig: msPDA,
         transaction: txPDA,
-        multisigAuth: msPDA
+        multisigAuth: msPDA,
       })
       .instruction();
 
@@ -851,7 +988,7 @@ describe('Basic functionality', () => {
       .accounts({
         multisig: msPDA,
         transaction: txPDA,
-        multisigAuth: msPDA
+        multisigAuth: msPDA,
       })
       .instruction();
 

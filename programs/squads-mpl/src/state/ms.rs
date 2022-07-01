@@ -285,3 +285,14 @@ pub struct IncomingInstruction {
     pub keys: Vec<MsAccountMeta>,
     pub data: Vec<u8>
 }
+
+#[cfg(test)]
+
+mod tests{
+    use super::*;
+
+    #[test]
+    fn ms_struct_pack_size (){
+
+    }
+}
