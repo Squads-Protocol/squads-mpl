@@ -17,6 +17,10 @@ pub mod squads_mpl {
 
     use super::*;
     pub fn create(ctx: Context<Create>, threshold:u16, members: Vec<Pubkey>) -> Result<()> {
+        if !(1..=members.len()).contains(&usize::from(threshold)) {
+            return err!(MsError::InvalidThreshold);
+        }
+
         ctx.accounts.multisig.init(
             threshold,
             ctx.accounts.creator.key(),
@@ -394,6 +398,7 @@ pub struct ActivateTransaction<'info> {
         constraint = creator.key() == transaction.creator,
         constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
+        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -424,6 +429,7 @@ pub struct ApproveTransaction<'info> {
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
+        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -454,6 +460,7 @@ pub struct RejectTransaction<'info> {
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
+        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
