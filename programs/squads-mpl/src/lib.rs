@@ -31,14 +31,14 @@ pub mod squads_mpl {
         // get the size of the data after the key would be added (size + 32)
         // compare
         // if not enough, add (10 * 32) to size - bump it up by 10 accounts 
-        let mut multisig_account_info = ctx.accounts.multisig.to_account_info();
+        let multisig_account_info = ctx.accounts.multisig.to_account_info();
         let curr_data_size = multisig_account_info.data.borrow().len();
         let next_len = curr_data_size + 32;
         if next_len > curr_data_size{
             let needed_len = curr_data_size + ( 10 * 32 );
             let rent_exempt_lamports = ctx.accounts.rent.minimum_balance(needed_len).max(1);
             let top_up_lamports = rent_exempt_lamports.saturating_sub(ctx.accounts.multisig.to_account_info().lamports());
-            AccountInfo::realloc(&mut multisig_account_info, needed_len, false)?;
+            AccountInfo::realloc(&multisig_account_info, needed_len, false)?;
             invoke(
                 &transfer(ctx.accounts.member.key, &ctx.accounts.multisig.key(), top_up_lamports),
                 &[
@@ -569,7 +569,8 @@ pub struct MsAuthRealloc<'info> {
         ], bump = multisig.bump
     )]
     pub multisig_auth: Signer<'info>,
-    #[account(mut)]                 // needs to sign as well to transfer lamports if needed
+    // needs to sign as well to transfer lamports if needed
+    #[account(mut)]
     pub member: Signer<'info>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>

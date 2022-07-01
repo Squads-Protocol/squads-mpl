@@ -5,6 +5,8 @@ import { BorshCoder, Program } from '@project-serum/anchor';
 import { SquadsMpl } from '../target/types/squads_mpl';
 import { AccountMeta, Connection, PublicKey, Transaction } from '@solana/web3.js';
 
+
+// some TX/IX helper functions
 const createTestTransferTransaction = async (authority: PublicKey, recipient: PublicKey, amount = 1000000) => {
   return anchor.web3.SystemProgram.transfer(
     {
@@ -49,6 +51,7 @@ const createExecuteTransactionTx = async (program, keys, feePayer) => {
   return executeTx;
 };
 
+// some PDA helper functions
 const getMsPDA = (creator: PublicKey, programId: PublicKey) => PublicKey.findProgramAddressSync([
   anchor.utils.bytes.utf8.encode("squad"),
   creator.toBuffer(),
@@ -69,6 +72,7 @@ const getIxPDA =  async(txPDA: PublicKey, iXIndexBN: anchor.BN, programId: Publi
   anchor.utils.bytes.utf8.encode("instruction")
 ], programId);
 
+// test suite
 describe('Basic functionality', () => {
 
   // Configure the client to use the local cluster.
@@ -96,6 +100,7 @@ describe('Basic functionality', () => {
     let msState = await program.account.ms.fetch(msPDA);
     expect(msState.threshold).to.equal(1);
     expect(msState.transactionIndex).to.equal(0);
+    expect((msState.keys as any[]).length).to.equal(10);
   });
 
 
@@ -153,7 +158,6 @@ describe('Basic functionality', () => {
       txCount++;
       // check the transaction indexes match
       msState = await program.account.ms.fetch(msPDA);
-      expect(msState.transactionIndex).to.equal(txCount);
       expect(txState.instructionIndex).to.equal(0);
       expect(txState.status).to.have.property("draft");
 
