@@ -30,7 +30,59 @@ const createBlankTransaction = async (program, feePayer) =>{
 };
 
 
-const createExecuteTransactionTx = async (program, keys, feePayer) => {
+const createExecuteTransactionTx = async (program, ms, tx, feePayer) => {
+    const txState = await program.account.msTransaction.fetch(tx);
+
+    const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {
+      const ixIndexBN = new anchor.BN(i + 1,10);
+      const [ixKey] =  await getIxPDA(tx, ixIndexBN, program.programId);
+      const ixAccount= await program.account.msInstruction.fetch(ixKey);
+      return {pubkey: ixKey, ixItem: ixAccount};
+    }));
+
+    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
+      const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
+
+      const formattedKeys = ixKeys.map((ixKey,keyInd) => {
+        return {
+          pubkey: ixKey.pubkey,
+          isSigner: false,
+          isWritable: ixKey.isWritable
+        };
+      });
+
+      return [
+        {pubkey, isSigner: false, isWritable: false},
+        {pubkey: ixItem.programId, isSigner: false, isWritable: false},
+        ...formattedKeys
+      ];
+    }).reduce((p,c) => p.concat(c),[])
+
+    let executeKeys = [
+    {
+      pubkey: ms,
+      isSigner: false,
+      isWritable: true
+    },
+    {
+      pubkey: tx,
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: feePayer,
+      isSigner: true,
+      isWritable: true,
+    },
+    {
+      pubkey: anchor.web3.SystemProgram.programId,
+      isSigner: false,
+      isWritable: false
+    }
+  ];
+  const keys = executeKeys.concat(ixKeysList);
+
+
   const {blockhash} = await program.provider.connection.getLatestBlockhash();
   const lastValidBlockHeight = await program.provider.connection.getBlockHeight();
 
@@ -411,59 +463,7 @@ describe('Basic functionality', () => {
       console.log(e);
     }
 
-    // get the TX
-    txState = await program.account.msTransaction.fetch(txPDA);
-
-    const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {
-      const ixIndexBN = new anchor.BN(i + 1,10);
-      const [ixKey] =  await getIxPDA(txPDA, ixIndexBN, program.programId);
-      const ixAccount= await program.account.msInstruction.fetch(ixKey);
-      return {pubkey: ixKey, ixItem: ixAccount};
-    }));
-
-    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
-      const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
-
-      const formattedKeys = ixKeys.map((ixKey,keyInd) => {
-        return {
-          pubkey: ixKey.pubkey,
-          isSigner: false,
-          isWritable: ixKey.isWritable
-        };
-      });
-
-      return [
-        {pubkey, isSigner: false, isWritable: false},
-        {pubkey: ixItem.programId, isSigner: false, isWritable: false},
-        ...formattedKeys
-      ];
-    }).reduce((p,c) => p.concat(c),[])
-
-    let executeKeys = [
-    {
-      pubkey: msPDA,
-      isSigner: false,
-      isWritable: true
-    },
-    {
-      pubkey: txPDA,
-      isSigner: false,
-      isWritable: true,
-    },
-    {
-      pubkey: creator.publicKey,
-      isSigner: true,
-      isWritable: true,
-    },
-    {
-      pubkey: anchor.web3.SystemProgram.programId,
-      isSigner: false,
-      isWritable: false
-    }
-  ];
-    executeKeys = executeKeys.concat(ixKeysList);
-
-    const executeTx = await createExecuteTransactionTx(program, executeKeys, creator.publicKey);
+    const executeTx = await createExecuteTransactionTx(program, msPDA, txPDA, creator.publicKey);
 
     creator.signTransaction(executeTx);
     try {
@@ -591,59 +591,7 @@ describe('Basic functionality', () => {
       console.log(e);
     }
 
-    // get the TX
-    txState = await program.account.msTransaction.fetch(txPDA);
-
-    const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {
-      const ixIndexBN = new anchor.BN(i + 1,10);
-      const [ixKey] =  await getIxPDA(txPDA, ixIndexBN, program.programId);
-      const ixAccount= await program.account.msInstruction.fetch(ixKey);
-      return {pubkey: ixKey, ixItem: ixAccount};
-    }));
-
-    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
-      const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
-
-      const formattedKeys = ixKeys.map((ixKey,keyInd) => {
-        return {
-          pubkey: ixKey.pubkey,
-          isSigner: false,
-          isWritable: ixKey.isWritable
-        };
-      });
-
-      return [
-        {pubkey, isSigner: false, isWritable: false},
-        {pubkey: ixItem.programId, isSigner: false, isWritable: false},
-        ...formattedKeys
-      ];
-    }).reduce((p,c) => p.concat(c),[])
-
-    let executeKeys = [
-    {
-      pubkey: msPDA,
-      isSigner: false,
-      isWritable: true
-    },
-    {
-      pubkey: txPDA,
-      isSigner: false,
-      isWritable: true,
-    },
-    {
-      pubkey: creator.publicKey,
-      isSigner: true,
-      isWritable: true,
-    },
-    {
-      pubkey: anchor.web3.SystemProgram.programId,
-      isSigner: false,
-      isWritable: false
-    }
-  ];
-    executeKeys = executeKeys.concat(ixKeysList);
-
-    const executeTx = await createExecuteTransactionTx(program, executeKeys, creator.publicKey);
+    const executeTx = await createExecuteTransactionTx(program, msPDA, txPDA, creator.publicKey);
 
     creator.signTransaction(executeTx);
     try {
@@ -728,60 +676,7 @@ describe('Basic functionality', () => {
     let txState = await program.account.msTransaction.fetch(txPDA);
     expect(txState.status).has.property("executeReady");
 
-        // 
-    // get the ix list
-    const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {
-      const ixIndexBN = new anchor.BN(i + 1,10);
-      const [ixKey] =  await getIxPDA(txPDA, ixIndexBN, program.programId);
-      const ixAccount= await program.account.msInstruction.fetch(ixKey);
-      return {pubkey: ixKey, ixItem: ixAccount};
-    }));
-
-    // get the keys for the ix(s)
-    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
-      const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
-
-      const formattedKeys = ixKeys.map((ixKey,keyInd) => {
-        return {
-          pubkey: ixKey.pubkey,
-          isSigner: false,
-          isWritable: ixKey.isWritable
-        };
-      });
-
-      return [
-        {pubkey, isSigner: false, isWritable: false},
-        {pubkey: ixItem.programId, isSigner: false, isWritable: false},
-        ...formattedKeys
-      ];
-    }).reduce((p,c) => p.concat(c),[])
-
-    // console.log(ixKeysList);
-
-    let executeKeys = [
-    {
-      pubkey: msPDA,
-      isSigner: false,
-      isWritable: true
-    },
-    {
-      pubkey: txPDA,
-      isSigner: false,
-      isWritable: true,
-    },
-    {
-      pubkey: creator.publicKey,
-      isSigner: true,
-      isWritable: true,
-    },
-    {
-      pubkey: anchor.web3.SystemProgram.programId,
-      isSigner: false,
-      isWritable: false
-    }
-    ];
-    executeKeys = executeKeys.concat(ixKeysList);
-    const executeTx = await createExecuteTransactionTx(program, executeKeys, creator.publicKey);
+    const executeTx = await createExecuteTransactionTx(program, msPDA, txPDA, creator.publicKey);
 
     creator.signTransaction(executeTx);
     try {
@@ -873,59 +768,7 @@ describe('Basic functionality', () => {
     txState = await program.account.msTransaction.fetch(txPDA);
     expect(txState.status).to.have.property("executeReady");
 
-    // get the ix list
-    const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {
-      const ixIndexBN = new anchor.BN(i + 1,10);
-      const [ixKey] =  await getIxPDA(txPDA, ixIndexBN, program.programId);
-      const ixAccount= await program.account.msInstruction.fetch(ixKey);
-      return {pubkey: ixKey, ixItem: ixAccount};
-    }));
-
-    // get the keys for the ix(s)
-    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
-      const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
-
-      const formattedKeys = ixKeys.map((ixKey,keyInd) => {
-        return {
-          pubkey: ixKey.pubkey,
-          isSigner: false,
-          isWritable: ixKey.isWritable
-        };
-      });
-
-      return [
-        {pubkey, isSigner: false, isWritable: false},
-        {pubkey: ixItem.programId, isSigner: false, isWritable: false},
-        ...formattedKeys
-      ];
-    }).reduce((p,c) => p.concat(c),[])
-
-    // console.log(ixKeysList);
-
-    let executeKeys = [
-    {
-      pubkey: msPDA,
-      isSigner: false,
-      isWritable: true
-    },
-    {
-      pubkey: txPDA,
-      isSigner: false,
-      isWritable: true,
-    },
-    {
-      pubkey: creator.publicKey,
-      isSigner: true,
-      isWritable: true,
-    },
-    {
-      pubkey: anchor.web3.SystemProgram.programId,
-      isSigner: false,
-      isWritable: false
-    }
-  ];
-    executeKeys = executeKeys.concat(ixKeysList);
-    const executeTx = await createExecuteTransactionTx(program, executeKeys, creator.publicKey);
+    const executeTx = await createExecuteTransactionTx(program, msPDA, txPDA, creator.publicKey);
 
     creator.signTransaction(executeTx);
     try {
@@ -1013,60 +856,7 @@ describe('Basic functionality', () => {
 
       // execute the tx
 
-    // get the TX
-    txState = await program.account.msTransaction.fetch(txPDA);
-
-    // get the ix list
-    const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {
-      const ixIndexBN = new anchor.BN(i + 1,10);
-      const [ixKey] =  await getIxPDA(txPDA, ixIndexBN, program.programId);
-      const ixAccount= await program.account.msInstruction.fetch(ixKey);
-      return {pubkey: ixKey, ixItem: ixAccount};
-    }));
-
-    // get the keys for the ix(s)
-    const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
-      const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
-
-      const formattedKeys = ixKeys.map((ixKey,keyInd) => {
-        return {
-          pubkey: ixKey.pubkey,
-          isSigner: false,
-          isWritable: ixKey.isWritable
-        };
-      });
-
-      return [
-        {pubkey, isSigner: false, isWritable: false},
-        {pubkey: ixItem.programId, isSigner: false, isWritable: false},
-        ...formattedKeys
-      ];
-    }).reduce((p,c) => p.concat(c),[])
-
-    let executeKeys = [
-    {
-      pubkey: msPDA,
-      isSigner: false,
-      isWritable: true
-    },
-    {
-      pubkey: txPDA,
-      isSigner: false,
-      isWritable: true,
-    },
-    {
-      pubkey: creator.publicKey,
-      isSigner: true,
-      isWritable: true,
-    },
-    {
-      pubkey: anchor.web3.SystemProgram.programId,
-      isSigner: false,
-      isWritable: false
-    }
-  ];
-    executeKeys = executeKeys.concat(ixKeysList);
-    const executeTx = await createExecuteTransactionTx(program, executeKeys, creator.publicKey);
+    const executeTx = await createExecuteTransactionTx(program, msPDA, txPDA, creator.publicKey);
 
     creator.signTransaction(executeTx);
     try {
