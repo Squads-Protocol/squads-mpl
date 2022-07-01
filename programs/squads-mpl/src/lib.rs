@@ -313,6 +313,7 @@ pub struct CreateTransaction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
+        constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 
@@ -343,6 +344,7 @@ pub struct AddInstruction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
+        constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 

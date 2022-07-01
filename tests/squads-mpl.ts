@@ -72,6 +72,12 @@ const getIxPDA =  async(txPDA: PublicKey, iXIndexBN: anchor.BN, programId: Publi
   anchor.utils.bytes.utf8.encode("instruction")
 ], programId);
 
+// basic helpers
+const getNextTxIndex = async (program:  Program<SquadsMpl>, msAddress: PublicKey) => {
+  const msState = await program.account.ms.fetch(msAddress);
+  return msState.transactionIndex + 1;
+};
+
 // test suite
 describe('Basic functionality', () => {
 
@@ -86,8 +92,9 @@ describe('Basic functionality', () => {
   const [msPDA] = getMsPDA(creator.publicKey, program.programId);
 
   let txCount = 0;
+  const numberOfMembersTotal = 10;
   it(`Create Multisig - MS: ${msPDA.toBase58()}`, async () => {
-    const memberList = [...new Array(9)].map(()=>{
+    const memberList = [...new Array(numberOfMembersTotal - 1)].map(()=>{
       return anchor.web3.Keypair.generate().publicKey;
     })
     await program.methods.create(1, memberList)
@@ -100,18 +107,14 @@ describe('Basic functionality', () => {
     let msState = await program.account.ms.fetch(msPDA);
     expect(msState.threshold).to.equal(1);
     expect(msState.transactionIndex).to.equal(0);
-    expect((msState.keys as any[]).length).to.equal(10);
+    expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal);
   });
 
 
   it(`Create Tx draft - MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
-    // get the state of the MS
-    let msState = await program.account.ms.fetch(msPDA);
-
-    // increment the transaction index
-    const newTxIndex = msState.transactionIndex + 1;
-    const newTxIndexBN = new anchor.BN(msState.transactionIndex + 1, 10);
+    const newTxIndex = await getNextTxIndex(program, msPDA);
+    const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
     // generate the tx pda
     const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
@@ -130,17 +133,14 @@ describe('Basic functionality', () => {
     expect(txState.creator.toBase58()).to.equal(creator.publicKey.toBase58());
 
     // check the transaction indexes match
-    msState = await program.account.ms.fetch(msPDA);
+    const msState = await program.account.ms.fetch(msPDA);
     expect(txState.transactionIndex).to.equal(msState.transactionIndex);
   });
 
   it(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
      // create an transaction draft
      // get the state of the MS
-     let msState = await program.account.ms.fetch(msPDA);
-
-     // increment the transaction index
-     const newTxIndex = msState.transactionIndex + 1;
+     const newTxIndex = await getNextTxIndex(program, msPDA);
      const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
      // generate the tx pda
@@ -157,7 +157,7 @@ describe('Basic functionality', () => {
       let txState = await program.account.msTransaction.fetch(txPDA);
       txCount++;
       // check the transaction indexes match
-      msState = await program.account.ms.fetch(msPDA);
+      const msState = await program.account.ms.fetch(msPDA);
       expect(txState.instructionIndex).to.equal(0);
       expect(txState.status).to.have.property("draft");
 
@@ -193,11 +193,7 @@ describe('Basic functionality', () => {
 
   it(`Tx Activate MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
-    // get the state of the MS
-    let msState = await program.account.ms.fetch(msPDA);
-
-    // increment the transaction index
-    const newTxIndex = msState.transactionIndex + 1;
+    const newTxIndex = await getNextTxIndex(program, msPDA);
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
     // generate the tx pda
@@ -214,7 +210,7 @@ describe('Basic functionality', () => {
      let txState = await program.account.msTransaction.fetch(txPDA);
      txCount++;
      // check the transaction indexes match
-     msState = await program.account.ms.fetch(msPDA);
+     const msState = await program.account.ms.fetch(msPDA);
 
      // increment the instruction index for this transaction (for new PDA)
      const newIxIndex = txState.instructionIndex + 1;
@@ -255,11 +251,7 @@ describe('Basic functionality', () => {
 
   it(`Tx Sign MS: ${msPDA.toBase58()}`, async () => {
     // create an transaction draft
-    // get the state of the MS
-    let msState = await program.account.ms.fetch(msPDA);
-
-    // increment the transaction index
-    const newTxIndex = msState.transactionIndex + 1;
+    const newTxIndex = await getNextTxIndex(program, msPDA);
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
     // generate the tx pda
@@ -276,7 +268,7 @@ describe('Basic functionality', () => {
     let txState = await program.account.msTransaction.fetch(txPDA);
     txCount++;
     // check the transaction indexes match
-    msState = await program.account.ms.fetch(msPDA);
+    const msState = await program.account.ms.fetch(msPDA);
 
     // increment the instruction index for this transaction (for new PDA)
     const newIxIndex = txState.instructionIndex + 1;
@@ -341,11 +333,7 @@ describe('Basic functionality', () => {
       anchor.utils.bytes.utf8.encode("authority")
     ], program.programId);
 
-    // get the state of the MS
-    let msState = await program.account.ms.fetch(msPDA);
-
-    // increment the transaction index
-    const newTxIndex = msState.transactionIndex + 1;
+    const newTxIndex = await getNextTxIndex(program, msPDA);
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
     // generate the tx pda
@@ -362,7 +350,7 @@ describe('Basic functionality', () => {
     let txState = await program.account.msTransaction.fetch(txPDA);
     txCount++;
     // check the transaction indexes match
-    msState = await program.account.ms.fetch(msPDA);
+    let msState = await program.account.ms.fetch(msPDA);
 
     // increment the instruction index for this transaction (for new PDA)
     const newIxIndex = txState.instructionIndex + 1;
@@ -503,10 +491,7 @@ describe('Basic functionality', () => {
     ], program.programId);
 
     // get the state of the MS
-    let msState = await program.account.ms.fetch(msPDA);
-
-    // increment the transaction index
-    const newTxIndex = msState.transactionIndex + 1;
+    const newTxIndex = await getNextTxIndex(program, msPDA);
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
     // generate the tx pda
@@ -523,7 +508,7 @@ describe('Basic functionality', () => {
     let txState = await program.account.msTransaction.fetch(txPDA);
     txCount++;
     // check the transaction indexes match
-    msState = await program.account.ms.fetch(msPDA);
+    let msState = await program.account.ms.fetch(msPDA);
 
     // person/entity who gets paid
     const testPayee = anchor.web3.Keypair.generate();
@@ -676,12 +661,10 @@ describe('Basic functionality', () => {
   });
 
   it('Change ms size with realloc', async () => {
-     // get the state of the MS
-     let msState = await program.account.ms.fetch(msPDA);
      let msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
      const startRentLamports = msAccount.value.lamports;
      // increment the transaction index
-     const newTxIndex = msState.transactionIndex + 1;
+     const newTxIndex = await getNextTxIndex(program, msPDA);
      const newTxIndexBN = new anchor.BN(newTxIndex, 10);
  
      // generate the tx pda
@@ -808,19 +791,15 @@ describe('Basic functionality', () => {
       expect(e.message).contains("Transaction simulation failed");
     }
 
-    msState = await program.account.ms.fetch(msPDA);
+    const msState = await program.account.ms.fetch(msPDA);
     msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
     const endRentLamports = msAccount.value.lamports;
-    expect((msState.keys as any[]).length).to.equal(11);
+    expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 1);
     expect(endRentLamports).to.be.greaterThan(startRentLamports);
   });
 
   it(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {
-    // get the state of the MS
-    let msState = await program.account.ms.fetch(msPDA);
-
-    // increment the transaction index
-    const newTxIndex = msState.transactionIndex + 1;
+    const newTxIndex = await getNextTxIndex(program, msPDA);
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
     // generate the tx pda
@@ -955,7 +934,7 @@ describe('Basic functionality', () => {
       console.log(e);
     }
 
-    msState = await program.account.ms.fetch(msPDA);
+    const msState = await program.account.ms.fetch(msPDA);
     txState = await program.account.msTransaction.fetch(txPDA);
 
     expect(msState.threshold).to.equal(2);
@@ -964,10 +943,7 @@ describe('Basic functionality', () => {
   });
 
   it("Insufficient approval failure", async() => {    // get the state of the MS
-    let msState = await program.account.ms.fetch(msPDA);
-
-    // increment the transaction index
-    const newTxIndex = msState.transactionIndex + 1;
+    const newTxIndex = await getNextTxIndex(program, msPDA);
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
     // generate the tx pda
