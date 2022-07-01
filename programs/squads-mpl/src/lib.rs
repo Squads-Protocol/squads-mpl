@@ -209,7 +209,7 @@ pub mod squads_mpl {
         // iterator for remaining accounts
         let ix_iter = &mut ctx.remaining_accounts.iter();
         let max_ix_index = ctx.accounts.transaction.instruction_index + 1;
-        let res = (1..max_ix_index).try_for_each(|i| {
+        (1..max_ix_index).try_for_each(|i| {
             // each ix block starts with the ms_ix account
             let ms_ix_account: &AccountInfo = next_account_info(ix_iter)?;
 
@@ -256,40 +256,24 @@ pub mod squads_mpl {
             // execute the ix
             match ctx.accounts.transaction.authority_index {
                 0 => {
-                   let ix_res = invoke_signed(
+                   invoke_signed(
                         &ix,
                         &ix_account_infos,
                         &[&ms_authority_seeds]
-                    );
-                    msg!("after invoke");
-                    ix_res
+                    )?;
                 },
                 1.. => {
-                    let ix_res = invoke_signed(
+                   invoke_signed(
                         &ix,
                         &ix_account_infos,
                         &[&authority_seeds]
-                    );
-                    msg!("after invoke");
-                    ix_res
+                    )?;
                 }
-            
-            // we can map the error, but we can't keep the logic moving
-            // ...maybe for the future?
-            }.map_err(|_| MsError::InstructionFailed.into())
-        });
+            };
+            Ok(())
+        })?;
 
-        // the following may be pointless for now - unless solana changes
-        // if tx returned failure(s) mark as failed and close
-        match res {
-            Ok(_) => {
-                ctx.accounts.transaction.set_executed()?;
-            },
-            // unfortunately this never gets invoke as the parent instruction exits entirely
-            Err(_) => {
-                ctx.accounts.transaction.set_failed()?;
-            }
-        };
+        ctx.accounts.transaction.set_executed()?;
 
         ctx.accounts.multisig.reload()?;
         Ok(())

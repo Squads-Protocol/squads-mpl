@@ -80,7 +80,6 @@ pub enum MsTransactionStatus {
     ExecuteReady,   // Transaction has been approved and is pending execution
     Executed,       // Transaction has been executed
     Rejected,       // Transaction has been rejected
-    Failed,         // Transaction failed
     Cancelled,      // Transaction has been cancelled
 }
 
@@ -154,12 +153,6 @@ impl MsTransaction {
     // set status to executed
     pub fn set_executed(&mut self) -> Result<()>{
         self.status = MsTransactionStatus::Executed;
-        Ok(())
-    }
-
-    // set status to executed
-    pub fn set_failed(&mut self) -> Result<()>{
-        self.status = MsTransactionStatus::Failed;
         Ok(())
     }
 
@@ -284,15 +277,4 @@ pub struct IncomingInstruction {
     pub program_id: Pubkey,
     pub keys: Vec<MsAccountMeta>,
     pub data: Vec<u8>
-}
-
-#[cfg(test)]
-
-mod tests{
-    use super::*;
-
-    #[test]
-    fn ms_struct_pack_size (){
-
-    }
 }
