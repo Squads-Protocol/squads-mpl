@@ -769,6 +769,7 @@ describe('Basic functionality', () => {
     try {
      const res = await programProvider.sendAndConfirm(executeTx);
     } catch (e) {
+      // :(
       expect(e.message).to.include("failed");
     }
  

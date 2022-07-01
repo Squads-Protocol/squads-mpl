@@ -256,22 +256,26 @@ pub mod squads_mpl {
             // execute the ix
             match ctx.accounts.transaction.authority_index {
                 0 => {
-                    invoke_signed(
+                   let ix_res = invoke_signed(
                         &ix,
                         &ix_account_infos,
                         &[&ms_authority_seeds]
-                    )
+                    );
+                    msg!("after invoke");
+                    ix_res
                 },
                 1.. => {
-                    invoke_signed(
+                    let ix_res = invoke_signed(
                         &ix,
                         &ix_account_infos,
                         &[&authority_seeds]
-                    )
+                    );
+                    msg!("after invoke");
+                    ix_res
                 }
             
             // we can map the error, but we can't keep the logic moving
-            // for the future?
+            // ...maybe for the future?
             }.map_err(|_| MsError::InstructionFailed.into())
         });
 
