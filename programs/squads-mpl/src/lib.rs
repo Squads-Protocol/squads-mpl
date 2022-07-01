@@ -269,15 +269,19 @@ pub mod squads_mpl {
                         &[&authority_seeds]
                     )
                 }
-            }.or_else(|_| err!(MsError::InstructionFailed))
-
+            
+            // we can map the error, but we can't keep the logic moving
+            // for the future?
+            }.map_err(|_| MsError::InstructionFailed.into())
         });
 
+        // the following may be pointless for now - unless solana changes
         // if tx returned failure(s) mark as failed and close
         match res {
             Ok(_) => {
                 ctx.accounts.transaction.set_executed()?;
             },
+            // unfortunately this never gets invoke as the parent instruction exits entirely
             Err(_) => {
                 ctx.accounts.transaction.set_failed()?;
             }

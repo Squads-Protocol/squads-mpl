@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import * as anchor from '@project-serum/anchor';
 import { BorshCoder, Program } from '@project-serum/anchor';
 import { SquadsMpl } from '../target/types/squads_mpl';
-import { AccountMeta, Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { AccountMeta, Connection, LAMPORTS_PER_SOL, PublicKey, Transaction } from '@solana/web3.js';
 
 
 // some TX/IX helper functions
@@ -693,6 +693,92 @@ describe('Basic functionality', () => {
     expect(endRentLamports).to.be.greaterThan(startRentLamports);
   });
 
+  it('Transaction instruction failure', async () => {
+    // create authority to use (Vault, index 1)
+    const authorityIndexBN = new anchor.BN(1,10);
+    const [authorityPDA] = await PublicKey.findProgramAddress([
+      anchor.utils.bytes.utf8.encode("squad"),
+      msPDA.toBuffer(),
+      authorityIndexBN.toBuffer("le",4),  // note instruction index is a u8 (1 byte)
+      anchor.utils.bytes.utf8.encode("authority")
+    ], program.programId);
+ 
+    const newTxIndex = await getNextTxIndex(program, msPDA);
+    const newTxIndexBN = new anchor.BN(newTxIndex, 10);
+ 
+    // generate the tx pda
+    const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+ 
+    await program.methods.createTransaction(1)
+      .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        creator: creator.publicKey
+      })
+      .rpc();
+ 
+    let txState = await program.account.msTransaction.fetch(txPDA);
+    txCount++;
+    // check the transaction indexes match
+    let msState = await program.account.ms.fetch(msPDA);
+ 
+    // increment the instruction index for this transaction (for new PDA)
+    const newIxIndex = txState.instructionIndex + 1;
+    const newIxIndexBN = new anchor.BN(newIxIndex, 10);
+ 
+    // create the instruction pda
+    const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+ 
+    // the test transfer instruction
+    const testPayee = anchor.web3.Keypair.generate();
+    const testIx = await createTestTransferTransaction( authorityPDA, testPayee.publicKey, LAMPORTS_PER_SOL * 100);
+ 
+    // add the instruction to the transaction
+    await program.methods.addInstruction(testIx)
+      .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        instruction: ixPDA,
+        creator: creator.publicKey
+      })
+      .rpc();
+ 
+    await program.methods.activateTransaction()
+      .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        creator: creator.publicKey
+      })
+      .rpc();
+ 
+    try {
+      await program.methods.approveTransaction()
+        .accounts({
+          multisig: msPDA,
+          transaction: txPDA,
+          member: creator.publicKey
+        })
+        .rpc();
+    } catch (e) {
+      console.log(e);
+    }
+ 
+    const executeTx = await createExecuteTransactionTx(program, msPDA, txPDA, creator.publicKey);
+ 
+    creator.signTransaction(executeTx);
+    try {
+     const res = await programProvider.sendAndConfirm(executeTx);
+    } catch (e) {
+      expect(e.message).to.include("failed");
+    }
+ 
+    msState = await program.account.ms.fetch(msPDA);
+    txState = await program.account.msTransaction.fetch(txPDA);
+ 
+    expect(txState.status).to.have.property("executeReady");
+   
+   });
+
   it(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {
     const newTxIndex = await getNextTxIndex(program, msPDA);
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -865,4 +951,5 @@ describe('Basic functionality', () => {
       expect(e.message).to.contain("Error processing Instruction");
     }
   });
+
 });
