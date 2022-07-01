@@ -700,7 +700,6 @@ describe('Basic functionality', () => {
        .accounts({
         multisig: msPDA,
         multisigAuth: msPDA,
-        multisigRealloc: msPDA,
         transaction: txPDA,
        })
        .instruction();
@@ -805,6 +804,7 @@ describe('Basic functionality', () => {
     }
 
     msState = await program.account.ms.fetch(msPDA);
+    expect((msState.keys as any[]).length).to.equal(11);
   });
 
   it(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {

@@ -27,7 +27,7 @@ impl Ms {
         self.keys = members;
         self.keys.push(creator);
         self.keys.sort();
-        self.authority_index = 0;
+        self.authority_index = 1;   // default vault is the first authority
         self.transaction_index = 0;
         self.ms_change_index= 0;
         self.bump = bump;

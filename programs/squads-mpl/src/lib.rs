@@ -13,7 +13,7 @@ pub mod squads_mpl {
 
     use std::convert::TryInto;
 
-    use anchor_lang::solana_program::program::invoke_signed;
+    use anchor_lang::solana_program::{program::{invoke_signed, invoke}, system_instruction::transfer};
 
     use super::*;
     pub fn create(ctx: Context<Create>, threshold:u16, members: Vec<Pubkey>) -> Result<()> {
@@ -28,14 +28,25 @@ pub mod squads_mpl {
     pub fn add_member(ctx: Context<MsAuthRealloc>, new_member: Pubkey) -> Result<()> {
         // * check if realloc is needed
         // get the current size
-        // get the size of the data after the key would be added (_+32)
+        // get the size of the data after the key would be added (size + 32)
         // compare
-        // if not enough, add (10 * 32) to size
-        let curr_data_size = ctx.accounts.multisig_realloc.data.borrow().len();
+        // if not enough, add (10 * 32) to size - bump it up by 10 accounts 
+        let mut multisig_account_info = ctx.accounts.multisig.to_account_info();
+        let curr_data_size = multisig_account_info.data.borrow().len();
         let next_len = curr_data_size + 32;
-        let needed_len = curr_data_size + ( 10 * 32 );
         if next_len > curr_data_size{
-            AccountInfo::realloc(&mut ctx.accounts.multisig_realloc, needed_len, false)?;
+            let needed_len = curr_data_size + ( 10 * 32 );
+            let rent_exempt_lamports = ctx.accounts.rent.minimum_balance(needed_len).max(1);
+            let top_up_lamports = rent_exempt_lamports.saturating_sub(ctx.accounts.multisig.to_account_info().lamports());
+            AccountInfo::realloc(&mut multisig_account_info, needed_len, false)?;
+            invoke(
+                &transfer(ctx.accounts.member.key, &ctx.accounts.multisig.key(), top_up_lamports),
+                &[
+                    ctx.accounts.member.to_account_info().clone(),
+                    multisig_account_info.clone(),
+                    ctx.accounts.system_program.to_account_info().clone(),
+                ],
+            )?;
         }
         ctx.accounts.multisig.reload()?;
         ctx.accounts.multisig.add_member(new_member)?;
@@ -236,6 +247,9 @@ pub mod squads_mpl {
                 let ix_account_info = next_account_info(ix_iter)?;
                 ix_account_infos.push(ix_account_info.clone());
             }
+
+            // push the executor incase realloc is needed
+            // ix_account_infos.push(ctx.accounts.member.clone());
             // create the instruction to invoke from the saved ms ix account
             let ix: Instruction = Instruction::from(ms_ix);
 
@@ -541,12 +555,6 @@ pub struct MsAuth<'info> {
 pub struct MsAuthRealloc<'info> {
     #[account(mut)]
     multisig: Box<Account<'info, Ms>>,
-    /// CHECK:
-    #[account(
-        mut,
-        constraint = multisig.key() == *multisig_realloc.key @MsError::InvalidInstructionAccount
-    )]
-    multisig_realloc: AccountInfo<'info>,
     #[account(
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
@@ -561,5 +569,8 @@ pub struct MsAuthRealloc<'info> {
         ], bump = multisig.bump
     )]
     pub multisig_auth: Signer<'info>,
-
+    #[account(mut)]                 // needs to sign as well to transfer lamports if needed
+    pub member: Signer<'info>,
+    pub rent: Sysvar<'info, Rent>,
+    pub system_program: Program<'info, System>
 }
