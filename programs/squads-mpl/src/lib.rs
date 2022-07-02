@@ -39,6 +39,9 @@ pub mod squads_mpl {
         let curr_data_size = multisig_account_info.data.borrow().len();
         let next_len = curr_data_size + 32;
         if next_len > curr_data_size{
+            if (ctx.accounts.multisig.keys.len() + 10) > u16::MAX:usize {
+                return err!(MsError::MaxMembersReached)
+            }
             let needed_len = curr_data_size + ( 10 * 32 );
             let rent_exempt_lamports = ctx.accounts.rent.minimum_balance(needed_len).max(1);
             let top_up_lamports = rent_exempt_lamports.saturating_sub(ctx.accounts.multisig.to_account_info().lamports());

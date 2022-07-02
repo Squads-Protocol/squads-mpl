@@ -11,5 +11,6 @@ pub enum MsError {
     CannotRemoveSoloMember,
     InvalidThreshold,
     DeprecatedTransaction,
-    InstructionFailed
+    InstructionFailed,
+    MaxMembersReached
 }
