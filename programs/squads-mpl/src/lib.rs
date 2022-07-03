@@ -17,6 +17,11 @@ pub mod squads_mpl {
 
     use super::*;
     pub fn create(ctx: Context<Create>, threshold:u16, members: Vec<Pubkey>) -> Result<()> {
+        // since creator is considered a member, check we don't exceed u16 - very unlikely
+        if members.len() + 1 >= usize::from(u16::MAX) {
+            return err!(MsError::MaxMembersReached);
+        }
+
         if !(1..=members.len()).contains(&usize::from(threshold)) {
             return err!(MsError::InvalidThreshold);
         }
