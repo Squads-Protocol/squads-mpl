@@ -30,18 +30,18 @@ pub mod squads_mpl {
     }
 
     pub fn add_member(ctx: Context<MsAuthRealloc>, new_member: Pubkey) -> Result<()> {
+        if ctx.accounts.multisig.keys.len() >= usize::from(u16::MAX) {
+            return err!(MsError::MaxMembersReached);
+        }
         // * check if realloc is needed
         // get the current size
         // get the size of the data after the key would be added (size + 32)
         // compare
-        // if not enough, add (10 * 32) to size - bump it up by 10 accounts 
+        // if not enough, add (10 * 32) to size - bump it up by 10 accounts
         let multisig_account_info = ctx.accounts.multisig.to_account_info();
         let curr_data_size = multisig_account_info.data.borrow().len();
         let next_len = curr_data_size + 32;
         if next_len > curr_data_size{
-            if (ctx.accounts.multisig.keys.len() + 10) > u16::MAX:usize {
-                return err!(MsError::MaxMembersReached)
-            }
             let needed_len = curr_data_size + ( 10 * 32 );
             let rent_exempt_lamports = ctx.accounts.rent.minimum_balance(needed_len).max(1);
             let top_up_lamports = rent_exempt_lamports.saturating_sub(ctx.accounts.multisig.to_account_info().lamports());
