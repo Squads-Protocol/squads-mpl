@@ -194,21 +194,13 @@ pub mod squads_mpl {
         // use for derivation for the authority
         let ms_key = ctx.accounts.multisig.key();
 
-        // get the authority pda - its implied it was already set earlier for the tx
-        let (_, authority_pda_bump) = Pubkey::find_program_address(&[
-            b"squad",
-            ms_key.as_ref(),
-            &ctx.accounts.transaction.authority_index.to_le_bytes(),
-            b"authority"
-        ],ctx.program_id);
-
         // default authority seeds to auth index > 0
         let authority_seeds = [
             b"squad",
             ms_key.as_ref(),
             &ctx.accounts.transaction.authority_index.to_le_bytes(),
             b"authority",
-            &[authority_pda_bump]
+            &[ctx.accounts.transaction.authority_bump]
         ];
         // if auth index < 1
         let ms_authority_seeds = [
@@ -299,7 +291,8 @@ pub struct Create<'info> {
         init,
         payer = creator,
         space = 8 + Ms::MAXIMUM_SIZE,
-        seeds = [b"squad", creator.key().as_ref(), b"multisig"], bump)]
+        seeds = [b"squad", creator.key().as_ref(), b"multisig"], bump
+    )]
     pub multisig: Account<'info, Ms>,
 
     #[account(mut)]

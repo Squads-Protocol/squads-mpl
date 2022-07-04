@@ -307,19 +307,10 @@ describe('Basic functionality', () => {
       })
       .instruction();
 
-      const signIx = await program.methods.approveTransaction()
-      .accounts({
-        multisig: msPDA,
-        transaction: txPDA,
-        member: creator.publicKey
-      })
-      .instruction();
-
     const transferTx = await createBlankTransaction(program, creator.publicKey);
     transferTx.add(createIx);
     transferTx.add(addIx);
     transferTx.add(activateIx);
-    transferTx.add(signIx);
     creator.signTransaction(transferTx);
 
     try {
@@ -327,6 +318,14 @@ describe('Basic functionality', () => {
     }catch(e){
       console.log(e);
     }
+
+    await program.methods.approveTransaction()
+    .accounts({
+      multisig: msPDA,
+      transaction: txPDA,
+      member: creator.publicKey
+    })
+    .rpc();
 
     let txState = await program.account.msTransaction.fetch(txPDA);
     expect(txState.status).to.have.property("executeReady");
