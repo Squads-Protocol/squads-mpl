@@ -117,6 +117,7 @@ pub mod squads_mpl {
         ms.transaction_index =  ms.transaction_index.checked_add(1).unwrap();
         ctx.accounts.transaction.init(
             ctx.accounts.creator.key(),
+            ms.key(),
             ms.transaction_index,
             *ctx.bumps.get("transaction").unwrap(),
             authority_index,
@@ -355,6 +356,7 @@ pub struct AddInstruction<'info> {
         ], bump = transaction.bump,
         constraint = creator.key() == transaction.creator,
         constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -400,6 +402,7 @@ pub struct ActivateTransaction<'info> {
         constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -431,6 +434,7 @@ pub struct ApproveTransaction<'info> {
         constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -462,6 +466,7 @@ pub struct RejectTransaction<'info> {
         constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -492,6 +497,7 @@ pub struct CancelTransaction<'info> {
             b"transaction"
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub transaction: Account<'info, MsTransaction>,
@@ -523,6 +529,7 @@ pub struct ExecuteTransaction<'info> {
             b"transaction"
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
     )]
     pub transaction: Account<'info, MsTransaction>,
@@ -538,6 +545,7 @@ pub struct MsAuth<'info> {
     multisig: Box<Account<'info, Ms>>,
     #[account(
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
     )]
     transaction: Box<Account<'info, MsTransaction>>,
@@ -559,6 +567,7 @@ pub struct MsAuthRealloc<'info> {
     multisig: Box<Account<'info, Ms>>,
     #[account(
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
     )]
     transaction: Box<Account<'info, MsTransaction>>,

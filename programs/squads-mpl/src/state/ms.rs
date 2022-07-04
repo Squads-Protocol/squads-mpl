@@ -87,6 +87,7 @@ pub enum MsTransactionStatus {
 #[account]
 pub struct MsTransaction {
     pub creator: Pubkey,                // creator, used to seed pda
+    pub ms: Pubkey,                     // the multisig this belongs to
     pub transaction_index: u32,         // used for seed
     pub authority_index: u32,           // index to use for other pdas (?)
     pub authority_bump: u8,             // the bump corresponding to the bespoke authority
@@ -101,6 +102,7 @@ pub struct MsTransaction {
 impl MsTransaction {
     // the minimum size without the approved/rejected vecs
     pub const MINIMUM_SIZE: usize = 32 +    // the creator pubkey
+        32 +                                // the multisig key
         4 +                                 // the transaction index
         4 +                                 // the authority index (for this proposal)
         1 +                                 // the authority bump
@@ -112,8 +114,9 @@ impl MsTransaction {
         MsTransaction::MINIMUM_SIZE + (3 * (4 + (members_len * 32) ) )
     }
 
-    pub fn init(&mut self, creator: Pubkey, transaction_index: u32, bump: u8, authority_index: u32, authority_bump: u8) -> Result<()>{
+    pub fn init(&mut self, creator: Pubkey, multisig: Pubkey, transaction_index: u32, bump: u8, authority_index: u32, authority_bump: u8) -> Result<()>{
         self.creator = creator;
+        self.ms = multisig;
         self.transaction_index = transaction_index;
         self.authority_index = authority_index;
         self.authority_bump = authority_bump;
