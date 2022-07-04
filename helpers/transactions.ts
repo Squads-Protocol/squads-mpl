@@ -18,12 +18,11 @@ export const createBlankTransaction = async (program:  Program<SquadsMpl>, feePa
   const {blockhash} = await program.provider.connection.getLatestBlockhash();
   const lastValidBlockHeight = await program.provider.connection.getBlockHeight();
 
-  const tX = new anchor.web3.Transaction({
+  return new anchor.web3.Transaction({
     blockhash,
     lastValidBlockHeight,
     feePayer
   });
-  return tX;
 };
 
 

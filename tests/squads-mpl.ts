@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 
 import * as anchor from '@project-serum/anchor';
-import { Program } from '@project-serum/anchor';
+import { Program, toInstruction } from '@project-serum/anchor';
 import { SquadsMpl } from '../target/types/squads_mpl';
 import { createBlankTransaction,
   createExecuteTransactionTx,
@@ -270,62 +270,68 @@ describe('Basic functionality', () => {
     // generate the tx pda
     const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
 
-    await program.methods.createTransaction(1)
+    const createIx = await program.methods.createTransaction(1)
       .accounts({
         multisig: msPDA,
         transaction: txPDA,
         creator: creator.publicKey
       })
-      .rpc();
-
-    let txState = await program.account.msTransaction.fetch(txPDA);
-    txCount++;
-    // check the transaction indexes match
-    let msState = await program.account.ms.fetch(msPDA);
-
-    // increment the instruction index for this transaction (for new PDA)
-    const newIxIndex = txState.instructionIndex + 1;
-    const newIxIndexBN = new anchor.BN(newIxIndex, 10);
-
-    // create the instruction pda
-    const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      .instruction();
 
     // the test transfer instruction
     const testPayee = anchor.web3.Keypair.generate();
     const testIx = await createTestTransferTransaction( authorityPDA, testPayee.publicKey);
 
+    // increment the instruction index for this transaction (for new PDA)
+    const newIxIndex = 1;
+    const newIxIndexBN = new anchor.BN(newIxIndex, 10);
+
+    // create the instruction pda
+    const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+
     // add the instruction to the transaction
-    await program.methods.addInstruction(testIx)
+    const addIx = await program.methods.addInstruction(testIx)
       .accounts({
         multisig: msPDA,
         transaction: txPDA,
         instruction: ixPDA,
         creator: creator.publicKey
-      })
-      .rpc();
+      }).
+      instruction();
 
-    await program.methods.activateTransaction()
+    const activateIx = await program.methods.activateTransaction()
       .accounts({
         multisig: msPDA,
         transaction: txPDA,
         creator: creator.publicKey
       })
-      .rpc();
+      .instruction();
+
+      const signIx = await program.methods.approveTransaction()
+      .accounts({
+        multisig: msPDA,
+        transaction: txPDA,
+        member: creator.publicKey
+      })
+      .instruction();
+
+    const transferTx = await createBlankTransaction(program, creator.publicKey);
+    transferTx.add(createIx);
+    transferTx.add(addIx);
+    transferTx.add(activateIx);
+    transferTx.add(signIx);
+    creator.signTransaction(transferTx);
 
     try {
-      await program.methods.approveTransaction()
-        .accounts({
-          multisig: msPDA,
-          transaction: txPDA,
-          member: creator.publicKey
-        })
-        .rpc();
-    } catch (e) {
+      await programProvider.sendAndConfirm(transferTx);
+    }catch(e){
       console.log(e);
     }
 
+    let txState = await program.account.msTransaction.fetch(txPDA);
+    expect(txState.status).to.have.property("executeReady");
     // transfer lamports to the authorityPDA
-    let testPayeeAccount= await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
+    let testPayeeAccount = await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
     // move funds to auth/vault
     const moveFundsToMsPDAIx =  await createTestTransferTransaction(creator.publicKey, authorityPDA);
     const {blockhash} = await program.provider.connection.getLatestBlockhash();
@@ -335,8 +341,8 @@ describe('Basic functionality', () => {
     try {
       creator.signTransaction(moveFundsToMsPDATx);
       await programProvider.sendAndConfirm(moveFundsToMsPDATx);
-      const msPDAFunded = await program.provider.connection.getAccountInfo(authorityPDA);
-      expect(msPDAFunded.lamports).to.equal(1000000);
+      const authorityPDAFunded = await program.provider.connection.getAccountInfo(authorityPDA);
+      expect(authorityPDAFunded.lamports).to.equal(1000000);
     }
     catch (e) {
       console.log(e);
@@ -351,7 +357,7 @@ describe('Basic functionality', () => {
       console.log(e);
     }
 
-    msState = await program.account.ms.fetch(msPDA);
+    let msState = await program.account.ms.fetch(msPDA);
     txState = await program.account.msTransaction.fetch(txPDA);
 
     expect(txState.status).to.have.property("executed");
