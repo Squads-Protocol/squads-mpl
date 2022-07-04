@@ -14,7 +14,7 @@ export const createTestTransferTransaction = async (authority: anchor.web3.Publi
   );
 };
 
-export const createBlankTransaction = async (program, feePayer) =>{
+export const createBlankTransaction = async (program:  Program<SquadsMpl>, feePayer: anchor.web3.PublicKey) =>{
   const {blockhash} = await program.provider.connection.getLatestBlockhash();
   const lastValidBlockHeight = await program.provider.connection.getBlockHeight();
 
@@ -27,7 +27,7 @@ export const createBlankTransaction = async (program, feePayer) =>{
 };
 
 
-export const createExecuteTransactionTx = async (program, ms, tx, feePayer) => {
+export const createExecuteTransactionTx = async (program:  Program<SquadsMpl>, ms: anchor.web3.PublicKey, tx: anchor.web3.PublicKey, feePayer: anchor.web3.PublicKey) => {
     const txState = await program.account.msTransaction.fetch(tx);
 
     const ixList = await Promise.all([...new Array(txState.instructionIndex)].map(async (a,i) => {

@@ -3,7 +3,15 @@ import { expect } from 'chai';
 import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
 import { SquadsMpl } from '../target/types/squads_mpl';
-import { createBlankTransaction, createExecuteTransactionTx, createTestTransferTransaction, getAuthorityPDA, getIxPDA, getMsPDA, getNextTxIndex, getTxPDA } from '../helpers/transactions';
+import { createBlankTransaction,
+  createExecuteTransactionTx,
+  createTestTransferTransaction,
+  getAuthorityPDA,
+  getIxPDA,
+  getMsPDA,
+  getNextTxIndex,
+  getTxPDA
+} from '../helpers/transactions';
 
 
 // test suite
