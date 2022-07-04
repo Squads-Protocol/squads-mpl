@@ -1,13 +1,12 @@
 import { expect } from 'chai';
 
 import * as anchor from '@project-serum/anchor';
-import { BorshCoder, Program } from '@project-serum/anchor';
+import { Program } from '@project-serum/anchor';
 import { SquadsMpl } from '../target/types/squads_mpl';
-import { AccountMeta, Connection, LAMPORTS_PER_SOL, PublicKey, Transaction } from '@solana/web3.js';
 
 
 // some TX/IX helper functions
-const createTestTransferTransaction = async (authority: PublicKey, recipient: PublicKey, amount = 1000000) => {
+const createTestTransferTransaction = async (authority: anchor.web3.PublicKey, recipient: anchor.web3.PublicKey, amount = 1000000) => {
   return anchor.web3.SystemProgram.transfer(
     {
       fromPubkey: authority,
@@ -41,7 +40,7 @@ const createExecuteTransactionTx = async (program, ms, tx, feePayer) => {
     }));
 
     const ixKeysList= ixList.map(({pubkey, ixItem}, ixIndex) => {
-      const ixKeys: AccountMeta[] = ixItem.keys as AccountMeta[];
+      const ixKeys: anchor.web3.AccountMeta[] = ixItem.keys as anchor.web3.AccountMeta[];
 
       const formattedKeys = ixKeys.map((ixKey,keyInd) => {
         return {
@@ -104,28 +103,35 @@ const createExecuteTransactionTx = async (program, ms, tx, feePayer) => {
 };
 
 // some PDA helper functions
-const getMsPDA = (creator: PublicKey, programId: PublicKey) => PublicKey.findProgramAddressSync([
+const getMsPDA = (creator: anchor.web3.PublicKey, programId: anchor.web3.PublicKey) => anchor.web3.PublicKey.findProgramAddressSync([
   anchor.utils.bytes.utf8.encode("squad"),
   creator.toBuffer(),
   anchor.utils.bytes.utf8.encode("multisig")
 ], programId);
 
-const getTxPDA = async (msPDA: PublicKey, txIndexBN: anchor.BN, programId: PublicKey) => await PublicKey.findProgramAddress([
+const getTxPDA = async (msPDA: anchor.web3.PublicKey, txIndexBN: anchor.BN, programId: anchor.web3.PublicKey) => await anchor.web3.PublicKey.findProgramAddress([
   anchor.utils.bytes.utf8.encode("squad"),
   msPDA.toBuffer(),
   txIndexBN.toBuffer("le",4),
   anchor.utils.bytes.utf8.encode("transaction")
 ], programId);
 
-const getIxPDA =  async(txPDA: PublicKey, iXIndexBN: anchor.BN, programId: PublicKey) => await PublicKey.findProgramAddress([
+const getIxPDA =  async(txPDA: anchor.web3.PublicKey, iXIndexBN: anchor.BN, programId: anchor.web3.PublicKey) => await anchor.web3.PublicKey.findProgramAddress([
   anchor.utils.bytes.utf8.encode("squad"),
   txPDA.toBuffer(),
   iXIndexBN.toBuffer("le",1),  // note instruction index is a u8 (1 byte)
   anchor.utils.bytes.utf8.encode("instruction")
 ], programId);
 
+const getAuthorityPDA = async (msPDA: anchor.web3.PublicKey, authorityIndexBN: anchor.BN, programId: anchor.web3.PublicKey) => await anchor.web3.PublicKey.findProgramAddress([
+  anchor.utils.bytes.utf8.encode("squad"),
+  msPDA.toBuffer(),
+  authorityIndexBN.toBuffer("le",4),  // note instruction index is a u8 (1 byte)
+  anchor.utils.bytes.utf8.encode("authority")
+], programId);
+
 // basic helpers
-const getNextTxIndex = async (program:  Program<SquadsMpl>, msAddress: PublicKey) => {
+const getNextTxIndex = async (program:  Program<SquadsMpl>, msAddress: anchor.web3.PublicKey) => {
   const msState = await program.account.ms.fetch(msAddress);
   return msState.transactionIndex + 1;
 };
@@ -218,7 +224,7 @@ describe('Basic functionality', () => {
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await PublicKey.findProgramAddress([
+      const [ixPDA] = await anchor.web3.PublicKey.findProgramAddress([
         anchor.utils.bytes.utf8.encode("squad"),
         txPDA.toBuffer(),
         newIxIndexBN.toBuffer("le",1),  // note instruction index is a u8 (1 byte)
@@ -378,12 +384,7 @@ describe('Basic functionality', () => {
   it(`Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
     // create authority to use (Vault, index 1)
     const authorityIndexBN = new anchor.BN(1,10);
-    const [authorityPDA] = await PublicKey.findProgramAddress([
-      anchor.utils.bytes.utf8.encode("squad"),
-      msPDA.toBuffer(),
-      authorityIndexBN.toBuffer("le",4),  // note instruction index is a u8 (1 byte)
-      anchor.utils.bytes.utf8.encode("authority")
-    ], program.programId);
+    const [authorityPDA] =  await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
 
     const newTxIndex = await getNextTxIndex(program, msPDA);
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -483,12 +484,7 @@ describe('Basic functionality', () => {
   it(`2X Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
     // create authority to use (Vault, index 1)
     const authorityIndexBN = new anchor.BN(1,10);
-    const [authorityPDA] = await PublicKey.findProgramAddress([
-      anchor.utils.bytes.utf8.encode("squad"),
-      msPDA.toBuffer(),
-      authorityIndexBN.toBuffer("le",4),  // note instruction index is a u8 (1 byte)
-      anchor.utils.bytes.utf8.encode("authority")
-    ], program.programId);
+    const [authorityPDA] =  await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
 
     // get the state of the MS
     const newTxIndex = await getNextTxIndex(program, msPDA);
@@ -696,12 +692,7 @@ describe('Basic functionality', () => {
   it('Transaction instruction failure', async () => {
     // create authority to use (Vault, index 1)
     const authorityIndexBN = new anchor.BN(1,10);
-    const [authorityPDA] = await PublicKey.findProgramAddress([
-      anchor.utils.bytes.utf8.encode("squad"),
-      msPDA.toBuffer(),
-      authorityIndexBN.toBuffer("le",4),  // note instruction index is a u8 (1 byte)
-      anchor.utils.bytes.utf8.encode("authority")
-    ], program.programId);
+    const [authorityPDA] =  await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
  
     const newTxIndex = await getNextTxIndex(program, msPDA);
     const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -731,7 +722,7 @@ describe('Basic functionality', () => {
  
     // the test transfer instruction
     const testPayee = anchor.web3.Keypair.generate();
-    const testIx = await createTestTransferTransaction( authorityPDA, testPayee.publicKey, LAMPORTS_PER_SOL * 100);
+    const testIx = await createTestTransferTransaction( authorityPDA, testPayee.publicKey, anchor.web3.LAMPORTS_PER_SOL * 100);
  
     // add the instruction to the transaction
     await program.methods.addInstruction(testIx)
