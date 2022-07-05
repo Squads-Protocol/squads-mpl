@@ -116,14 +116,14 @@ export const getTxPDA = async (msPDA: anchor.web3.PublicKey, txIndexBN: anchor.B
 export const getIxPDA =  async(txPDA: anchor.web3.PublicKey, iXIndexBN: anchor.BN, programId: anchor.web3.PublicKey) => await anchor.web3.PublicKey.findProgramAddress([
   anchor.utils.bytes.utf8.encode("squad"),
   txPDA.toBuffer(),
-  iXIndexBN.toBuffer("le",1),  // note instruction index is a u8 (1 byte)
+  iXIndexBN.toBuffer("le",1),  // note instruction index is an u8 (1 byte)
   anchor.utils.bytes.utf8.encode("instruction")
 ], programId);
 
 export const getAuthorityPDA = async (msPDA: anchor.web3.PublicKey, authorityIndexBN: anchor.BN, programId: anchor.web3.PublicKey) => await anchor.web3.PublicKey.findProgramAddress([
   anchor.utils.bytes.utf8.encode("squad"),
   msPDA.toBuffer(),
-  authorityIndexBN.toBuffer("le",4),  // note instruction index is a u8 (1 byte)
+  authorityIndexBN.toBuffer("le",4),  // note authority index is an u32 (4 byte)
   anchor.utils.bytes.utf8.encode("authority")
 ], programId);
 
