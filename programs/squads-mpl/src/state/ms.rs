@@ -47,6 +47,12 @@ impl Ms {
         Ok(())
     }
 
+    // bumps up the authority tracking index for easy use
+    pub fn add_authority(&mut self) -> Result<()>{
+        self.authority_index = self.authority_index.checked_add(1).unwrap();
+        Ok(())
+    }
+
     pub fn add_member(&mut self, member: Pubkey) -> Result<()>{
         if matches!(self.is_member(member), None) {
             self.keys.push(member);

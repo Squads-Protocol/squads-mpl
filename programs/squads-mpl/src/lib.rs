@@ -96,6 +96,11 @@ pub mod squads_mpl {
         ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
     }
 
+    // add a new vault, program upgrade authority, mint authority, etc
+    pub fn add_authority(ctx: Context<MsAuth>) -> Result<()> {
+        ctx.accounts.multisig.add_authority()
+    }
+
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
         let ms = &mut ctx.accounts.multisig;
         let authority_bump = match authority_index  {
