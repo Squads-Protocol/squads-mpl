@@ -11,7 +11,7 @@ declare_id!("8zTaQtMiBELrRZeB4jU8bVNLpbhUoLVBjokiqxhVfyWM");
 #[program]
 pub mod squads_mpl {
 
-    use std::convert::TryInto;
+    use std::convert::{TryInto};
 
     use anchor_lang::solana_program::{program::{invoke_signed, invoke}, system_instruction::transfer};
 
@@ -77,6 +77,47 @@ pub mod squads_mpl {
             ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
 
+        ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
+    }
+
+    pub fn remove_member_and_change_threshold<'info>(
+        ctx: Context<'_,'_,'_,'info, MsAuth<'info>>, old_member: Pubkey, new_threshold: u16
+    ) -> Result<()> {
+        remove_member(
+            Context::new(
+                ctx.program_id,
+                ctx.accounts,
+                ctx.remaining_accounts,
+                ctx.bumps.clone()
+            ), old_member
+        )?;
+        change_threshold(ctx, new_threshold)
+    }
+
+    pub fn add_member_and_change_threshold<'info>(
+        ctx: Context<'_,'_,'_,'info, MsAuthRealloc<'info>>, new_member: Pubkey, new_threshold: u16
+    ) -> Result<()> {
+        // add the member
+        add_member(
+            Context::new(
+                ctx.program_id,
+                ctx.accounts,
+                ctx.remaining_accounts,
+                ctx.bumps.clone()
+            ), new_member
+        )?;
+
+        // check the threshold
+        if ctx.accounts.multisig.keys.len() < usize::from(new_threshold) {
+            let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
+            ctx.accounts.multisig.change_threshold(new_threshold)?;
+        // if the new threshol is lte 0 throw error
+        } else if new_threshold < 1 {
+            return err!(MsError::InvalidThreshold);
+        // threshold value is fine, set it
+        } else {
+            ctx.accounts.multisig.change_threshold(new_threshold)?;
+        }
         ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
     }
 
@@ -591,4 +632,15 @@ pub struct MsAuthRealloc<'info> {
     pub member: Signer<'info>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>
+}
+
+// reuse MsAuth from MsAuthRealloc as its a subset
+impl<'info> From<&mut MsAuthRealloc<'info>> for MsAuth<'info> {
+    fn from(context: &mut MsAuthRealloc<'info>) -> Self {
+        MsAuth {
+            multisig: context.multisig.clone(),
+            transaction: context.transaction.clone(),
+            multisig_auth: context.multisig_auth.clone()
+        }
+    }
 }
