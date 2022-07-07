@@ -6,7 +6,7 @@ pub mod state;
 use errors::*;
 pub mod errors;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("8zTaQtMiBELrRZeB4jU8bVNLpbhUoLVBjokiqxhVfyWM");
 
 #[program]
 pub mod squads_mpl {
@@ -72,7 +72,7 @@ pub mod squads_mpl {
         }
         ctx.accounts.multisig.remove_member(old_member)?;
         // if the number of keys is now less than the threshold, adjust it
-        if ctx.accounts.multisig.keys.len() > usize::from(ctx.accounts.multisig.threshold) {
+        if ctx.accounts.multisig.keys.len() < usize::from(ctx.accounts.multisig.threshold) {
             let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
             ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
@@ -102,6 +102,7 @@ pub mod squads_mpl {
     }
 
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
+        msg!("TX PDA: {:?}", ctx.accounts.transaction.key());
         let ms = &mut ctx.accounts.multisig;
         let authority_bump = match authority_index  {
            1.. => {
