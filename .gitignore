@@ -4,5 +4,5 @@
 target
 **/*.rs.bk
 node_modules
-
+Anchor.toml
 .idea/
