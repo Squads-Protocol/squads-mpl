@@ -34,13 +34,13 @@ Each created and executed MsTransaction does so on behalf of an authority. Autho
 ## Execute a MsTransaction
 In order to execute a MsTransaction, in addition to the accounts specified in the IDL, the user/key invoking the execute must also pass in a list of accounts that reference the MsInstructions in this format (example for 2 instructions):
 
-First MsInstruction
-* The pda of the MsInstruction
+First MsInstruction (`instruction_index of 1`)
+* The PDA of the MsInstruction
 * The program_id that will be invoked by the MsInstruction
 * A list of all other accounts referenced by the attached MsInstruction
   
-Second MsInstruction
-* The pda of the MsInstruction
+Second MsInstruction (`instruction_index of 2`)
+* The PDA of the MsInstruction
 * The program_id that will be invoked by the MsInstruction
 * A list of all other accounts referenced by the attached MsInstruction
 
