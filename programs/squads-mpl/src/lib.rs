@@ -310,7 +310,6 @@ pub mod squads_mpl {
             }
 
             // push the executor incase realloc is needed
-            // ix_account_infos.push(ctx.accounts.member.clone());
             // create the instruction to invoke from the saved ms ix account
             let ix: Instruction = Instruction::from(ms_ix);
 
@@ -592,7 +591,7 @@ pub struct ExecuteTransaction<'info> {
 
     #[account(mut)]
     pub member: Signer<'info>,
-    pub system_program: Program<'info, System>
+    // pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]

@@ -95,11 +95,6 @@ export const createExecuteTransactionTx = async (program:  Program<SquadsMpl>, m
       pubkey: feePayer,
       isSigner: true,
       isWritable: true,
-    },
-    {
-      pubkey: anchor.web3.SystemProgram.programId,
-      isSigner: false,
-      isWritable: false
     }
   ];
 //   const keys = executeKeys.concat(ixKeysList);
