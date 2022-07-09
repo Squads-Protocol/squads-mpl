@@ -11,7 +11,7 @@ declare_id!("8zTaQtMiBELrRZeB4jU8bVNLpbhUoLVBjokiqxhVfyWM");
 #[program]
 pub mod squads_mpl {
 
-    use std::convert::{TryInto};
+    use std::{convert::{TryInto}, slice::SliceIndex};
 
     use anchor_lang::solana_program::{program::{invoke_signed, invoke}, system_instruction::transfer};
 
@@ -232,7 +232,7 @@ pub mod squads_mpl {
         Ok(())
     }
 
-    pub fn execute_transaction<'info>(ctx: Context<'_,'_,'_,'info,ExecuteTransaction<'info>>) -> Result<()> {
+    pub fn execute_transaction<'info>(ctx: Context<'_,'_,'_,'info,ExecuteTransaction<'info>>, account_list: Vec<u8>) -> Result<()> {
         // check that we are provided at least one instruction
         if ctx.accounts.transaction.instruction_index < 1 {
             // if no instructions were found, for whatever reason, mark it as executed and move on
@@ -259,8 +259,16 @@ pub mod squads_mpl {
             &[ctx.accounts.multisig.bump]
         ];
 
+        // unroll account infos from account_list
+        let mapped_remaining_accounts: Vec<AccountInfo>= account_list.iter().map(|&i| {
+            let index = usize::from(i);
+            let acc = &ctx.remaining_accounts[index];
+            acc.clone()
+        }).collect();
+
         // iterator for remaining accounts
-        let ix_iter = &mut ctx.remaining_accounts.iter();
+        let ix_iter = &mut mapped_remaining_accounts.iter();
+
         let max_ix_index = ctx.accounts.transaction.instruction_index + 1;
         (1..max_ix_index).try_for_each(|i| {
             // each ix block starts with the ms_ix account

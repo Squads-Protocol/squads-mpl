@@ -1,5 +1,6 @@
 import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
+import { Account } from '@solana/web3.js';
 import { SquadsMpl } from '../target/types/squads_mpl';
 
 
@@ -54,6 +55,31 @@ export const createExecuteTransactionTx = async (program:  Program<SquadsMpl>, m
       ];
     }).reduce((p,c) => p.concat(c),[])
 
+    //  [ix ix_account, ix program_id, key1, key2 ...]
+    const keysUnique = ixKeysList.reduce((prev,curr) => {
+        const inList = prev.findIndex(a => a.pubkey.toBase58() === curr.pubkey.toBase58());
+        // if its already in the list, and has same write flag
+        if ( inList >= 0 && prev[inList].isWritable === curr.isWritable){
+            return prev;
+        }else{
+            prev.push({pubkey: curr.pubkey, isWritable: curr.isWritable, isSigner: curr.isSigner});
+            return prev;
+        }
+    },[]);
+
+    const keyIndexMap = ixKeysList.map(a => {
+        return keysUnique.findIndex(k => {
+            if (k.pubkey.toBase58() === a.pubkey.toBase58() && k.isWritable === a.isWritable) {
+                return true;
+            }
+            return false;
+        });
+    });
+    // console.log('ix key mapping', keyIndexMap);
+    const keyIndexMapLengthBN = new anchor.BN(keyIndexMap.length, 10);
+    const keyIndexMapLengthBuffer = keyIndexMapLengthBN.toArrayLike(Buffer, "le",2);
+    const keyIndexMapBuffer = Buffer.from(keyIndexMap);
+
     let executeKeys = [
     {
       pubkey: ms,
@@ -76,9 +102,8 @@ export const createExecuteTransactionTx = async (program:  Program<SquadsMpl>, m
       isWritable: false
     }
   ];
-  const keys = executeKeys.concat(ixKeysList);
-
-
+//   const keys = executeKeys.concat(ixKeysList);
+  const keys = executeKeys.concat(keysUnique);
   const {blockhash} = await program.provider.connection.getLatestBlockhash();
   const lastValidBlockHeight = await program.provider.connection.getBlockHeight();
 
@@ -90,11 +115,12 @@ export const createExecuteTransactionTx = async (program:  Program<SquadsMpl>, m
 
   const sig = anchor.utils.sha256.hash("global:execute_transaction");
   const ixDiscriminator = Buffer.from(sig, "hex");
-  const executeIx = new anchor.web3.TransactionInstruction({
-    programId: program.programId,
-    keys,
-    data: ixDiscriminator.slice(0,16)
-  });
+
+  const data = Buffer.concat([ixDiscriminator.slice(0,16), keyIndexMapLengthBuffer, keyIndexMapBuffer]);
+  const executeIx = await program.methods.executeTransaction(Buffer.from(keyIndexMap))
+    .accounts({multisig: ms, transaction: tx, member: feePayer})
+    .instruction();
+  executeIx.keys = executeIx.keys.concat(keysUnique);
   executeTx.add(executeIx);
   return executeTx;
 };
