@@ -11,7 +11,7 @@ declare_id!("8zTaQtMiBELrRZeB4jU8bVNLpbhUoLVBjokiqxhVfyWM");
 #[program]
 pub mod squads_mpl {
 
-    use std::{convert::{TryInto}, slice::SliceIndex};
+    use std::{convert::{TryInto}};
 
     use anchor_lang::solana_program::{program::{invoke_signed, invoke}, system_instruction::transfer};
 
@@ -262,7 +262,7 @@ pub mod squads_mpl {
         // unroll account infos from account_list
         let mapped_remaining_accounts: Vec<AccountInfo>= account_list.iter().map(|&i| {
             let index = usize::from(i);
-            let acc = &ctx.remaining_accounts[index];
+            let acc = &ctx.remaining_accounts[index].clone();
             acc.clone()
         }).collect();
 
@@ -309,10 +309,8 @@ pub mod squads_mpl {
                 ix_account_infos.push(ix_account_info.clone());
             }
 
-            // push the executor incase realloc is needed
             // create the instruction to invoke from the saved ms ix account
             let ix: Instruction = Instruction::from(ms_ix);
-
             // execute the ix
             match ctx.accounts.transaction.authority_index {
                 0 => {

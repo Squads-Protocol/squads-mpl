@@ -3,9 +3,9 @@
       "target": "es5",
       "module": "commonjs",
       "declaration": true,
-      "outDir": "./lib",
+      "outDir": "./build",
       "strict": true
     },
-    "include": ["index.ts"],
+    "include": ["index.ts", "cli.ts"],
     "exclude": ["node_modules", "**/__tests__/*"]
   }
