@@ -40,14 +40,11 @@ pub mod squads_mpl {
             return err!(MsError::MaxMembersReached);
         }
         // * check if realloc is needed
-        // get the current size
-        // get the size of the data after the key would be added (size + 32)
-        // compare
-        // if not enough, add (10 * 32) to size - bump it up by 10 accounts
         let multisig_account_info = ctx.accounts.multisig.to_account_info();
         let curr_data_size = multisig_account_info.data.borrow().len();
         let spots_left = ((curr_data_size - Ms::SIZE_WITHOUT_MEMBERS) / 32 ) - ctx.accounts.multisig.keys.len();
 
+        // if not enough, add (10 * 32) to size - bump it up by 10 accounts
         if spots_left < 1{
             // add space for 10 more keys
             let needed_len = curr_data_size + ( 10 * 32 );
@@ -300,6 +297,7 @@ pub mod squads_mpl {
             }
             // get the instructions program account
             let ix_program_info: &AccountInfo = next_account_info(ix_iter)?;
+            // check that it matches the submitted account
             if &ms_ix.program_id != ix_program_info.key {
                 return err!(MsError::InvalidInstructionAccount);
             }
@@ -308,6 +306,8 @@ pub mod squads_mpl {
 
             // add the program account needed for the ix
             ix_account_infos.push(ix_program_info.clone());
+
+            // loop through the provided remaining accounts
             for account_index in 0..ms_ix.keys.len() {
                 let ix_account_info = next_account_info(ix_iter)?;
                 // check that the ix account keys match the submitted account keys
