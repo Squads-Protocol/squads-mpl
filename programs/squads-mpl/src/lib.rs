@@ -306,8 +306,16 @@ pub mod squads_mpl {
 
             // add the program account needed for the ix
             ix_account_infos.push(ix_program_info.clone());
-            for _ in 0..ms_ix.keys.len() {
+            for account_index in 0..ms_ix.keys.len() {
                 let ix_account_info = next_account_info(ix_iter)?;
+                // check that the ix account keys match the submitted account keys
+                if ix_account_info.key != &ms_ix.keys[account_index].pubkey {
+                    return err!(MsError::InvalidInstructionAccount);
+                }
+                // check that the ix account writable match the submitted account writable
+                if ix_account_info.is_writable != ms_ix.keys[account_index].is_writable {
+                    return err!(MsError::InvalidInstructionAccount);
+                }
                 ix_account_infos.push(ix_account_info.clone());
             }
 
@@ -554,6 +562,8 @@ pub struct CancelTransaction<'info> {
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
+        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
+
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -598,12 +608,6 @@ pub struct ExecuteTransaction<'info> {
 pub struct MsAuth<'info> {
     #[account(mut)]
     multisig: Box<Account<'info, Ms>>,
-    // #[account(
-    //     constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
-    //     constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-    //     constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
-    // )]
-    // transaction: Box<Account<'info, MsTransaction>>,
     #[account(
         mut,
         seeds = [
@@ -620,12 +624,6 @@ pub struct MsAuth<'info> {
 pub struct MsAuthRealloc<'info> {
     #[account(mut)]
     multisig: Box<Account<'info, Ms>>,
-    // #[account(
-    //     constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
-    //     constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-    //     constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
-    // )]
-    // transaction: Box<Account<'info, MsTransaction>>,
     #[account(
         mut,
         seeds = [
