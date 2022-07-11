@@ -530,7 +530,7 @@ describe('Basic functionality', () => {
             .accounts({
                 multisig: msPDA,
                 multisigAuth: msPDA,
-                transaction: txPDA,
+                // transaction: txPDA,
             })
             .instruction();
 
@@ -698,7 +698,7 @@ describe('Basic functionality', () => {
         const testChangeThresholdIx = await program.methods.changeThreshold(2)
             .accounts({
                 multisig: msPDA,
-                transaction: txPDA,
+                // transaction: txPDA,
                 multisigAuth: msPDA,
             })
             .instruction();

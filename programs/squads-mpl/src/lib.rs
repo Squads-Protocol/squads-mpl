@@ -63,7 +63,8 @@ pub mod squads_mpl {
         }
         ctx.accounts.multisig.reload()?;
         ctx.accounts.multisig.add_member(new_member)?;
-        ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
+        let new_index = ctx.accounts.multisig.transaction_index;
+        ctx.accounts.multisig.set_change_index(new_index)
     }
 
     pub fn remove_member(ctx: Context<MsAuth>, old_member: Pubkey) -> Result<()> {
@@ -77,8 +78,8 @@ pub mod squads_mpl {
             let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
             ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
-
-        ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
+        let new_index = ctx.accounts.multisig.transaction_index;
+        ctx.accounts.multisig.set_change_index(new_index)
     }
 
     pub fn remove_member_and_change_threshold<'info>(
@@ -119,7 +120,8 @@ pub mod squads_mpl {
         } else {
             ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
-        ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
+        let new_index = ctx.accounts.multisig.transaction_index;
+        ctx.accounts.multisig.set_change_index(new_index)
     }
 
     pub fn change_threshold(ctx: Context<MsAuth>, new_threshold: u16) -> Result<()> {
@@ -134,8 +136,8 @@ pub mod squads_mpl {
         } else {
             ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
-
-        ctx.accounts.multisig.set_change_index(ctx.accounts.transaction.transaction_index)
+        let new_index = ctx.accounts.multisig.transaction_index;
+        ctx.accounts.multisig.set_change_index(new_index)
     }
 
     // add a new vault, program upgrade authority, mint authority, etc
@@ -596,12 +598,12 @@ pub struct ExecuteTransaction<'info> {
 pub struct MsAuth<'info> {
     #[account(mut)]
     multisig: Box<Account<'info, Ms>>,
-    #[account(
-        constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
-    )]
-    transaction: Box<Account<'info, MsTransaction>>,
+    // #[account(
+    //     constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+    //     constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
+    //     constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
+    // )]
+    // transaction: Box<Account<'info, MsTransaction>>,
     #[account(
         mut,
         seeds = [
@@ -618,12 +620,12 @@ pub struct MsAuth<'info> {
 pub struct MsAuthRealloc<'info> {
     #[account(mut)]
     multisig: Box<Account<'info, Ms>>,
-    #[account(
-        constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
-    )]
-    transaction: Box<Account<'info, MsTransaction>>,
+    // #[account(
+    //     constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+    //     constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
+    //     constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
+    // )]
+    // transaction: Box<Account<'info, MsTransaction>>,
     #[account(
         mut,
         seeds = [
@@ -638,15 +640,4 @@ pub struct MsAuthRealloc<'info> {
     pub member: Signer<'info>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>
-}
-
-// reuse MsAuth from MsAuthRealloc as its a subset
-impl<'info> From<&mut MsAuthRealloc<'info>> for MsAuth<'info> {
-    fn from(context: &mut MsAuthRealloc<'info>) -> Self {
-        MsAuth {
-            multisig: context.multisig.clone(),
-            transaction: context.transaction.clone(),
-            multisig_auth: context.multisig_auth.clone()
-        }
-    }
 }
