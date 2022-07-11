@@ -1,8 +1,13 @@
 [package]
 name = "squads-mpl"
 version = "0.1.0"
-description = "Created with Anchor"
+description = "Squads Multisig Program Library"
+authors = ["Sean Lars Ganser <sean@sqds.io>", "Bastien Guillaumat <bastien@sqds.io>"]
+homepage = "https://squads.so"
+repository = "https://github.com/squads-dapp/squads-mpl"
 edition = "2018"
+keywords = ["squads", "solana", "program", "smart-contract", "multisig"]
+readme = "README.md"
 
 [lib]
 crate-type = ["cdylib", "lib"]
