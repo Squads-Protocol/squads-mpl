@@ -14,13 +14,17 @@ pub struct Ms {
 }
 
 impl Ms {
-    pub const MAXIMUM_SIZE: usize = 4 + (32 * 10) + // initial space for 10 keys
-        2 +         // threshold value
-        2 +         // authority index
-        4 +         // transaction index
-        4 +         // processed transaction index
-        1 +         // PDA bump
-        32;         // creator
+    pub const SIZE_WITHOUT_MEMBERS: usize = 8 + // Anchor disriminator
+    2 +         // threshold value
+    2 +         // authority index
+    4 +         // transaction index
+    4 +         // processed internal transaction index
+    1 +         // PDA bump
+    32 +        // creator
+    4;          // for vec length
+
+    pub const MAXIMUM_SIZE: usize = (32 * 10) + Self::SIZE_WITHOUT_MEMBERS; // initial space for 10 keys
+
 
     pub fn init (&mut self, threshold: u16, creator: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
         self.threshold = threshold;

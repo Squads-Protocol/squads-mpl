@@ -46,8 +46,10 @@ pub mod squads_mpl {
         // if not enough, add (10 * 32) to size - bump it up by 10 accounts
         let multisig_account_info = ctx.accounts.multisig.to_account_info();
         let curr_data_size = multisig_account_info.data.borrow().len();
-        let next_len = curr_data_size + 32;
-        if next_len > curr_data_size{
+        let spots_left = ((curr_data_size - Ms::SIZE_WITHOUT_MEMBERS) / 32 ) - ctx.accounts.multisig.keys.len();
+
+        if spots_left < 1{
+            // add space for 10 more keys
             let needed_len = curr_data_size + ( 10 * 32 );
             let rent_exempt_lamports = ctx.accounts.rent.minimum_balance(needed_len).max(1);
             let top_up_lamports = rent_exempt_lamports.saturating_sub(ctx.accounts.multisig.to_account_info().lamports());
@@ -354,7 +356,7 @@ pub struct Create<'info> {
     #[account(
         init,
         payer = creator,
-        space = 8 + Ms::MAXIMUM_SIZE,
+        space = Ms::MAXIMUM_SIZE,
         seeds = [b"squad", creator.key().as_ref(), b"multisig"], bump
     )]
     pub multisig: Account<'info, Ms>,
