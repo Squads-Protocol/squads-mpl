@@ -13,6 +13,7 @@ import {
     getNextTxIndex,
     getTxPDA
 } from '../helpers/transactions';
+import { PublicKey } from '@solana/web3.js';
 
 
 // test suite
@@ -26,19 +27,21 @@ describe('Basic functionality', () => {
 
     const creator = programProvider.wallet;
     // the Multisig PDA to use for the test run
-    const [msPDA] = getMsPDA(creator.publicKey, program.programId);
-
+    let randomCreateKey = anchor.web3.Keypair.generate().publicKey;
+    const [msPDA] = getMsPDA(randomCreateKey, program.programId);
     let txCount = 0;
     const numberOfMembersTotal = 10;
     it(`Create Multisig - MS: ${msPDA.toBase58()}`, async () => {
+
         const memberList = [...new Array(numberOfMembersTotal - 1)].map(() => {
             return anchor.web3.Keypair.generate().publicKey;
         })
-        await program.methods.create(1, memberList)
+        await program.methods.create(1, randomCreateKey, memberList)
             .accounts({
                 multisig: msPDA,
                 creator: creator.publicKey,
             })
+            // .remainingAccounts([{pubkey: randomCreateKey, isSigner: false, isWritable: false}])
             .rpc();
 
         const vaultIndex = new anchor.BN(1, 10);
@@ -790,7 +793,6 @@ describe('Basic functionality', () => {
         const testChangeThresholdIx = await program.methods.changeThreshold(2)
             .accounts({
                 multisig: msPDA,
-                transaction: txPDA,
                 multisigAuth: msPDA,
             })
             .instruction();
