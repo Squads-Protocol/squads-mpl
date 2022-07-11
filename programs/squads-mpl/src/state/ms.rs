@@ -9,7 +9,7 @@ pub struct Ms {
     pub transaction_index: u32, // look up and seed reference for transactions
     pub ms_change_index: u32,   // the last executed/closed transaction
     pub bump: u8,               // bump for the multisig seed
-    pub creator: Pubkey,        // creator of multisig, used for seed
+    pub create_key: Pubkey,     // random key(or not) used to seed the multisig pda
     pub keys: Vec<Pubkey>,      // keys of the members
 }
 
@@ -26,7 +26,7 @@ impl Ms {
     pub const MAXIMUM_SIZE: usize = (32 * 10) + Self::SIZE_WITHOUT_MEMBERS; // initial space for 10 keys
 
 
-    pub fn init (&mut self, threshold: u16, creator: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
+    pub fn init (&mut self, threshold: u16, creator: Pubkey, create_key: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
         self.threshold = threshold;
         self.keys = members;
         self.keys.push(creator);
@@ -35,7 +35,7 @@ impl Ms {
         self.transaction_index = 0;
         self.ms_change_index= 0;
         self.bump = bump;
-        self.creator = creator;
+        self.create_key = create_key;
         Ok(())
     }
 

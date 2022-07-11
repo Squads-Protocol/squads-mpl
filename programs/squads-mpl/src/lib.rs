@@ -16,7 +16,7 @@ pub mod squads_mpl {
     use anchor_lang::solana_program::{program::{invoke_signed, invoke}, system_instruction::transfer};
 
     use super::*;
-    pub fn create(ctx: Context<Create>, threshold:u16, members: Vec<Pubkey>) -> Result<()> {
+    pub fn create(ctx: Context<Create>, threshold:u16, create_key: Pubkey, members: Vec<Pubkey>) -> Result<()> {
         // since creator is considered a member, check we don't exceed u16 - very unlikely
         let total_members = members.len() + 1;
         if total_members > usize::from(u16::MAX) {
@@ -30,6 +30,7 @@ pub mod squads_mpl {
         ctx.accounts.multisig.init(
             threshold,
             ctx.accounts.creator.key(),
+            create_key,
             members,
             *ctx.bumps.get("multisig").unwrap(),
         )
@@ -255,7 +256,7 @@ pub mod squads_mpl {
         // if auth index < 1
         let ms_authority_seeds = [
             b"squad",
-            ctx.accounts.multisig.creator.as_ref(),
+            ctx.accounts.multisig.create_key.as_ref(),
             b"multisig",
             &[ctx.accounts.multisig.bump]
         ];
@@ -352,12 +353,13 @@ pub mod squads_mpl {
 }
 
 #[derive(Accounts)]
+#[instruction(threshold: u16, create_key: Pubkey)]
 pub struct Create<'info> {
     #[account(
         init,
         payer = creator,
         space = Ms::MAXIMUM_SIZE,
-        seeds = [b"squad", creator.key().as_ref(), b"multisig"], bump
+        seeds = [b"squad", create_key.as_ref(), b"multisig"], bump
     )]
     pub multisig: Account<'info, Ms>,
 
@@ -372,7 +374,7 @@ pub struct CreateTransaction<'info> {
         mut,
         seeds = [
             b"squad",
-            multisig.creator.as_ref(),
+            multisig.create_key.as_ref(),
             b"multisig"
         ],
         bump = multisig.bump,
@@ -403,7 +405,7 @@ pub struct AddInstruction<'info> {
     #[account(
         seeds = [
             b"squad",
-            multisig.creator.as_ref(),
+            multisig.create_key.as_ref(),
             b"multisig"
         ],
         bump = multisig.bump,
@@ -448,7 +450,7 @@ pub struct ActivateTransaction<'info> {
     #[account(
         seeds = [
             b"squad",
-            multisig.creator.as_ref(),
+            multisig.create_key.as_ref(),
             b"multisig"
         ],
         bump = multisig.bump,
@@ -481,7 +483,7 @@ pub struct ApproveTransaction<'info> {
     #[account(
         seeds = [
             b"squad",
-            multisig.creator.as_ref(),
+            multisig.create_key.as_ref(),
             b"multisig"
         ],
         bump = multisig.bump,
@@ -513,7 +515,7 @@ pub struct RejectTransaction<'info> {
     #[account(
         seeds = [
             b"squad",
-            multisig.creator.as_ref(),
+            multisig.create_key.as_ref(),
             b"multisig"
         ],
         bump = multisig.bump,
@@ -546,7 +548,7 @@ pub struct CancelTransaction<'info> {
         mut,
         seeds = [
             b"squad",
-            multisig.creator.as_ref(),
+            multisig.create_key.as_ref(),
             b"multisig"
         ],
         bump = multisig.bump,
@@ -580,7 +582,7 @@ pub struct ExecuteTransaction<'info> {
         mut,
         seeds = [
             b"squad",
-            multisig.creator.as_ref(),
+            multisig.create_key.as_ref(),
             b"multisig"
         ],
         bump = multisig.bump,
@@ -615,7 +617,7 @@ pub struct MsAuth<'info> {
         mut,
         seeds = [
             b"squad",
-            multisig.creator.as_ref(),
+            multisig.create_key.as_ref(),
             b"multisig"
         ], bump = multisig.bump
     )]
@@ -631,7 +633,7 @@ pub struct MsAuthRealloc<'info> {
         mut,
         seeds = [
             b"squad",
-            multisig.creator.as_ref(),
+            multisig.create_key.as_ref(),
             b"multisig"
         ], bump = multisig.bump
     )]
