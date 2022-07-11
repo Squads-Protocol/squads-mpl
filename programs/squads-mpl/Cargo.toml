@@ -1,6 +1,6 @@
 [package]
 name = "squads-mpl"
-version = "0.1.0"
+version = "0.1.1"
 description = "Squads Multisig Program Library"
 authors = ["Sean Lars Ganser <sean@sqds.io>", "Bastien Guillaumat <bastien@sqds.io>"]
 homepage = "https://squads.so"
