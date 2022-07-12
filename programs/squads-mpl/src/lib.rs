@@ -19,17 +19,23 @@ pub mod squads_mpl {
     pub fn create(ctx: Context<Create>, threshold:u16, create_key: Pubkey, members: Vec<Pubkey>) -> Result<()> {
         // since creator is considered a member, check we don't exceed u16 - very unlikely
         let total_members = members.len() + 1;
+        //make sure we don't exceed on first call - not likely but this shoudl be here
         if total_members > usize::from(u16::MAX) {
             return err!(MsError::MaxMembersReached);
         }
 
+        //make sure threshold is valid
         if !(1..=total_members).contains(&usize::from(threshold)) {
             return err!(MsError::InvalidThreshold);
         }
+        
+        // check that the creator isn't in the member list, they'll be added automatically
+        let mut members = members;
+        members.sort();
+        members.dedup();
 
         ctx.accounts.multisig.init(
             threshold,
-            ctx.accounts.creator.key(),
             create_key,
             members,
             *ctx.bumps.get("multisig").unwrap(),

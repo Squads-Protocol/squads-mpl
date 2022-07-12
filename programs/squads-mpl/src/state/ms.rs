@@ -26,11 +26,9 @@ impl Ms {
     pub const MAXIMUM_SIZE: usize = (32 * 10) + Self::SIZE_WITHOUT_MEMBERS; // initial space for 10 keys
 
 
-    pub fn init (&mut self, threshold: u16, creator: Pubkey, create_key: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
+    pub fn init (&mut self, threshold: u16, create_key: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
         self.threshold = threshold;
         self.keys = members;
-        self.keys.push(creator);
-        self.keys.sort();
         self.authority_index = 1;   // default vault is the first authority
         self.transaction_index = 0;
         self.ms_change_index= 0;

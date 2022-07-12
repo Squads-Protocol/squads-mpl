@@ -36,6 +36,7 @@ describe('Basic functionality', () => {
         const memberList = [...new Array(numberOfMembersTotal - 1)].map(() => {
             return anchor.web3.Keypair.generate().publicKey;
         })
+        memberList.push(creator.publicKey);
         await program.methods.create(1, randomCreateKey, memberList)
             .accounts({
                 multisig: msPDA,
