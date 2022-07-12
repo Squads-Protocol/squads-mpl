@@ -33,7 +33,7 @@ pub mod squads_mpl {
             return err!(MsError::InvalidThreshold);
         }
         
-        // check that the creator isn't in the member list, they'll be added automatically
+        // sort the members and remove duplicates
         let mut members = members;
         members.sort();
         members.dedup();
@@ -47,9 +47,11 @@ pub mod squads_mpl {
     }
 
     pub fn add_member(ctx: Context<MsAuthRealloc>, new_member: Pubkey) -> Result<()> {
+        // if max is already reached, we can't have more members
         if ctx.accounts.multisig.keys.len() >= usize::from(u16::MAX) {
             return err!(MsError::MaxMembersReached);
         }
+
         // * check if realloc is needed
         let multisig_account_info = ctx.accounts.multisig.to_account_info();
         let curr_data_size = multisig_account_info.data.borrow().len();
@@ -151,10 +153,12 @@ pub mod squads_mpl {
     }
 
     // add a new vault, program upgrade authority, mint authority, etc
+    // this is mainly for convience to collected tracked authorities
     pub fn add_authority(ctx: Context<MsAuth>) -> Result<()> {
         ctx.accounts.multisig.add_authority()
     }
 
+    // create a transaction, and delegate an authority to sign for it later
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
         msg!("TX PDA: {:?}", ctx.accounts.transaction.key());
         let ms = &mut ctx.accounts.multisig;
@@ -186,10 +190,12 @@ pub mod squads_mpl {
 
     }
 
+    // sets a transaction status to Active, it can then be voted on
     pub fn activate_transaction(ctx: Context<ActivateTransaction>) -> Result<()> {
         ctx.accounts.transaction.activate()
     }
 
+    // attach an instruction to the transaction
     pub fn add_instruction(ctx: Context<AddInstruction>, incoming_instruction: IncomingInstruction) -> Result<()> {
         let tx = &mut ctx.accounts.transaction;
         tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
@@ -244,6 +250,7 @@ pub mod squads_mpl {
         Ok(())
     }
 
+    // execute the transaction if status is ExecuteReady and its not deprecated by the ms_change_index
     pub fn execute_transaction<'info>(ctx: Context<'_,'_,'_,'info,ExecuteTransaction<'info>>, account_list: Vec<u8>) -> Result<()> {
         // check that we are provided at least one instruction
         if ctx.accounts.transaction.instruction_index < 1 {
@@ -286,6 +293,7 @@ pub mod squads_mpl {
             // each ix block starts with the ms_ix account
             let ms_ix_account: &AccountInfo = next_account_info(ix_iter)?;
 
+            // if the attached instruction doesn't belong to this program, throw error
             if ms_ix_account.owner != ctx.program_id {
                 return err!(MsError::InvalidInstructionAccount);
             }
@@ -302,7 +310,7 @@ pub mod squads_mpl {
                 b"instruction"],
                 ctx.program_id
             );
-            // check the instruction
+            // check the instruction account key maches the derived pda
             if &ix_pda != ms_ix_account.key {
                 return err!(MsError::InvalidInstructionAccount);
             }
@@ -336,6 +344,7 @@ pub mod squads_mpl {
             let ix: Instruction = Instruction::from(ms_ix);
             // execute the ix
             match ctx.accounts.transaction.authority_index {
+                // if its a 0 authority, use the MS pda seeds
                 0 => {
                    invoke_signed(
                         &ix,
@@ -343,6 +352,7 @@ pub mod squads_mpl {
                         &[&ms_authority_seeds]
                     )?;
                 },
+                // if its > 1 authority, use the derived authority seeds
                 1.. => {
                    invoke_signed(
                         &ix,
@@ -354,8 +364,9 @@ pub mod squads_mpl {
             Ok(())
         })?;
 
+        // mark it as executed
         ctx.accounts.transaction.set_executed()?;
-
+        // reload any multisig changes
         ctx.accounts.multisig.reload()?;
         Ok(())
     }
