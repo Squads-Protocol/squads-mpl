@@ -12,5 +12,6 @@ pub enum MsError {
     InvalidThreshold,
     DeprecatedTransaction,
     InstructionFailed,
-    MaxMembersReached
+    MaxMembersReached,
+    EmptyMembers,
 }

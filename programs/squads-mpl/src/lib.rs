@@ -18,7 +18,11 @@ pub mod squads_mpl {
     use super::*;
     pub fn create(ctx: Context<Create>, threshold:u16, create_key: Pubkey, members: Vec<Pubkey>) -> Result<()> {
         // since creator is considered a member, check we don't exceed u16 - very unlikely
-        let total_members = members.len() + 1;
+        let total_members = members.len();
+        if total_members < 1 {
+            return err!(MsError::EmptyMembers);
+        }
+
         //make sure we don't exceed on first call - not likely but this shoudl be here
         if total_members > usize::from(u16::MAX) {
             return err!(MsError::MaxMembersReached);
