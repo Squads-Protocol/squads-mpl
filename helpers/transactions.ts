@@ -121,9 +121,9 @@ export const createExecuteTransactionTx = async (program:  Program<SquadsMpl>, m
 };
 
 // some PDA helper functions
-export const getMsPDA = (creator: anchor.web3.PublicKey, programId: anchor.web3.PublicKey) => anchor.web3.PublicKey.findProgramAddressSync([
+export const getMsPDA = (create_key: anchor.web3.PublicKey, programId: anchor.web3.PublicKey) => anchor.web3.PublicKey.findProgramAddressSync([
   anchor.utils.bytes.utf8.encode("squad"),
-  creator.toBuffer(),
+  create_key.toBuffer(),
   anchor.utils.bytes.utf8.encode("multisig")
 ], programId);
 
