@@ -17,6 +17,11 @@ pub mod squads_mpl {
 
     use super::*;
     pub fn create(ctx: Context<Create>, threshold:u16, create_key: Pubkey, members: Vec<Pubkey>) -> Result<()> {
+        // sort the members and remove duplicates
+        let mut members = members;
+        members.sort();
+        members.dedup();
+
         // since creator is considered a member, check we don't exceed u16 - very unlikely
         let total_members = members.len();
         if total_members < 1 {
@@ -32,11 +37,6 @@ pub mod squads_mpl {
         if !(1..=total_members).contains(&usize::from(threshold)) {
             return err!(MsError::InvalidThreshold);
         }
-        
-        // sort the members and remove duplicates
-        let mut members = members;
-        members.sort();
-        members.dedup();
 
         ctx.accounts.multisig.init(
             threshold,
