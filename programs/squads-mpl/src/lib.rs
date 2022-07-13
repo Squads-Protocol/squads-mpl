@@ -22,7 +22,7 @@ pub mod squads_mpl {
         members.sort();
         members.dedup();
 
-        // since creator is considered a member, check we don't exceed u16 - very unlikely
+        // check we don't exceed u16 - very unlikely
         let total_members = members.len();
         if total_members < 1 {
             return err!(MsError::EmptyMembers);
