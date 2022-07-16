@@ -623,13 +623,11 @@ pub struct ExecuteTransaction<'info> {
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
-        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
     #[account(mut)]
     pub member: Signer<'info>,
-    // pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]
