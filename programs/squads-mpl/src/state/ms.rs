@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
+use anchor_lang::solana_program::borsh::get_instance_packed_len;
 
 #[account]
 pub struct Ms {
@@ -253,6 +254,12 @@ impl MsInstruction {
         self.keys = incoming_instruction.keys;
         self.data = incoming_instruction.data;
         Ok(())
+    }
+}
+
+impl IncomingInstruction {
+    pub fn get_max_size(&self) -> usize {
+        return get_instance_packed_len(&self).unwrap_or_default().checked_add(2).unwrap_or_default();
     }
 }
 

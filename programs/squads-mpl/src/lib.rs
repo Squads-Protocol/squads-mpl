@@ -422,6 +422,7 @@ pub struct CreateTransaction<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(instruction_data: IncomingInstruction)]
 pub struct AddInstruction<'info> {
     #[account(
         seeds = [
@@ -451,13 +452,14 @@ pub struct AddInstruction<'info> {
     #[account(
         init,
         payer = creator,
-        space = 8 + MsInstruction::MAXIMUM_SIZE,
+        space = 8 + instruction_data.get_max_size(),
         seeds = [
             b"squad",
             transaction.key().as_ref(),
             &transaction.instruction_index.checked_add(1).unwrap().to_le_bytes(),
             b"instruction"
-        ], bump
+        ], bump,
+        constraint = 8 + instruction_data.get_max_size() <= MsInstruction::MAXIMUM_SIZE @MsError::InvalidTransactionState,
     )]
     pub instruction: Account<'info, MsInstruction>,
 
