@@ -158,6 +158,12 @@ pub mod squads_mpl {
         ctx.accounts.multisig.add_authority()
     }
 
+    pub fn set_external_execute(ctx: Context<MsAuth>, setting: bool) -> Result<()> {
+        let ms = &mut ctx.accounts.multisig;
+        ms.allow_external_execute = setting;
+        Ok(())
+    }
+
     // create a transaction, and delegate an authority to sign for it later
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
         msg!("TX PDA: {:?}", ctx.accounts.transaction.key());
@@ -678,6 +684,8 @@ pub struct ExecuteTransaction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
+        // only members can execute unless specified by the allow_external_execute setting
+        constraint = matches!(multisig.is_member(member.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Box<Account<'info, Ms>>,
 
@@ -691,7 +699,6 @@ pub struct ExecuteTransaction<'info> {
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-        constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
         // if they've already started sequential execution, they must continue
         constraint = transaction.executed_index < 1 @MsError::PartialExecution,
     )]
@@ -712,6 +719,7 @@ pub struct ExecuteInstruction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
+        constraint = matches!(multisig.is_member(member.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Box<Account<'info, Ms>>,
 
@@ -725,7 +733,6 @@ pub struct ExecuteInstruction<'info> {
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-        constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub transaction: Account<'info, MsTransaction>,
     
