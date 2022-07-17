@@ -371,6 +371,75 @@ pub mod squads_mpl {
         Ok(())
     }
 
+    // will sequentially execute an instruction - must be executed in order
+    pub fn execute_instruction<'info>(ctx: Context<'_,'_,'_,'info,ExecuteInstruction<'info>>) -> Result<()> {
+        let ms_key = &ctx.accounts.multisig.key();
+        let ms_ix = &mut ctx.accounts.instruction;
+        let tx = &mut ctx.accounts.transaction;
+        
+        // setup the authority seeds
+        let authority_seeds = [
+            b"squad",
+            ms_key.as_ref(),
+            &tx.authority_index.to_le_bytes(),
+            b"authority",
+            &[tx.authority_bump]
+        ];
+
+        // map the saved instruction account data to the instruction to be invoked
+        let ix: Instruction = Instruction {
+            accounts: ms_ix.keys.iter().map(|k| {
+                AccountMeta {
+                    pubkey: k.pubkey,
+                    is_signer: k.is_signer,
+                    is_writable:k.is_writable
+                }
+            }).collect(),
+            data: ms_ix.data.clone(),
+            program_id: ms_ix.program_id
+        };
+
+        // collect the accounts needed from remaining accounts (order matters)
+        let mut ix_account_infos: Vec<AccountInfo> = Vec::<AccountInfo>::new();
+        let ix_account_iter = &mut ctx.remaining_accounts.iter();
+        // the first account in the submitted list should be the program
+        let ix_program_account = next_account_info(ix_account_iter)?;
+        // check that the programs match
+        if ix_program_account.key != &ix.program_id {
+            return err!(MsError::InvalidInstructionAccount);
+        }
+
+        // loop through the provided remaining accounts - check they match the saved instruction accounts
+        for account_index in 0..ms_ix.keys.len() {
+            let ix_account_info = next_account_info(ix_account_iter)?;
+            // check that the ix account keys match the submitted account keys
+            if ix_account_info.key != &ms_ix.keys[account_index].pubkey {
+                return err!(MsError::InvalidInstructionAccount);
+            }
+            // check that the ix account writable match the submitted account writable
+            if ix_account_info.is_writable != ms_ix.keys[account_index].is_writable {
+                return err!(MsError::InvalidInstructionAccount);
+            }
+            ix_account_infos.push(ix_account_info.clone());
+        }
+
+        invoke_signed(
+            &ix,
+            &ix_account_infos,
+            &[&authority_seeds]
+        )?;
+
+        // set the instruction as executed
+        ms_ix.set_executed()?;
+        // set the executed index to match
+        tx.executed_index = ms_ix.instruction_index;
+        // this is the last one - finish
+        if ctx.accounts.instruction.instruction_index == ctx.accounts.transaction.instruction_index {
+            ctx.accounts.transaction.set_executed()?;
+        }
+        Ok(())
+    }
+
 }
 
 #[derive(Accounts)]
@@ -623,8 +692,56 @@ pub struct ExecuteTransaction<'info> {
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
+        // if they've already started sequential execution, they must continue
+        constraint = transaction.executed_index < 1 @MsError::PartialExecution,
     )]
     pub transaction: Account<'info, MsTransaction>,
+
+    #[account(mut)]
+    pub member: Signer<'info>,
+}
+
+// executes the the next instruction sequentially if a tx is executeReady
+#[derive(Accounts)]
+pub struct ExecuteInstruction<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+    )]
+    pub multisig: Box<Account<'info, Ms>>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ], bump = transaction.bump,
+        constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
+        constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
+    )]
+    pub transaction: Account<'info, MsTransaction>,
+    
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            transaction.key().as_ref(),
+            &transaction.executed_index.checked_add(1).unwrap().to_le_bytes(),
+            b"instruction"
+        ], bump = instruction.bump,
+        constraint = !instruction.executed @MsError::InvalidInstructionAccount,
+        // it should be the next expected instruction account to be executed
+        constraint = instruction.instruction_index == transaction.executed_index.checked_add(1).unwrap() @MsError::InvalidInstructionAccount,
+    )]
+    pub instruction: Account<'info, MsInstruction>,
 
     #[account(mut)]
     pub member: Signer<'info>,

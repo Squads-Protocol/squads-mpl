@@ -14,4 +14,5 @@ pub enum MsError {
     InstructionFailed,
     MaxMembersReached,
     EmptyMembers,
+    PartialExecution,
 }

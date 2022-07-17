@@ -149,7 +149,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it(`Tx Activate MS: ${msPDA.toBase58()}`, async () => {
+    it(`Tx Activate - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -207,7 +207,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it(`Tx Sign MS: ${msPDA.toBase58()}`, async () => {
+    it(`Tx Sign - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -281,7 +281,7 @@ describe('Basic functionality', () => {
         expect(txState.status).to.have.property("executeReady");
     });
 
-    it(`Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
+    it(`Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -384,7 +384,7 @@ describe('Basic functionality', () => {
         expect(testPayeeAccount.value.lamports).to.equal(1000000);
     });
 
-    it(`2X Transfer Tx Execute MS: ${msPDA.toBase58()}`, async () => {
+    it(`2X Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -504,6 +504,153 @@ describe('Basic functionality', () => {
         expect(txState.status).to.have.property("executed");
         testPayeeAccount = await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
         expect(testPayeeAccount.value.lamports).to.equal(2000000);
+    });
+
+    it(`2X Transfer Tx Sequential execute - MS: ${msPDA.toBase58()}`, async () => {
+        // create authority to use (Vault, index 1)
+        const authorityIndexBN = new anchor.BN(1, 10);
+        const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
+
+        // get the state of the MS
+        const newTxIndex = await getNextTxIndex(program, msPDA);
+        const newTxIndexBN = new anchor.BN(newTxIndex, 10);
+
+        // generate the tx pda
+        const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+
+        await program.methods.createTransaction(1)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        let txState = await program.account.msTransaction.fetch(txPDA);
+        txCount++;
+        // check the transaction indexes match
+        let msState = await program.account.ms.fetch(msPDA);
+
+        // person/entity who gets paid
+        const testPayee = anchor.web3.Keypair.generate();
+
+        ////////////////////////////////////////////////////////
+        // add the first transfer
+        // increment the instruction index for this transaction (for new PDA)
+        const newIxIndex = txState.instructionIndex + 1;
+        const newIxIndexBN = new anchor.BN(newIxIndex, 10);
+
+        // create the instruction pda
+        const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+
+        // the test transfer instruction
+        const testIx = await createTestTransferTransaction(authorityPDA, testPayee.publicKey);
+
+        await program.methods.addInstruction(testIx)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                instruction: ixPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        //////////////////////////////////////////////////////////
+        // add the second transfer ix
+        txState = await program.account.msTransaction.fetch(txPDA);
+        const newIx2xIndex = txState.instructionIndex + 1;
+        const newIx2xIndexBN = new anchor.BN(newIx2xIndex, 10);
+
+        // create the instruction pda for ix 2x
+        const [ix2xPDA] = await getIxPDA(txPDA, newIx2xIndexBN, program.programId);
+
+        const testIx2x = await createTestTransferTransaction(authorityPDA, testPayee.publicKey);
+        await program.methods.addInstruction(testIx2x)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                instruction: ix2xPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        await program.methods.activateTransaction()
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        try {
+            await program.methods.approveTransaction()
+                .accounts({
+                    multisig: msPDA,
+                    transaction: txPDA,
+                    member: creator.publicKey
+                })
+                .rpc();
+        } catch (e) {
+            console.log(e);
+        }
+
+        // transfer lamports to the authorityPDA
+        let testPayeeAccount = await program.provider.connection.getParsedAccountInfo(testPayee.publicKey);
+        // move funds to auth/vault
+        const moveFundsToMsPDAIx = await createTestTransferTransaction(creator.publicKey, authorityPDA, 3000000);
+        const {blockhash} = await program.provider.connection.getLatestBlockhash();
+        const lastValidBlockHeight = await program.provider.connection.getBlockHeight();
+        const moveFundsToMsPDATx = new anchor.web3.Transaction({blockhash, lastValidBlockHeight});
+        moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
+        try {
+            creator.signTransaction(moveFundsToMsPDATx);
+            await programProvider.sendAndConfirm(moveFundsToMsPDATx);
+        } catch (e) {
+            console.log(e);
+        }
+        const msPDAFunded = await program.provider.connection.getAccountInfo(authorityPDA);
+        // expect the vault to be correct:
+        expect(msPDAFunded.lamports).to.equal(5000000);
+        // lead with the expected program account, follow with the other accounts for the ix
+        const testIx1Keys: anchor.web3.AccountMeta[] = [{pubkey:testIx.programId, isSigner: false, isWritable: false}].concat(testIx.keys.map(k => {
+            k.isSigner = false;
+            return k;
+        }))
+        await program.methods.executeInstruction()
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                instruction: ixPDA,
+                member: creator.publicKey,
+            })
+            .remainingAccounts(testIx1Keys)
+            .rpc();
+        const ixUpdatedState = await program.account.msInstruction.fetch(ixPDA);
+        let txUpdatedState = await program.account.msTransaction.fetch(txPDA);
+
+        expect(ixUpdatedState.executed).to.be.true;
+        expect(txUpdatedState.executedIndex).to.equal(1);
+
+        const testIx2Keys: anchor.web3.AccountMeta[] = [{pubkey:testIx2x.programId, isSigner: false, isWritable: false}].concat(testIx2x.keys.map(k => {
+            k.isSigner = false;
+            return k;
+        }))
+        await program.methods.executeInstruction()
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                instruction: ix2xPDA,
+                member: creator.publicKey,
+            })
+            .remainingAccounts(testIx2Keys)
+            .rpc();
+
+        const ix2UpdatedState = await program.account.msInstruction.fetch(ixPDA);
+        txUpdatedState = await program.account.msTransaction.fetch(txPDA);
+
+        expect(ix2UpdatedState.executed).to.be.true;
+        expect(txUpdatedState.executedIndex).to.equal(2);
+        expect(txUpdatedState.status).to.have.property("executed");
     });
 
     it('Change ms size with realloc', async () => {

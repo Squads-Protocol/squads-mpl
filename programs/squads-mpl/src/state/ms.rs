@@ -105,7 +105,8 @@ pub struct MsTransaction {
     pub bump: u8,                       // bump for the seed
     pub approved: Vec<Pubkey>,          // keys that have approved/signed
     pub rejected: Vec<Pubkey>,          // keys that have rejected
-    pub cancelled: Vec<Pubkey>          // keys that have cancelled (ExecuteReady only)
+    pub cancelled: Vec<Pubkey>,         // keys that have cancelled (ExecuteReady only)
+    pub executed_index: u8              // if Tx is executed sequentially, track latest
 }
 
 impl MsTransaction {
@@ -117,7 +118,8 @@ impl MsTransaction {
         1 +                                 // the authority bump
         (1 + 12) +                          // the enum size
         1 +                                 // the number of instructions (attached)
-        1;                                  // space for tx bump
+        1 +                                 // space for tx bump
+        1;                                  // track index if executed sequentially
 
     pub fn initial_size_with_members(members_len: usize) -> usize {
         MsTransaction::MINIMUM_SIZE + (3 * (4 + (members_len * 32) ) )
@@ -135,6 +137,7 @@ impl MsTransaction {
         self.rejected = Vec::new();
         self.cancelled = Vec::new();
         self.bump = bump;
+        self.executed_index = 0;
         Ok(())
     }
 
@@ -241,6 +244,7 @@ pub struct MsInstruction {
     pub data: Vec<u8>,
     pub instruction_index: u8,
     pub bump: u8,
+    pub executed: bool,
 }
 
 // map the incoming instruction to internal instruction schema
@@ -253,13 +257,20 @@ impl MsInstruction {
         self.program_id = incoming_instruction.program_id;
         self.keys = incoming_instruction.keys;
         self.data = incoming_instruction.data;
+        self.executed = false;
+        Ok(())
+    }
+
+    pub fn set_executed(&mut self) -> Result<()> {
+        self.executed = true;
         Ok(())
     }
 }
 
 impl IncomingInstruction {
     pub fn get_max_size(&self) -> usize {
-        return get_instance_packed_len(&self).unwrap_or_default().checked_add(2).unwrap_or_default();
+        // add three the size to correlate with the saved instruction account
+        return get_instance_packed_len(&self).unwrap_or_default().checked_add(3).unwrap_or_default();
     }
 }
 
