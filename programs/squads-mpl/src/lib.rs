@@ -158,6 +158,7 @@ pub mod squads_mpl {
         ctx.accounts.multisig.add_authority()
     }
 
+    // change the setting of the allow_external_execute
     pub fn set_external_execute(ctx: Context<MsAuth>, setting: bool) -> Result<()> {
         let ms = &mut ctx.accounts.multisig;
         ms.allow_external_execute = setting;
