@@ -11,16 +11,31 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 pub mod program_manager {
     use super::*;
 
-    pub fn create_program_manager(ctx: Context<CreateManager>)-> Result<()>{
-        Ok(())
+    pub fn create_program_manager(ctx: Context<CreateManager>, bump: u8)-> Result<()>{
+        let program_manager = &mut ctx.accounts.program_manager;
+        program_manager.init(ctx.accounts.multisig.key(), bump)
     }
 
-    pub fn create_managed_program(ctx: Context<CreateManagedProgram>)->Result<()>{
-        Ok(())
+    pub fn create_managed_program(ctx: Context<CreateManagedProgram>, program_address: Pubkey, name: String, bump: u8)->Result<()>{
+        let managed_program = &mut ctx.accounts.managed_program;
+        managed_program.init(
+            program_address,
+            ctx.accounts.multisig.key(),
+            bump,
+            name,
+            ctx.accounts.program_manager.managed_program_index.checked_add(1).unwrap()
+        )
     }
 
-    pub fn create_program_upgrade(ctx: Context<CreateProgramUpgrade>)->Result<()>{
-        Ok(())
+    pub fn create_program_upgrade(ctx: Context<CreateProgramUpgrade>, ix: UpgradeInstruction, bump: u8, name: String)->Result<()>{
+        let program_upgrade = &mut ctx.accounts.program_upgrade;
+        program_upgrade.init(
+            ctx.accounts.managed_program.key(),
+            ctx.accounts.managed_program.upgrade_index.checked_add(1).unwrap(),
+            ix,
+            bump,
+            name
+        )
     }
 
     // pub fn close_managed_program_account() -> Result<()>{
@@ -135,7 +150,7 @@ pub struct CreateProgramUpgrade<'info> {
             b"pupgrade"
         ], bump
     )]
-    pub program_upgrade: Account<'info,ManagedProgram>,
+    pub program_upgrade: Account<'info,ProgramUpgrade>,
     
     #[account(mut)]
     pub creator: Signer<'info>,
