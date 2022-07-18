@@ -100,6 +100,13 @@ pub struct UpgradeInstruction {
     pub upgrade_instruction_data: Vec<u8>,
 }
 
+impl UpgradeInstruction {
+    pub fn get_max_size(&self) -> usize {
+        // add three the size to correlate with the saved instruction account
+        return get_instance_packed_len(&self).unwrap();
+    }
+}
+
 #[account]
 pub struct UpgradeAccountMeta {
     pub pubkey: Pubkey,

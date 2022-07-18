@@ -13,7 +13,10 @@ pub mod program_manager {
 
     pub fn create_program_manager(ctx: Context<CreateManager>, bump: u8)-> Result<()>{
         let program_manager = &mut ctx.accounts.program_manager;
-        program_manager.init(ctx.accounts.multisig.key(), bump)
+        program_manager.init(
+            ctx.accounts.multisig.key(),
+            bump
+        )
     }
 
     pub fn create_managed_program(ctx: Context<CreateManagedProgram>, program_address: Pubkey, name: String, bump: u8)->Result<()>{
@@ -27,7 +30,7 @@ pub mod program_manager {
         )
     }
 
-    pub fn create_program_upgrade(ctx: Context<CreateProgramUpgrade>, ix: UpgradeInstruction, bump: u8, name: String)->Result<()>{
+    pub fn create_program_upgrade(ctx: Context<CreateProgramUpgrade>, ix: UpgradeInstruction, name: String, bump: u8)->Result<()>{
         let program_upgrade = &mut ctx.accounts.program_upgrade;
         program_upgrade.init(
             ctx.accounts.managed_program.key(),
@@ -75,6 +78,7 @@ pub struct CreateManager<'info> {
 
 
 #[derive(Accounts)]
+#[instruction(program_address: Pubkey, name: String)]
 pub struct CreateManagedProgram<'info> {
     #[account(
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
@@ -94,7 +98,7 @@ pub struct CreateManagedProgram<'info> {
     #[account(
         init,
         payer = creator,
-        space = ManagedProgram::MINIMUM_SIZE,
+        space = ManagedProgram::MINIMUM_SIZE + name.try_to_vec().unwrap().len(),
         seeds = [
             b"squad",
             program_manager.key().as_ref(),
@@ -112,6 +116,7 @@ pub struct CreateManagedProgram<'info> {
 
 
 #[derive(Accounts)]
+#[instruction(ix: UpgradeInstruction, name: String)]
 pub struct CreateProgramUpgrade<'info> {
     #[account(
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
@@ -126,7 +131,7 @@ pub struct CreateProgramUpgrade<'info> {
         ],
         bump = program_manager.bump
     )]
-    pub program_manager: Account<'info,ProgramManager>,
+    pub program_manager: Account<'info, ProgramManager>,
 
     #[account(
         seeds = [
@@ -137,12 +142,12 @@ pub struct CreateProgramUpgrade<'info> {
         ],
         bump = managed_program.bump
     )]
-    pub managed_program: Account<'info,ManagedProgram>,
+    pub managed_program: Account<'info, ManagedProgram>,
 
     #[account(
         init,
         payer = creator,
-        space = ProgramUpgrade::MINIMUM_SIZE,
+        space = ProgramUpgrade::MINIMUM_SIZE + ix.get_max_size() + name.try_to_vec().unwrap().len(),
         seeds = [
             b"squad",
             managed_program.key().as_ref(),
@@ -150,7 +155,7 @@ pub struct CreateProgramUpgrade<'info> {
             b"pupgrade"
         ], bump
     )]
-    pub program_upgrade: Account<'info,ProgramUpgrade>,
+    pub program_upgrade: Account<'info, ProgramUpgrade>,
     
     #[account(mut)]
     pub creator: Signer<'info>,
