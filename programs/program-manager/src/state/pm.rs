@@ -65,20 +65,21 @@ pub struct ProgramUpgrade{
     pub created_on: i64,
     pub upgraded_on: i64,
     pub executed: bool,
-    pub upgrade_ix: UpgradeInstruction,
     pub bump: u8,
+    pub upgrade_ix: UpgradeInstruction,
     pub name: String,
 }
 
 impl ProgramUpgrade {
     // minimum size, as name & instruction may vary and use args
-    pub const MINIMUM_SIZE: usize = 8 + // anchor discriminator
-        32 +                            // the managed program index
-        4 +                             // the upgrade index
-        8 +                             // when the upgrade was created
-        8 +                             // when the upgrade was used
-        1 +                             // if the upgrade has been used
-        1;                              // seed derivation bump
+    pub const MINIMUM_SIZE: usize = 8 +     // anchor discriminator
+        32 +                                // the managed program address
+        4 +                                 // the upgrade index
+        8 +                                 // when the upgrade was created
+        8 +                                 // when the upgrade was used
+        1 +                                 // if the upgrade has been used
+        1 +                                 // seed derivation bump
+        UpgradeInstruction::MAXIMUM_SIZE;   // max size of the upgrade instruction
 
     pub fn init(&mut self, managed_program_address: Pubkey, upgrade_index: u32, upgrade_ix: UpgradeInstruction, bump: u8, name: String) -> Result<()>{
         self.managed_program_address = managed_program_address;
@@ -93,7 +94,7 @@ impl ProgramUpgrade {
     }
 }
 
-#[account]
+#[derive(AnchorSerialize,AnchorDeserialize, Clone)]
 pub struct UpgradeInstruction {
     pub program_id: Pubkey,
     pub accounts: Vec<UpgradeAccountMeta>,
@@ -101,17 +102,24 @@ pub struct UpgradeInstruction {
 }
 
 impl UpgradeInstruction {
+    pub const MAXIMUM_SIZE: usize = 282; // upgrade instruction serialized length
+
     pub fn get_max_size(&self) -> usize {
         // add three the size to correlate with the saved instruction account
-        return get_instance_packed_len(&self).unwrap();
+        return get_instance_packed_len(&self).unwrap_or_default();
     }
 }
 
-#[account]
+#[derive(AnchorSerialize,AnchorDeserialize, Clone)]
 pub struct UpgradeAccountMeta {
     pub pubkey: Pubkey,
     pub is_signer: bool,
     pub is_writable: bool,
+}
+impl UpgradeAccountMeta {
+    pub const MAXIMUM_SIZE: usize = 32 +            // the key
+        1 +                                         // is_signer 
+        1;                                          // is_writable
 }
 
 // convert from instruction to saveable/serializable struct

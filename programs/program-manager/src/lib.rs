@@ -9,42 +9,66 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 #[program]
 pub mod program_manager {
+    use anchor_lang::solana_program::{bpf_loader_upgradeable::upgrade};
+
     use super::*;
 
-    pub fn create_program_manager(ctx: Context<CreateManager>, bump: u8)-> Result<()>{
+    pub fn create_program_manager(ctx: Context<CreateManager>)-> Result<()>{
         let program_manager = &mut ctx.accounts.program_manager;
         program_manager.init(
             ctx.accounts.multisig.key(),
-            bump
+            *ctx.bumps.get("program_manager").unwrap(),
         )
     }
 
-    pub fn create_managed_program(ctx: Context<CreateManagedProgram>, program_address: Pubkey, name: String, bump: u8)->Result<()>{
+    pub fn create_managed_program(ctx: Context<CreateManagedProgram>, program_address: Pubkey, name: String)->Result<()>{
         let managed_program = &mut ctx.accounts.managed_program;
+        let program_manager = &mut ctx.accounts.program_manager;
+        let new_mpi = program_manager.managed_program_index.checked_add(1).unwrap();
         managed_program.init(
             program_address,
             ctx.accounts.multisig.key(),
-            bump,
+            *ctx.bumps.get("managed_program").unwrap(),
             name,
-            ctx.accounts.program_manager.managed_program_index.checked_add(1).unwrap()
-        )
+            new_mpi
+        )?;
+        program_manager.managed_program_index = new_mpi;
+        Ok(())
     }
 
-    pub fn create_program_upgrade(ctx: Context<CreateProgramUpgrade>, ix: UpgradeInstruction, name: String, bump: u8)->Result<()>{
+    pub fn create_program_upgrade(ctx: Context<CreateProgramUpgrade>, buffer: Pubkey, spill: Pubkey, authority: Pubkey, name: String)->Result<()>{
         let program_upgrade = &mut ctx.accounts.program_upgrade;
+        let managed_program = &mut ctx.accounts.managed_program;
+        let new_ui = managed_program.upgrade_index.checked_add(1).unwrap();
+
+        // generate the upgrade instruction
+        let ix = upgrade(
+            &managed_program.program_address,
+            &buffer, 
+            &authority, 
+            &spill
+        );
+        let uix = UpgradeInstruction::from(ix);
+        msg!("PACKED SIZE: {:?}", uix.get_max_size());
+        // set up the new upgrade account
         program_upgrade.init(
-            ctx.accounts.managed_program.key(),
-            ctx.accounts.managed_program.upgrade_index.checked_add(1).unwrap(),
-            ix,
-            bump,
+            managed_program.key(),
+            new_ui,
+            uix,
+            *ctx.bumps.get("program_upgrade").unwrap(),
             name
-        )
+        )?;
+        // increment the upgrade index
+        managed_program.upgrade_index = new_ui;
+        Ok(())
     }
 
+    // TO DO
     // pub fn close_managed_program_account() -> Result<()>{
     //     Ok(())
     // }
 
+    // TO DO
     // pub fn close_upgrade_account()->Result<()>{
     //     Ok(())
     // }
@@ -86,6 +110,7 @@ pub struct CreateManagedProgram<'info> {
     pub multisig: Account<'info, Ms>,
 
     #[account(
+        mut,
         seeds = [
             b"squad",
             multisig.key().as_ref(),
@@ -98,7 +123,7 @@ pub struct CreateManagedProgram<'info> {
     #[account(
         init,
         payer = creator,
-        space = ManagedProgram::MINIMUM_SIZE + name.try_to_vec().unwrap().len(),
+        space = ManagedProgram::MINIMUM_SIZE + name.try_to_vec().unwrap().len() + 4,
         seeds = [
             b"squad",
             program_manager.key().as_ref(),
@@ -116,7 +141,7 @@ pub struct CreateManagedProgram<'info> {
 
 
 #[derive(Accounts)]
-#[instruction(ix: UpgradeInstruction, name: String)]
+#[instruction(buffer: Pubkey, spill: Pubkey, authority: Pubkey, name: String)]
 pub struct CreateProgramUpgrade<'info> {
     #[account(
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
@@ -134,6 +159,7 @@ pub struct CreateProgramUpgrade<'info> {
     pub program_manager: Account<'info, ProgramManager>,
 
     #[account(
+        mut,
         seeds = [
             b"squad",
             program_manager.key().as_ref(),
@@ -147,7 +173,7 @@ pub struct CreateProgramUpgrade<'info> {
     #[account(
         init,
         payer = creator,
-        space = ProgramUpgrade::MINIMUM_SIZE + ix.get_max_size() + name.try_to_vec().unwrap().len(),
+        space = ProgramUpgrade::MINIMUM_SIZE + name.try_to_vec().unwrap().len() + 4,
         seeds = [
             b"squad",
             managed_program.key().as_ref(),

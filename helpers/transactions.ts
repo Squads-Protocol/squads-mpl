@@ -2,7 +2,7 @@ import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
 import { Account } from '@solana/web3.js';
 import { SquadsMpl } from '../target/types/squads_mpl';
-
+import { ProgramManager } from '../target/types/program_manager';
 
 // some TX/IX helper functions
 export const createTestTransferTransaction = async (authority: anchor.web3.PublicKey, recipient: anchor.web3.PublicKey, amount = 1000000) => {
@@ -152,4 +152,35 @@ export const getAuthorityPDA = async (msPDA: anchor.web3.PublicKey, authorityInd
 export const getNextTxIndex = async (program:  Program<SquadsMpl>, msAddress: anchor.web3.PublicKey) => {
   const msState = await program.account.ms.fetch(msAddress);
   return msState.transactionIndex + 1;
+};
+
+// program manager helpers
+export const getProgramManagerPDA = (msPDA: anchor.web3.PublicKey, programId: anchor.web3.PublicKey) => anchor.web3.PublicKey.findProgramAddressSync([
+  anchor.utils.bytes.utf8.encode("squad"),
+  msPDA.toBuffer(),
+  anchor.utils.bytes.utf8.encode("pmanage")
+], programId);
+
+export const getManagedProgramPDA = async (programManagerPDA: anchor.web3.PublicKey, managedProgramIndexBN: anchor.BN, programId: anchor.web3.PublicKey) => await anchor.web3.PublicKey.findProgramAddress([
+  anchor.utils.bytes.utf8.encode("squad"),
+  programManagerPDA.toBuffer(),
+  managedProgramIndexBN.toBuffer("le",4),  // note authority index is an u32 (4 byte)
+  anchor.utils.bytes.utf8.encode("program")
+], programId);
+
+export const getProgramUpgradePDA = async (managedProgramPDA: anchor.web3.PublicKey, upgradeIndexBN: anchor.BN, programId: anchor.web3.PublicKey) => await anchor.web3.PublicKey.findProgramAddress([
+  anchor.utils.bytes.utf8.encode("squad"),
+  managedProgramPDA.toBuffer(),
+  upgradeIndexBN.toBuffer("le",4),  // note authority index is an u32 (4 byte)
+  anchor.utils.bytes.utf8.encode("pupgrade")
+], programId);
+
+export const getNextProgramIndex = async (program:  Program<ProgramManager>, pmAddress: anchor.web3.PublicKey) => {
+  const pmState = await program.account.programManager.fetch(pmAddress);
+  return pmState.managedProgramIndex + 1;
+};
+
+export const getNextUpgradeIndex = async (program:  Program<ProgramManager>, mpAddress: anchor.web3.PublicKey) => {
+  const mpState = await program.account.managedProgram.fetch(mpAddress);
+  return mpState.upgradeIndex + 1;
 };

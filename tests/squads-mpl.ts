@@ -3,14 +3,20 @@ import {expect} from 'chai';
 import * as anchor from '@project-serum/anchor';
 import {Program, toInstruction} from '@project-serum/anchor';
 import {SquadsMpl} from '../target/types/squads_mpl';
+import { ProgramManager } from '../target/types/program_manager';
 import {
     createBlankTransaction,
     createExecuteTransactionTx,
     createTestTransferTransaction,
     getAuthorityPDA,
     getIxPDA,
+    getManagedProgramPDA,
     getMsPDA,
+    getNextProgramIndex,
     getNextTxIndex,
+    getNextUpgradeIndex,
+    getProgramManagerPDA,
+    getProgramUpgradePDA,
     getTxPDA
 } from '../helpers/transactions';
 import { PublicKey } from '@solana/web3.js';
@@ -22,13 +28,20 @@ describe('Basic functionality', () => {
     // Configure the client to use the local cluster.
     anchor.setProvider(anchor.AnchorProvider.env());
 
+    // the squads-mpl program / provider
     const program = anchor.workspace.SquadsMpl as Program<SquadsMpl>;
     const programProvider = program.provider as anchor.AnchorProvider;
+
+    // the program-manager program / provider
+    const programManagerProgram = anchor.workspace.ProgramManager as Program<ProgramManager>;
+    const programManagerProvider = programManagerProgram.provider as anchor.AnchorProvider;
 
     const creator = programProvider.wallet;
     // the Multisig PDA to use for the test run
     let randomCreateKey = anchor.web3.Keypair.generate().publicKey;
     const [msPDA] = getMsPDA(randomCreateKey, program.programId);
+    const [pmPDA] = getProgramManagerPDA(msPDA, programManagerProgram.programId);
+
     let txCount = 0;
     const numberOfMembersTotal = 10;
     it(`Create Multisig - MS: ${msPDA.toBase58()}`, async () => {
@@ -992,4 +1005,84 @@ describe('Basic functionality', () => {
         }
     });
 
+    it(`Create a program manager - MS: ${msPDA.toBase58()}`, async () => {
+        try {
+            await programManagerProgram.methods.createProgramManager()
+                .accounts({
+                    multisig: msPDA,
+                    programManager: pmPDA,
+                })
+                .rpc();
+        }catch(e){
+            console.log("eror creating program manager", e);
+        }
+        const newProgramManager = await programManagerProgram.account.programManager.fetch(pmPDA);
+        expect(newProgramManager.multisig.toBase58()).to.equal(msPDA.toBase58());
+    });
+
+    it(`Create a program to manage - MS ${msPDA.toBase58()}`, async () => {
+        const nextProgramIndex = await getNextProgramIndex(programManagerProgram, pmPDA);
+        const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
+        const [mpPDA] = await getManagedProgramPDA(pmPDA, new anchor.BN(nextProgramIndex), programManagerProgram.programId);
+        const nameString = "This is my test Program";
+        try {
+            await programManagerProgram.methods.createManagedProgram(testProgramAddress, nameString)
+                .accounts({
+                    multisig: msPDA,
+                    programManager: pmPDA,
+                    managedProgram: mpPDA,
+                }).rpc();
+        }catch(e){
+            console.log("error creating managed program", e);
+        }
+        const newManagedProgramState = await programManagerProgram.account.managedProgram.fetch(mpPDA);
+        expect(newManagedProgramState.name).to.equal(nameString);
+        expect(newManagedProgramState.managedProgramIndex).to.equal(nextProgramIndex);
+    });
+
+    it(`Create a program to manage and upgrade - MS ${msPDA.toBase58()}`, async () => {
+        const nextProgramIndex = await getNextProgramIndex(programManagerProgram, pmPDA);
+        const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
+        const [mpPDA] = await getManagedProgramPDA(pmPDA, new anchor.BN(nextProgramIndex), programManagerProgram.programId);
+
+        const nameString = "This is my test Program 2";
+        try {
+            await programManagerProgram.methods.createManagedProgram(testProgramAddress, nameString)
+                .accounts({
+                    multisig: msPDA,
+                    programManager: pmPDA,
+                    managedProgram: mpPDA,
+                }).rpc();
+        }catch(e){
+            console.log("error creating managed program", e);
+        }
+        const newManagedProgramState = await programManagerProgram.account.managedProgram.fetch(mpPDA);
+        expect(newManagedProgramState.name).to.equal(nameString);
+        expect(newManagedProgramState.managedProgramIndex).to.equal(nextProgramIndex);
+
+        const nextUpgradeIndex = await getNextUpgradeIndex(programManagerProgram, mpPDA);
+        const [upgradePDA] = await getProgramUpgradePDA(mpPDA, new anchor.BN(nextUpgradeIndex,10), programManagerProgram.programId);
+        
+        const testBufferAddress = anchor.web3.Keypair.generate().publicKey;
+        const testSpillAddress = anchor.web3.Keypair.generate().publicKey;
+        const testAuthorityAddress = anchor.web3.Keypair.generate().publicKey;
+        const testUpgradeName = "Upgrade #1";
+        try {
+            await programManagerProgram.methods.createProgramUpgrade(testBufferAddress, testSpillAddress, testAuthorityAddress, testUpgradeName)
+                .accounts({
+                    multisig: msPDA,
+                    programManager: pmPDA,
+                    managedProgram: mpPDA,
+                    programUpgrade: upgradePDA
+                })
+                .rpc();
+        }catch(e) {
+            console.log("Error creating program upgrade", e);
+        }
+
+        const addedUpgrade = await programManagerProgram.account.programUpgrade.fetch(upgradePDA);
+        const managedProgramState = await programManagerProgram.account.managedProgram.fetch(mpPDA);
+        expect(addedUpgrade.upgradeIndex).to.equal(managedProgramState.upgradeIndex);
+        expect(addedUpgrade.name).to.equal(testUpgradeName);
+    });
 });

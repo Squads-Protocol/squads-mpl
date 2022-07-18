@@ -17,4 +17,4 @@ default = []
 
 [dependencies]
 anchor-lang = "0.25.0"
-squads-mpl = { path = "../squads-mpl" }
+squads-mpl = { path = "../squads-mpl", features = ["cpi"] }
