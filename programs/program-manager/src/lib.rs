@@ -5,7 +5,7 @@ use squads_mpl::errors::*;
 pub mod state;
 
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("8Y5Qbdb67Ka4LcPCziyhLrGbYN2ftZ1BG11Q5PiHenLP");
 
 #[program]
 pub mod program_manager {

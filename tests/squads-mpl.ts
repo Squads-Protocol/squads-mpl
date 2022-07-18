@@ -1040,7 +1040,7 @@ describe('Basic functionality', () => {
         expect(newManagedProgramState.managedProgramIndex).to.equal(nextProgramIndex);
     });
 
-    it(`Create a program to manage and upgrade - MS ${msPDA.toBase58()}`, async () => {
+    it(`Create a program to manage and create upgrade - MS ${msPDA.toBase58()}`, async () => {
         const nextProgramIndex = await getNextProgramIndex(programManagerProgram, pmPDA);
         const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
         const [mpPDA] = await getManagedProgramPDA(pmPDA, new anchor.BN(nextProgramIndex), programManagerProgram.programId);
