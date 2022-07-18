@@ -19,8 +19,8 @@ import {
     getProgramUpgradePDA,
     getTxPDA
 } from '../helpers/transactions';
-import { PublicKey } from '@solana/web3.js';
 
+const BPF_UPGRADE_ID = new anchor.web3.PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 
 // test suite
 describe('Basic functionality', () => {
@@ -1084,5 +1084,6 @@ describe('Basic functionality', () => {
         const managedProgramState = await programManagerProgram.account.managedProgram.fetch(mpPDA);
         expect(addedUpgrade.upgradeIndex).to.equal(managedProgramState.upgradeIndex);
         expect(addedUpgrade.name).to.equal(testUpgradeName);
+        expect(addedUpgrade.upgradeIx.programId.toBase58()).to.equal(BPF_UPGRADE_ID.toBase58());
     });
 });
