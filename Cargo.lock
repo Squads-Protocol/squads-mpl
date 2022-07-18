@@ -872,6 +872,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "program-manager"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "squads-mpl",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
