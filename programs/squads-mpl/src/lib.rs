@@ -61,17 +61,21 @@ pub mod squads_mpl {
         if spots_left < 1{
             // add space for 10 more keys
             let needed_len = curr_data_size + ( 10 * 32 );
+            // reallocate more space
+            AccountInfo::realloc(&multisig_account_info, needed_len, false)?;
+            // if more lamports are needed, transfer them to the account
             let rent_exempt_lamports = ctx.accounts.rent.minimum_balance(needed_len).max(1);
             let top_up_lamports = rent_exempt_lamports.saturating_sub(ctx.accounts.multisig.to_account_info().lamports());
-            AccountInfo::realloc(&multisig_account_info, needed_len, false)?;
-            invoke(
-                &transfer(ctx.accounts.member.key, &ctx.accounts.multisig.key(), top_up_lamports),
-                &[
-                    ctx.accounts.member.to_account_info().clone(),
-                    multisig_account_info.clone(),
-                    ctx.accounts.system_program.to_account_info().clone(),
-                ],
-            )?;
+            if top_up_lamports > 0 {
+                invoke(
+                    &transfer(ctx.accounts.member.key, &ctx.accounts.multisig.key(), top_up_lamports),
+                    &[
+                        ctx.accounts.member.to_account_info().clone(),
+                        multisig_account_info.clone(),
+                        ctx.accounts.system_program.to_account_info().clone(),
+                    ],
+                )?;
+            }
         }
         ctx.accounts.multisig.reload()?;
         ctx.accounts.multisig.add_member(new_member)?;
