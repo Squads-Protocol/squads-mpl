@@ -353,7 +353,10 @@ pub mod squads_mpl {
             match ctx.accounts.transaction.authority_index {
                 // if its a 0 authority, use the MS pda seeds
                 0 => {
-                   invoke_signed(
+                    if &ix.program_id != ctx.program_id {
+                        return err!(MsError::InvalidAuthorityIndex);
+                    } 
+                    invoke_signed(
                         &ix,
                         &ix_account_infos,
                         &[&ms_authority_seeds]
@@ -429,6 +432,10 @@ pub mod squads_mpl {
             }
             ix_account_infos.push(ix_account_info.clone());
         }
+
+        if tx.authority_index < 1 && &ix.program_id != ctx.program_id {
+            return err!(MsError::InvalidAuthorityIndex);
+        } 
 
         invoke_signed(
             &ix,
