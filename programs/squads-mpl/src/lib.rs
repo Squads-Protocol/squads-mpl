@@ -218,7 +218,7 @@ pub mod squads_mpl {
     }
 
     // sign/approve the transaction
-    pub fn approve_transaction(ctx: Context<ApproveTransaction>) -> Result<()> {
+    pub fn approve_transaction(ctx: Context<VoteTransaction>) -> Result<()> {
         // if they have previously voted to reject, remove that item (change vote check)
         if let Some(ind) = ctx.accounts.transaction.has_voted_reject(ctx.accounts.member.key()) { ctx.accounts.transaction.remove_reject(ind)?; }
 
@@ -233,7 +233,7 @@ pub mod squads_mpl {
     }
 
     // reject the transaction
-    pub fn reject_transaction(ctx: Context<RejectTransaction>) -> Result<()> {
+    pub fn reject_transaction(ctx: Context<VoteTransaction>) -> Result<()> {
         // if they have previously voted to approve, remove that item (change vote check)
         if let Some(ind) = ctx.accounts.transaction.has_voted_approve(ctx.accounts.member.key()) { ctx.accounts.transaction.remove_approve(ind)?; }
 
@@ -587,39 +587,7 @@ pub struct ActivateTransaction<'info> {
 }
 
 #[derive(Accounts)]
-pub struct ApproveTransaction<'info> {
-    #[account(
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ],
-        bump = multisig.bump,
-    )]
-    pub multisig: Account<'info, Ms>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &transaction.transaction_index.to_le_bytes(),
-            b"transaction"
-        ], bump = transaction.bump,
-        constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
-        constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
-        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-    )]
-    pub transaction: Account<'info, MsTransaction>,
-
-    #[account(mut)]
-    pub member: Signer<'info>,
-    pub system_program: Program<'info, System>
-}
-
-#[derive(Accounts)]
-pub struct RejectTransaction<'info> {
+pub struct VoteTransaction<'info> {
     #[account(
         seeds = [
             b"squad",
