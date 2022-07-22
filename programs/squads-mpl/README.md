@@ -51,3 +51,7 @@ Second MsInstruction (`instruction_index of 2`)
 * A list of all other accounts referenced by the attached MsInstruction
 
 The accounts needed for execution can be derived by the MsTransaction account itself, as the MsTransaction account contains an instruction_index, which when attaching an MsInstruction needs to be incremented sequentially. To execute, first you can fetch the MsTransaction account, and then derive all MsInstruction accounts by working backwards from the instruction_index in the MsTransaction and derive the MsInstruction PDAs, fetch the MsInstruction accounts, and then format the ExecuteInstruction for the multisig as explained above. See how this can be accomplished you can [take a look here at one of the test helper functions](https://github.com/squads-dapp/squads-mpl/blob/main/helpers/transactions.ts#L29). The accounts sent to the ExecuteTransaction instruction should follow a unique array index pattern, where the array has a total number of items that map to the list of expected accounts, with each item representing the index of the account to use from the `remaining_accounts` field in the Context.
+
+## Other
+* [Program Manager](https://github.com/squads-dapp/squads-mpl/tree/main/programs/program-manager) - a program to manage program upgrades for Squads multisigs
+* [Squads Grinder](https://github.com/mralbertchen/squads-grinder) -Vanity authority key grinder if you want to try to grind a vault/authority address
