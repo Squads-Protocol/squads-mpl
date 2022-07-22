@@ -26,9 +26,6 @@ impl Ms {
     1 +         // allow external execute
     4;          // for vec length
 
-    pub const MAXIMUM_SIZE: usize = (32 * 10) + Self::SIZE_WITHOUT_MEMBERS; // initial space for 10 keys
-
-
     pub fn init (&mut self, threshold: u16, create_key: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
         self.threshold = threshold;
         self.keys = members;

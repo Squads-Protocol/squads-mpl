@@ -450,12 +450,12 @@ pub mod squads_mpl {
 }
 
 #[derive(Accounts)]
-#[instruction(threshold: u16, create_key: Pubkey)]
+#[instruction(threshold: u16, create_key: Pubkey, members: Vec<Pubkey>)]
 pub struct Create<'info> {
     #[account(
         init,
         payer = creator,
-        space = Ms::MAXIMUM_SIZE,
+        space = Ms::SIZE_WITHOUT_MEMBERS + (members.len() * 32),
         seeds = [b"squad", create_key.as_ref(), b"multisig"], bump
     )]
     pub multisig: Account<'info, Ms>,
