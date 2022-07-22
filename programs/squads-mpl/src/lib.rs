@@ -34,7 +34,7 @@ pub mod squads_mpl {
         }
 
         //make sure threshold is valid
-        if !(1..=total_members).contains(&usize::from(threshold)) {
+        if usize::from(threshold) < 1 || usize::from(threshold) > total_members {
             return err!(MsError::InvalidThreshold);
         }
 
@@ -288,15 +288,13 @@ pub mod squads_mpl {
         // unroll account infos from account_list
         let mapped_remaining_accounts: Vec<AccountInfo>= account_list.iter().map(|&i| {
             let index = usize::from(i);
-            let acc = &ctx.remaining_accounts[index].clone();
-            acc.clone()
+            ctx.remaining_accounts[index].clone()
         }).collect();
 
         // iterator for remaining accounts
         let ix_iter = &mut mapped_remaining_accounts.iter();
 
-        let max_ix_index = ctx.accounts.transaction.instruction_index + 1;
-        (1..max_ix_index).try_for_each(|i| {
+        (1..=ctx.accounts.transaction.instruction_index).try_for_each(|i| {
             // each ix block starts with the ms_ix account
             let ms_ix_account: &AccountInfo = next_account_info(ix_iter)?;
 
