@@ -49,7 +49,7 @@ pub mod program_manager {
             &spill
         );
         let uix = UpgradeInstruction::from(ix);
-        msg!("PACKED SIZE: {:?}", uix.get_max_size());
+
         // set up the new upgrade account
         program_upgrade.init(
             managed_program.key(),
@@ -72,6 +72,19 @@ pub mod program_manager {
     // pub fn close_upgrade_account()->Result<()>{
     //     Ok(())
     // }
+
+    // a function to run after an upgrade instruction via squads-mpl that will update some data
+    pub fn set_as_executed(ctx: Context<UpdateUpgrade>) -> Result<()>{
+        let upgrade_account = &mut ctx.accounts.program_upgrade;
+        let managed_program_account = &mut ctx.accounts.managed_program;
+        // update the upgrade account
+        upgrade_account.upgraded_on = Clock::get().unwrap().unix_timestamp;
+        upgrade_account.executed = true;
+
+        managed_program_account.last_upgrade = Clock::get().unwrap().unix_timestamp;
+        managed_program_account.last_upgrade_index = upgrade_account.upgrade_index;
+        Ok(())
+    }
 
 }
 
@@ -189,4 +202,75 @@ pub struct CreateProgramUpgrade<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>
+}
+
+#[derive(Accounts)]
+pub struct UpdateUpgrade<'info> {
+    // multisig account needs to come from squads-mpl
+    #[account(
+        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+    )]
+    pub multisig: Account<'info, Ms>,
+    
+    // derive the program manager from the multisig
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            b"pmanage"
+        ],
+        bump = program_manager.bump
+    )]
+    pub program_manager: Account<'info, ProgramManager>,
+
+    // derive the managed program from the program manager
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            program_manager.key().as_ref(),
+            &managed_program.managed_program_index.to_le_bytes(),
+            b"program"
+        ],
+        bump = managed_program.bump
+    )]
+    pub managed_program: Account<'info, ManagedProgram>,
+
+    // derive the upgrade from the managed program
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            managed_program.key().as_ref(),
+            &program_upgrade.upgrade_index.to_le_bytes(),
+            b"pupgrade"
+        ], bump = program_upgrade.bump
+    )]
+    pub program_upgrade: Account<'info, ProgramUpgrade>,
+    
+    // check that the transaction is derived from the multisig
+    #[account(
+        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ], bump = transaction.bump,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
+    )]
+    pub transaction: Account<'info, MsTransaction>,
+
+    // check that the authority invoking this is derived from multisig and
+    // part of a tx cpi (authority index)
+    // ie. tx has auth index of 1, runs the upgrade, then invokes update here
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.authority_index.to_le_bytes(),
+            b"authority",
+        ], bump = transaction.authority_bump
+    )]
+    pub authority: Signer<'info>,
 }
