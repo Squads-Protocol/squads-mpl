@@ -79,6 +79,7 @@ pub mod program_manager {
 pub struct CreateManager<'info> {
     #[account(
         owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        // todo is_some()
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
@@ -107,6 +108,7 @@ pub struct CreateManager<'info> {
 pub struct CreateManagedProgram<'info> {
     #[account(
         owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        // todo is_some()
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,

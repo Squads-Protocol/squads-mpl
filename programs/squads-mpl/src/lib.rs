@@ -1,3 +1,7 @@
+// todo meta comments:
+//  should be using checked math everywhere, something like https://github.com/gemworks/gem-farm/blob/main/lib/gem_common/src/try_math.rs
+//  a lot of typos in comments - wouldn't matter if it was internal code, but if you want to OSS and for it to become the standard, I'd fix
+
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 
 use state::ms::*;
@@ -16,6 +20,7 @@ pub mod squads_mpl {
     use anchor_lang::solana_program::{program::{invoke_signed, invoke}, system_instruction::transfer};
 
     use super::*;
+
     pub fn create(ctx: Context<Create>, threshold:u16, create_key: Pubkey, members: Vec<Pubkey>) -> Result<()> {
         // sort the members and remove duplicates
         let mut members = members;
@@ -42,8 +47,8 @@ pub mod squads_mpl {
             threshold,
             create_key,
             members,
-            *ctx.bumps.get("multisig").unwrap(),
-        )
+            *ctx.bumps.get("multisig").unwrap(), //todo can replace with (?)
+                )
     }
 
     pub fn add_member(ctx: Context<MsAuthRealloc>, new_member: Pubkey) -> Result<()> {
@@ -55,10 +60,11 @@ pub mod squads_mpl {
         // * check if realloc is needed
         let multisig_account_info = ctx.accounts.multisig.to_account_info();
         let curr_data_size = multisig_account_info.data.borrow().len();
+        // todo does this always evenly divide by 32? what happens if not?
         let spots_left = ((curr_data_size - Ms::SIZE_WITHOUT_MEMBERS) / 32 ) - ctx.accounts.multisig.keys.len();
 
         // if not enough, add (10 * 32) to size - bump it up by 10 accounts
-        if spots_left < 1{
+        if spots_left < 1 {
             // add space for 10 more keys
             let needed_len = curr_data_size + ( 10 * 32 );
             // reallocate more space
@@ -89,6 +95,7 @@ pub mod squads_mpl {
             return err!(MsError::CannotRemoveSoloMember);
         }
         ctx.accounts.multisig.remove_member(old_member)?;
+        // todo doesn't this duplicate logic inside of remove_member?
         // if the number of keys is now less than the threshold, adjust it
         if ctx.accounts.multisig.keys.len() < usize::from(ctx.accounts.multisig.threshold) {
             let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
@@ -125,6 +132,7 @@ pub mod squads_mpl {
             ), new_member
         )?;
 
+        // todo to reduce code duplication I'd cpi into the below function, or factor it out
         // check the threshold
         if ctx.accounts.multisig.keys.len() < usize::from(new_threshold) {
             let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
@@ -141,6 +149,13 @@ pub mod squads_mpl {
     }
 
     pub fn change_threshold(ctx: Context<MsAuth>, new_threshold: u16) -> Result<()> {
+
+        // todo this feels easier on the eyes, but no strong opinion
+        // if new_threshold < 1 {
+        //     return err!(MsError::InvalidThreshold);
+        // }
+        // ctx.accounts.multisig.change_threshold(new_threshold.min(u16::from(ctx.accounts.multisig.keys.len())?)?)?;
+
         // if the new threshold exceeds the number of keys, set it to the max amount
         if ctx.accounts.multisig.keys.len() < usize::from(new_threshold) {
             let new_threshold: u16 = ctx.accounts.multisig.keys.len().try_into().unwrap();
@@ -219,16 +234,22 @@ pub mod squads_mpl {
 
     // sign/approve the transaction
     pub fn approve_transaction(ctx: Context<VoteTransaction>) -> Result<()> {
+        // todo not a fan of such long code lines, but that might be me:)
+        // todo in theory this logic could be packaged into the method on the struct, seems logically coupled
         // if they have previously voted to reject, remove that item (change vote check)
         if let Some(ind) = ctx.accounts.transaction.has_voted_reject(ctx.accounts.member.key()) { ctx.accounts.transaction.remove_reject(ind)?; }
 
         // if they haven't already approved
+        // todo same here or at least .is_none()
         if ctx.accounts.transaction.has_voted_approve(ctx.accounts.member.key()) == None { ctx.accounts.transaction.sign(ctx.accounts.member.key())?; }
 
         // if current number of signers reaches threshold, mark the transaction as execute ready
         if ctx.accounts.transaction.approved.len() >= usize::from(ctx.accounts.multisig.threshold) {
             ctx.accounts.transaction.ready_to_execute()?;
         }
+
+        // todo should this also be checking to "unreject" tx? if cutoff no longer reached?
+
         Ok(())
     }
 
@@ -238,6 +259,7 @@ pub mod squads_mpl {
         if let Some(ind) = ctx.accounts.transaction.has_voted_approve(ctx.accounts.member.key()) { ctx.accounts.transaction.remove_approve(ind)?; }
 
         // if they haven't already voted reject
+        // todo same here or at least .is_none()
         if ctx.accounts.transaction.has_voted_reject(ctx.accounts.member.key()) == None { ctx.accounts.transaction.reject(ctx.accounts.member.key())?; }
 
         // ie total members 7, threshold 3, cutoff = 4
@@ -246,12 +268,18 @@ pub mod squads_mpl {
         if ctx.accounts.transaction.rejected.len() > cutoff {
             ctx.accounts.transaction.set_rejected()?;
         }
+
+        // todo should this also be checking to "unapprove" tx? if approval no longer reached?
+
         Ok(())
     }
 
     // cancel the transaction
     pub fn cancel_transaction(ctx: Context<CancelTransaction>) -> Result<()> {
+        // todo should this be checking if tx is in approved state? or more appropriately should the cancel method be checking that below?
+
         // if they haven't cancelled yet
+        // todo same here or at least .is_none()
         if ctx.accounts.transaction.has_cancelled(ctx.accounts.member.key()) == None { ctx.accounts.transaction.cancel(ctx.accounts.member.key())? }
 
         // if current number of signers reaches threshold, mark the transaction as execute ready
@@ -263,6 +291,10 @@ pub mod squads_mpl {
 
     // execute the transaction if status is ExecuteReady and its not deprecated by the ms_change_index
     pub fn execute_transaction<'info>(ctx: Context<'_,'_,'_,'info,ExecuteTransaction<'info>>, account_list: Vec<u8>) -> Result<()> {
+
+        // todo I probably missed it, but where is the check that says "only execute if ms_change_index < this tx's index"? that's how it should work right?
+        //  I saw there was a check in voting accounts... but what if everyone voted on B, A got executed, B is now ready but in theory has lower index?
+
         // check that we are provided at least one instruction
         if ctx.accounts.transaction.instruction_index < 1 {
             // if no instructions were found, for whatever reason, mark it as executed and move on
@@ -323,6 +355,8 @@ pub mod squads_mpl {
             if &ix_pda != ms_ix_account.key {
                 return err!(MsError::InvalidInstructionAccount);
             }
+
+            // todo maybe a more descriptive name would be "ix_executing_program" - otherwise confusing (both previous and this one sound like "program accounts")
             // get the instructions program account
             let ix_program_info: &AccountInfo = next_account_info(ix_iter)?;
             // check that it matches the submitted account
@@ -330,6 +364,7 @@ pub mod squads_mpl {
                 return err!(MsError::InvalidInstructionAccount);
             }
 
+            // todo again confusing name... need more differentiation
             let mut ix_account_infos: Vec<AccountInfo> = Vec::<AccountInfo>::new();
 
             // add the program account needed for the ix
@@ -346,6 +381,9 @@ pub mod squads_mpl {
                 if ix_account_info.is_writable != ms_ix.keys[account_index].is_writable {
                     return err!(MsError::InvalidInstructionAccount);
                 }
+
+                // todo worth checking if signer? or no need?
+
                 ix_account_infos.push(ix_account_info.clone());
             }
 
@@ -378,6 +416,7 @@ pub mod squads_mpl {
 
         // mark it as executed
         ctx.accounts.transaction.set_executed()?;
+        // todo why is this needed right before the end?
         // reload any multisig changes
         ctx.accounts.multisig.reload()?;
         Ok(())
@@ -411,6 +450,7 @@ pub mod squads_mpl {
             program_id: ms_ix.program_id
         };
 
+        // todo duplicate logic from execute_transaction - I'd refactor into a method
         // collect the accounts needed from remaining accounts (order matters)
         let mut ix_account_infos: Vec<AccountInfo> = Vec::<AccountInfo>::new();
         let ix_account_iter = &mut ctx.remaining_accounts.iter();
@@ -435,6 +475,7 @@ pub mod squads_mpl {
             ix_account_infos.push(ix_account_info.clone());
         }
 
+        // todo Q: unclear on this one. What's authority index? why does it imply program should be current program?
         if tx.authority_index < 1 && &ix.program_id != ctx.program_id {
             return err!(MsError::InvalidAuthorityIndex);
         } 
@@ -484,6 +525,7 @@ pub struct CreateTransaction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
+        // todo is_some()
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
@@ -516,6 +558,8 @@ pub struct AddInstruction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
+        // todo is_some()
+        // todo probably stupid question: what happens if creator creates valid tx -> then gets removed from multisig's creator array? should he not/be able to execute?
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
@@ -575,6 +619,7 @@ pub struct ActivateTransaction<'info> {
         ], bump = transaction.bump,
         constraint = creator.key() == transaction.creator,
         constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
+        // todo is_some()
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
@@ -607,6 +652,7 @@ pub struct VoteTransaction<'info> {
             b"transaction"
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
+        // todo is_some()
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
@@ -641,6 +687,8 @@ pub struct CancelTransaction<'info> {
         ], bump = transaction.bump,
         constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
+        // todo is_some()
+        // todo wait should this constraint not be on the multisig above / creator below? why is it on tx object?
         constraint = matches!(multisig.is_member(member.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub transaction: Account<'info, MsTransaction>,
@@ -695,10 +743,12 @@ pub struct ExecuteInstruction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
+        // todo is_some()
         constraint = matches!(multisig.is_member(member.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Box<Account<'info, Ms>>,
 
+    // todo now that I'm reading the tx entry in a struct for the 5th time... I wonder if you could dedupe code by factoring them out into a shared struct? check out goki repo
     #[account(
         mut,
         seeds = [
@@ -733,6 +783,7 @@ pub struct ExecuteInstruction<'info> {
 #[derive(Accounts)]
 pub struct MsAuth<'info> {
     #[account(mut)]
+    // todo forgot to check seeds? I'd go through every pda and make sure seeds are being checked
     multisig: Box<Account<'info, Ms>>,
     #[account(
         mut,
@@ -749,6 +800,7 @@ pub struct MsAuth<'info> {
 #[derive(Accounts)]
 pub struct MsAuthRealloc<'info> {
     #[account(mut)]
+    // todo forgot to check seeds? I'd go through every pda and make sure seeds are being checked
     multisig: Box<Account<'info, Ms>>,
     #[account(
         mut,
