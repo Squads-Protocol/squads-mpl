@@ -171,7 +171,6 @@ pub mod squads_mpl {
 
     // create a transaction, and delegate an authority to sign for it later
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
-        msg!("TX PDA: {:?}", ctx.accounts.transaction.key());
         let ms = &mut ctx.accounts.multisig;
         let authority_bump = match authority_index  {
            1.. => {
@@ -209,6 +208,10 @@ pub mod squads_mpl {
     // attach an instruction to the transaction
     pub fn add_instruction(ctx: Context<AddInstruction>, incoming_instruction: IncomingInstruction) -> Result<()> {
         let tx = &mut ctx.accounts.transaction;
+        // make sure internal transactions have a matching program id for attached instructions
+        if tx.authority_index == 0 && &incoming_instruction.program_id != ctx.program_id {
+            return err!(MsError::InvalidAuthorityIndex);
+        }
         tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
         ctx.accounts.instruction.init(
             tx.instruction_index,
