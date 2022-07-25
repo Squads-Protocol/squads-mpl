@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/squads-dapp/squads-mpl/compare/v1.0.0...v1.0.1) (2022-07-25)
+
+
+### Bug Fixes
+
+* **attach_ix:** OS-SQD-SUG-01 - verify internal attached ix has proper program_id ([aa62d18](https://github.com/squads-dapp/squads-mpl/commit/aa62d18d88cf276f2b4c47101e5fe12cb6e5ef47))
+
 ## 1.0.0 (2022-07-22)
 
 
