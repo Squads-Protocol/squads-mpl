@@ -3,12 +3,13 @@ use std::convert::TryInto;
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 use anchor_lang::solana_program::borsh::get_instance_packed_len;
 
+// todo for readability, I'd renaame "ms" to "multisig" - took me a while to get it
 #[account]
 pub struct Ms {
     pub threshold: u16,                 // threshold for signatures
-    pub authority_index: u16,           // index to seed other authorities under this multisig
-    pub transaction_index: u32,         // look up and seed reference for transactions
-    pub ms_change_index: u32,           // the last executed/closed transaction
+    pub authority_index: u16,           // todo index to seed other authorities under this multisig - Q: unclear what this is/does
+    pub transaction_index: u32,         // todo look up and seed reference for transactions - is this the last added tx? not very clear name, I'd rename to something more descriptive
+    pub ms_change_index: u32,           // todo the last executed/closed transaction - not very clear name, I'd rename to something more descriptive
     pub bump: u8,                       // bump for the multisig seed
     pub create_key: Pubkey,             // random key(or not) used to seed the multisig pda
     pub allow_external_execute: bool,   // allow non-member keys to execute txs
@@ -57,6 +58,7 @@ impl Ms {
     }
 
     pub fn add_member(&mut self, member: Pubkey) -> Result<()>{
+        // todo maybe simpler: self.is_member(member).is_none()
         if matches!(self.is_member(member), None) {
             self.keys.push(member);
             self.keys.sort();
@@ -98,10 +100,11 @@ pub struct MsTransaction {
     pub creator: Pubkey,                // creator, used to seed pda
     pub ms: Pubkey,                     // the multisig this belongs to
     pub transaction_index: u32,         // used for seed
-    pub authority_index: u32,           // index to use for other pdas (?)
+    pub authority_index: u32,           // todo index to use for other pdas (?) - Q: unclear what this is/does
     pub authority_bump: u8,             // the bump corresponding to the bespoke authority
     pub status: MsTransactionStatus,    // the status of the transaction
-    pub instruction_index: u8,          // index of this instruction
+    pub instruction_index: u8,          // todo index of this instruction - I seee this is the LATEST ix in the tx. I would rename to make it clearer, otherwise confusing
+                                            // eg "latest_added_ix_index" and "latest_executed_ix_index" below
     pub bump: u8,                       // bump for the seed
     pub approved: Vec<Pubkey>,          // keys that have approved/signed
     pub rejected: Vec<Pubkey>,          // keys that have rejected
@@ -148,6 +151,9 @@ impl MsTransaction {
         Ok(())
     }
 
+    // todo feels like there should be if checks in these methods...
+    //  eg should you be able to set it to "Ready to execute" if it's already executed?
+    //  I prefer to have the checks as deep into code as possible, rather than at the surface (ix level) - latter can be forgotten when new ix created
     // change status to ExecuteReady
     pub fn ready_to_execute(&mut self)-> Result<()>{
         self.status = MsTransactionStatus::ExecuteReady;
@@ -195,6 +201,7 @@ impl MsTransaction {
 
     // check if a user has voted already
     pub fn has_voted(&self, member: Pubkey) -> bool {
+        // todo maybe simpler: self.is_member(member).is_ok()
         let approved = matches!(self.approved.binary_search(&member), Ok(..));
         let rejected = matches!(self.rejected.binary_search(&member), Ok(..));
         approved || rejected
@@ -202,6 +209,7 @@ impl MsTransaction {
 
     // check if a user has signed to approve
     pub fn has_voted_approve(&self, member: Pubkey) -> Option<usize> {
+        // todo maybe simpler: self.approved.binary_search(&member).ok()
         match self.approved.binary_search(&member) {
             Ok(ind)=> Some(ind),
             _ => None
@@ -210,6 +218,7 @@ impl MsTransaction {
 
     // check if a use has signed to reject
     pub fn has_voted_reject(&self, member: Pubkey) -> Option<usize> {
+        // todo maybe simpler: self.approved.binary_search(&member).ok()
         match self.rejected.binary_search(&member) {
             Ok(ind)=> Some(ind),
             _ => None
@@ -218,12 +227,14 @@ impl MsTransaction {
 
     // check if a user has signed to cancel
     pub fn has_cancelled(&self, member: Pubkey) -> Option<usize> {
+        // todo maybe simpler: self.approved.binary_search(&member).ok()
         match self.cancelled.binary_search(&member) {
             Ok(ind)=> Some(ind),
             _ => None
         }
     }
 
+    // todo hopefully indexes don't mess up, otherwise will be painful. I'd double check everywhere where they are set
     pub fn remove_reject(&mut self, index: usize) -> Result<()>{
         self.rejected.remove(index);
         Ok(())
@@ -269,7 +280,7 @@ impl MsInstruction {
 
 impl IncomingInstruction {
     pub fn get_max_size(&self) -> usize {
-        // add three the size to correlate with the saved instruction account
+        // add three the size to correlate with the saved instruction account todo <-- not clear
         return get_instance_packed_len(&self).unwrap_or_default().checked_add(3).unwrap_or_default();
     }
 }
