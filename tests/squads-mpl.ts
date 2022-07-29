@@ -666,7 +666,7 @@ describe('Basic functionality', () => {
         expect(txUpdatedState.status).to.have.property("executed");
     });
 
-    it('Change ms size with realloc', async () => {
+    it(`Change ms size with realloc - MS: ${msPDA.toBase58()}`, async () => {
         let msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
         const startRentLamports = msAccount.value.lamports;
         // increment the transaction index
@@ -751,7 +751,7 @@ describe('Basic functionality', () => {
         expect(endRentLamports).to.be.greaterThan(startRentLamports);
     });
 
-    it('Transaction instruction failure', async () => {
+    it(`Transaction instruction failure - MS: ${msPDA.toBase58()}`, async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -833,7 +833,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {
+    it(`Change threshold test - MS: ${msPDA.toBase58()}`, async () => {
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
@@ -925,7 +925,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it("Insufficient approval failure", async () => {    // get the state of the MS
+    it(`Insufficient approval failure - MS: ${msPDA.toBase58()}`, async () => {    // get the state of the MS
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
@@ -1003,6 +1003,94 @@ describe('Basic functionality', () => {
         } catch (e) {
             expect(e.message).to.contain("Error processing Instruction");
         }
+    });
+
+    it(`Change vote from approved to rejected - MS: ${msPDA.toBase58()}`, async () => {
+        const newTxIndex = await getNextTxIndex(program, msPDA);
+        const newTxIndexBN = new anchor.BN(newTxIndex, 10);
+
+        // generate the tx pda
+        const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+
+        // use 0 as authority index
+        await program.methods.createTransaction(0)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        // get the current tx state
+        let txState = await program.account.msTransaction.fetch(txPDA);
+        txCount++;
+        const newIxIndex = txState.instructionIndex + 1;
+        const newIxIndexBN = new anchor.BN(newIxIndex, 10);
+
+        // create the instruction pda
+        const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+
+        // the test transfer instruction
+        const testChangeThresholdIx = await program.methods.changeThreshold(2)
+            .accounts({
+                multisig: msPDA,
+                multisigAuth: msPDA,
+            })
+            .instruction();
+
+        // attache the change threshold ix
+        await program.methods.addInstruction(testChangeThresholdIx)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                instruction: ixPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        // get the ix
+        let ixState = await program.account.msInstruction.fetch(ixPDA);
+        expect(ixState.instructionIndex).to.equal(1);
+
+        // acitveate the tx
+        await program.methods.activateTransaction()
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("active");
+
+        // approve the tx
+        await program.methods.approveTransaction()
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                member: creator.publicKey
+            })
+            .rpc();
+
+        // check that state is "approved"
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("active");
+        expect(txState.approved.map(k=> k.toBase58()).indexOf(creator.publicKey.toBase58())).is.greaterThanOrEqual(0);
+
+        // now reject
+        await program.methods.rejectTransaction()
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                member: creator.publicKey
+            })
+            .rpc();
+
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("active");
+        expect(txState.rejected.map(k=> k.toBase58()).indexOf(creator.publicKey.toBase58())).is.greaterThanOrEqual(0);
+        expect(txState.approved.map(k=> k.toBase58()).indexOf(creator.publicKey.toBase58())).is.lessThan(0);
     });
 
     it(`Create a program manager - MS: ${msPDA.toBase58()}`, async () => {
