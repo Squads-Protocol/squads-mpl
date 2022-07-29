@@ -1,7 +1,7 @@
 import {expect} from 'chai';
 
 import * as anchor from '@project-serum/anchor';
-import {Program, toInstruction} from '@project-serum/anchor';
+import {Program, toInstruction, Wallet} from '@project-serum/anchor';
 import {SquadsMpl} from '../target/types/squads_mpl';
 import { ProgramManager } from '../target/types/program_manager';
 import {
@@ -41,6 +41,8 @@ describe('Basic functionality', () => {
     let randomCreateKey = anchor.web3.Keypair.generate().publicKey;
     const [msPDA] = getMsPDA(randomCreateKey, program.programId);
     const [pmPDA] = getProgramManagerPDA(msPDA, programManagerProgram.programId);
+
+    const member2 = anchor.web3.Keypair.generate();
 
     let txCount = 0;
     const numberOfMembersTotal = 10;
@@ -688,9 +690,8 @@ describe('Basic functionality', () => {
                 creator: creator.publicKey
             }).instruction();
 
-        let newMember = anchor.web3.Keypair.generate().publicKey;
 
-        let addMemberIx = await program.methods.addMember(newMember)
+        let addMemberIx = await program.methods.addMember(member2.publicKey)
             .accounts({
                 multisig: msPDA,
                 multisigAuth: msPDA,
@@ -749,6 +750,86 @@ describe('Basic functionality', () => {
         const endRentLamports = msAccount.value.lamports;
         expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 1);
         expect(endRentLamports).to.be.greaterThan(startRentLamports);
+    });
+
+    it(`Add a new member but creator is not executor - MS: ${msPDA.toBase58()}`, async () => {
+        let msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
+        const startRentLamports = msAccount.value.lamports;
+        // increment the transaction index
+        const newTxIndex = await getNextTxIndex(program, msPDA);
+        const newTxIndexBN = new anchor.BN(newTxIndex, 10);
+
+        // generate the tx pda
+        const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+
+        // 1 get the instruction to create a transction
+        // 2 get the instruction to add a member
+        // 3 get the instruction to 'activate' the tx
+        // 4 send over the transaction to the ms program with 1 - 3
+        // use 0 as authority index
+        let createIx = await program.methods.createTransaction(0)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                creator: creator.publicKey
+            }).instruction();
+
+        const newMember = anchor.web3.Keypair.generate().publicKey;
+
+        let addMemberIx = await program.methods.addMember(newMember)
+            .accounts({
+                multisig: msPDA,
+                multisigAuth: msPDA,
+                // transaction: txPDA,
+            })
+            .instruction();
+
+        const newIxIndex = 1;
+        const newIxIndexBN = new anchor.BN(newIxIndex, 10);
+
+        // create the instruction pda
+        const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+        let attachIx = await program.methods.addInstruction(addMemberIx)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                instruction: ixPDA,
+                creator: creator.publicKey
+            }).instruction();
+
+        let activateIx = await program.methods.activateTransaction()
+            .accounts({multisig: msPDA, transaction: txPDA, creator: creator.publicKey})
+            .instruction();
+
+        let addMemberTx = await createBlankTransaction(program, creator.publicKey);
+        addMemberTx.add(createIx);
+        addMemberTx.add(attachIx);
+        addMemberTx.add(activateIx);
+
+        creator.signTransaction(addMemberTx);
+        try {
+            const res = await programProvider.sendAndConfirm(addMemberTx);
+        } catch (e) {
+            console.log(e);
+        }
+
+        await program.methods.approveTransaction()
+            .accounts({multisig: msPDA, transaction: txPDA, member: creator.publicKey})
+            .rpc();
+
+        let txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).has.property("executeReady");
+
+        const executeTx = await createExecuteTransactionTx(program, msPDA, txPDA, member2.publicKey);
+
+        try {
+            const res = await programProvider.sendAndConfirm(executeTx, [member2]);
+        } catch (e) {
+            console.log(e);
+        }
+
+        const msState = await program.account.ms.fetch(msPDA);
+        expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 2);
     });
 
     it(`Transaction instruction failure - MS: ${msPDA.toBase58()}`, async () => {

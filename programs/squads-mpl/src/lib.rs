@@ -1,4 +1,5 @@
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
+use hex::FromHex;
 
 use state::ms::*;
 pub mod state;
@@ -349,34 +350,49 @@ pub mod squads_mpl {
                 return err!(MsError::InvalidInstructionAccount);
             }
 
+            let ix_keys = ms_ix.keys.clone();
+            // create the instruction to invoke from the saved ms ix account
+            let mut ix: Instruction = Instruction::from(ms_ix);
             let mut ix_account_infos: Vec<AccountInfo> = Vec::<AccountInfo>::new();
 
             // add the program account needed for the ix
             ix_account_infos.push(ix_program_info.clone());
 
+            let add_member_discriminator = Vec::from_hex("0d747b827ec63922").unwrap();
+
             // loop through the provided remaining accounts
-            for account_index in 0..ms_ix.keys.len() {
+            for account_index in 0..ix_keys.len() {
                 let ix_account_info = next_account_info(ix_iter)?;
-                // check that the ix account keys match the submitted account keys
-                if ix_account_info.key != &ms_ix.keys[account_index].pubkey {
-                    return err!(MsError::InvalidInstructionAccount);
+
+                if add_member_discriminator == ix.data[0..8] && account_index == 2 {
+                    // check that the ix account keys match the submitted account keys
+                    if *ix_account_info.key != *ctx.accounts.member.key {
+                        return err!(MsError::InvalidInstructionAccount);
+                    }
+                } else {
+                    // check that the ix account keys match the submitted account keys
+                    if *ix_account_info.key != ix_keys[account_index].pubkey {
+                        return err!(MsError::InvalidInstructionAccount);
+                    }
                 }
                 // check that the ix account writable match the submitted account writable
-                if ix_account_info.is_writable != ms_ix.keys[account_index].is_writable {
+                if ix_account_info.is_writable != ix_keys[account_index].is_writable {
                     return err!(MsError::InvalidInstructionAccount);
                 }
                 ix_account_infos.push(ix_account_info.clone());
             }
 
-            // create the instruction to invoke from the saved ms ix account
-            let ix: Instruction = Instruction::from(ms_ix);
             // execute the ix
             match ctx.accounts.transaction.authority_index {
                 // if its a 0 authority, use the MS pda seeds
                 0 => {
                     if &ix.program_id != ctx.program_id {
                         return err!(MsError::InvalidAuthorityIndex);
-                    } 
+                    }
+                    if add_member_discriminator == ix.data[0..8] {
+                        ix.accounts[2].pubkey = *ctx.accounts.member.key;
+                        ix_account_infos[3].key = ctx.accounts.member.key;
+                    }
                     invoke_signed(
                         &ix,
                         &ix_account_infos,
