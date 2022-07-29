@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/squads-dapp/squads-mpl/compare/v1.0.1...v1.0.2) (2022-07-29)
+
+
+### Bug Fixes
+
+* **cleanup:** new test and code cleanup ([d083556](https://github.com/squads-dapp/squads-mpl/commit/d083556f00db619a013398137bbcedd3fd27e88e))
+
 ## [1.0.1](https://github.com/squads-dapp/squads-mpl/compare/v1.0.0...v1.0.1) (2022-07-25)
 
 
