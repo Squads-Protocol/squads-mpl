@@ -6,3 +6,4 @@ target
 node_modules
 Anchor.toml
 .idea/
+tests/tmp

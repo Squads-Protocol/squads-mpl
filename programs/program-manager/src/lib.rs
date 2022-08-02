@@ -4,7 +4,6 @@ use squads_mpl::state::*;
 use squads_mpl::errors::*;
 pub mod state;
 
-
 declare_id!("8Y5Qbdb67Ka4LcPCziyhLrGbYN2ftZ1BG11Q5PiHenLP");
 
 #[program]
@@ -75,6 +74,20 @@ pub mod program_manager {
 
     // a function to run after an upgrade instruction via squads-mpl that will update some data
     pub fn set_as_executed(ctx: Context<UpdateUpgrade>) -> Result<()>{
+        // check the keys vec length to make sure they match
+        let instruction_keys_len = ctx.accounts.instruction.keys.len();
+        if instruction_keys_len != ctx.accounts.program_upgrade.upgrade_ix.accounts.len() {
+            return err!(MsError::InvalidInstructionAccount);
+        }
+
+        // check that the saved upgrade instruction matches the upgrade instruction from the transaction
+        (0..instruction_keys_len).try_for_each(|i| {
+            if ctx.accounts.instruction.keys[i].pubkey != ctx.accounts.program_upgrade.upgrade_ix.accounts[i].pubkey {
+                return err!(MsError::InvalidInstructionAccount);
+            }
+            Ok(())
+        }).ok();
+
         let upgrade_account = &mut ctx.accounts.program_upgrade;
         let managed_program_account = &mut ctx.accounts.managed_program;
         // update the upgrade account
@@ -91,7 +104,7 @@ pub mod program_manager {
 #[derive(Accounts)]
 pub struct CreateManager<'info> {
     #[account(
-        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        owner = squads_mpl::ID,
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
@@ -119,7 +132,7 @@ pub struct CreateManager<'info> {
 #[instruction(program_address: Pubkey, name: String)]
 pub struct CreateManagedProgram<'info> {
     #[account(
-        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        owner = squads_mpl::ID,
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
@@ -159,7 +172,7 @@ pub struct CreateManagedProgram<'info> {
 #[instruction(buffer: Pubkey, spill: Pubkey, authority: Pubkey, name: String)]
 pub struct CreateProgramUpgrade<'info> {
     #[account(
-        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        owner = squads_mpl::ID,
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
@@ -208,7 +221,7 @@ pub struct CreateProgramUpgrade<'info> {
 pub struct UpdateUpgrade<'info> {
     // multisig account needs to come from squads-mpl
     #[account(
-        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        owner = squads_mpl::ID,
     )]
     pub multisig: Account<'info, Ms>,
     
@@ -250,16 +263,29 @@ pub struct UpdateUpgrade<'info> {
     
     // check that the transaction is derived from the multisig
     #[account(
-        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        owner = squads_mpl::ID,
         seeds = [
             b"squad",
             multisig.key().as_ref(),
             &transaction.transaction_index.to_le_bytes(),
             b"transaction"
-        ], bump = transaction.bump,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
+        ],
+        bump = transaction.bump,
+        seeds::program = squads_mpl::ID,
     )]
     pub transaction: Account<'info, MsTransaction>,
+
+    #[account(
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            transaction.key().as_ref(),
+            &instruction.instruction_index.to_le_bytes(),
+            b"instruction"
+        ], bump = instruction.bump,
+        constraint = instruction.executed @MsError::InvalidInstructionAccount,
+    )]
+    pub instruction: Account<'info, MsInstruction>,
 
     // check that the authority invoking this is derived from multisig and
     // part of a tx cpi (authority index)
@@ -270,7 +296,9 @@ pub struct UpdateUpgrade<'info> {
             multisig.key().as_ref(),
             &transaction.authority_index.to_le_bytes(),
             b"authority",
-        ], bump = transaction.authority_bump
+        ],
+        bump = transaction.authority_bump,
+        seeds::program = squads_mpl::ID
     )]
     pub authority: Signer<'info>,
 }

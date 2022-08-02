@@ -1,5 +1,7 @@
 import {expect} from 'chai';
-
+import fs from "fs";
+import os from "os";
+import path from "path";
 import * as anchor from '@project-serum/anchor';
 import {Program, toInstruction} from '@project-serum/anchor';
 import {SquadsMpl} from '../target/types/squads_mpl';
@@ -19,11 +21,52 @@ import {
     getProgramUpgradePDA,
     getTxPDA
 } from '../helpers/transactions';
+import {execSync} from 'child_process';
+import { ParsedAccountData } from '@solana/web3.js';
+
 
 const BPF_UPGRADE_ID = new anchor.web3.PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 
+const deploySmpl = () => {
+    const deployCmd = `solana program deploy --url localhost -v --program-id $(pwd)/target/deploy/squads_mpl-keypair.json $(pwd)/target/deploy/squads_mpl.so`;
+    execSync(deployCmd);
+};
+
+const deployPm = () => {
+    const deployCmd = `solana program deploy --url localhost -v --program-id $(pwd)/target/deploy/program_manager-keypair.json $(pwd)/target/deploy/program_manager.so`;
+    execSync(deployCmd);
+};
+
+// will deploy a buffer for the program manager program
+const writeBuffer = (bufferKeypair: string) => {
+    const writeCmd = `solana program write-buffer --buffer ${bufferKeypair} --url localhost -v $(pwd)/target/deploy/program_manager.so`;
+    execSync(writeCmd);
+};
+
+const setBufferAuthority = (bufferAddress: anchor.web3.PublicKey, authority: anchor.web3.PublicKey) => {
+    const authCmd = `solana program set-buffer-authority --url localhost ${bufferAddress.toBase58()} --new-buffer-authority ${authority.toBase58()}`;
+    execSync(authCmd);
+};
+
+const setProgramAuthority = (programAddress: anchor.web3.PublicKey, authority: anchor.web3.PublicKey) => {
+    try {
+        const logsCmd = `solana program show --url localhost --programs`;
+        execSync(logsCmd,  {stdio: 'inherit'});
+        const authCmd = `solana program set-upgrade-authority --url localhost ${programAddress.toBase58()} --new-upgrade-authority ${authority.toBase58()}`;
+        execSync(authCmd,  {stdio: 'inherit'});
+    }catch(e){
+        console.log(e);
+        throw new Error(e);
+    }
+};
+
 // test suite
 describe('Basic functionality', () => {
+
+    console.log("Deploying programs...");
+    deploySmpl();
+    deployPm();
+    console.log("Finished deploying programs...");
 
     // Configure the client to use the local cluster.
     anchor.setProvider(anchor.AnchorProvider.env());
@@ -44,6 +87,7 @@ describe('Basic functionality', () => {
 
     let txCount = 0;
     const numberOfMembersTotal = 10;
+
     it(`Create Multisig - MS: ${msPDA.toBase58()}`, async () => {
 
         const memberList = [...new Array(numberOfMembersTotal - 1)].map(() => {
@@ -82,7 +126,7 @@ describe('Basic functionality', () => {
     });
 
 
-    it(`Create Tx draft - MS: ${msPDA.toBase58()}`, async () => {
+    it.skip(`Create Tx draft - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -108,7 +152,7 @@ describe('Basic functionality', () => {
         expect(txState.transactionIndex).to.equal(msState.transactionIndex);
     });
 
-    it(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
+    it.skip(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         // get the state of the MS
         const newTxIndex = await getNextTxIndex(program, msPDA);
@@ -162,7 +206,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it(`Tx Activate - MS: ${msPDA.toBase58()}`, async () => {
+    it.skip(`Tx Activate - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -220,7 +264,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it(`Tx Sign - MS: ${msPDA.toBase58()}`, async () => {
+    it.skip(`Tx Sign - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -294,7 +338,7 @@ describe('Basic functionality', () => {
         expect(txState.status).to.have.property("executeReady");
     });
 
-    it(`Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
+    it.skip(`Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -397,7 +441,7 @@ describe('Basic functionality', () => {
         expect(testPayeeAccount.value.lamports).to.equal(1000000);
     });
 
-    it(`2X Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
+    it.skip(`2X Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -519,7 +563,7 @@ describe('Basic functionality', () => {
         expect(testPayeeAccount.value.lamports).to.equal(2000000);
     });
 
-    it(`2X Transfer Tx Sequential execute - MS: ${msPDA.toBase58()}`, async () => {
+    it.skip(`2X Transfer Tx Sequential execute - MS: ${msPDA.toBase58()}`, async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -666,7 +710,7 @@ describe('Basic functionality', () => {
         expect(txUpdatedState.status).to.have.property("executed");
     });
 
-    it('Change ms size with realloc', async () => {
+    it.skip('Change ms size with realloc', async () => {
         let msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
         const startRentLamports = msAccount.value.lamports;
         // increment the transaction index
@@ -751,7 +795,7 @@ describe('Basic functionality', () => {
         expect(endRentLamports).to.be.greaterThan(startRentLamports);
     });
 
-    it('Transaction instruction failure', async () => {
+    it.skip('Transaction instruction failure', async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -833,7 +877,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {
+    it.skip(`Change threshold test MS: ${msPDA.toBase58()}`, async () => {
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
@@ -925,7 +969,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it("Insufficient approval failure", async () => {    // get the state of the MS
+    it.skip("Insufficient approval failure", async () => {    // get the state of the MS
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
@@ -1020,7 +1064,7 @@ describe('Basic functionality', () => {
         expect(newProgramManager.multisig.toBase58()).to.equal(msPDA.toBase58());
     });
 
-    it(`Create a program to manage - MS ${msPDA.toBase58()}`, async () => {
+    it.skip(`Create a program to manage - MS ${msPDA.toBase58()}`, async () => {
         const nextProgramIndex = await getNextProgramIndex(programManagerProgram, pmPDA);
         const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
         const [mpPDA] = await getManagedProgramPDA(pmPDA, new anchor.BN(nextProgramIndex), programManagerProgram.programId);
@@ -1040,7 +1084,7 @@ describe('Basic functionality', () => {
         expect(newManagedProgramState.managedProgramIndex).to.equal(nextProgramIndex);
     });
 
-    it(`Create a program to manage and create upgrade - MS ${msPDA.toBase58()}`, async () => {
+    it.skip(`Create a program to manage and create upgrade - MS ${msPDA.toBase58()}`, async () => {
         const nextProgramIndex = await getNextProgramIndex(programManagerProgram, pmPDA);
         const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
         const [mpPDA] = await getManagedProgramPDA(pmPDA, new anchor.BN(nextProgramIndex), programManagerProgram.programId);
@@ -1085,5 +1129,215 @@ describe('Basic functionality', () => {
         expect(addedUpgrade.upgradeIndex).to.equal(managedProgramState.upgradeIndex);
         expect(addedUpgrade.name).to.equal(testUpgradeName);
         expect(addedUpgrade.upgradeIx.programId.toBase58()).to.equal(BPF_UPGRADE_ID.toBase58());
+    });
+
+    it(`Create upgrade with buffer and deploy it - MS ${msPDA.toBase58()}`, async function(){
+        this.timeout(20000);
+        const nextProgramIndex = await getNextProgramIndex(programManagerProgram, pmPDA);
+        const [mpPDA] = await getManagedProgramPDA(pmPDA, new anchor.BN(nextProgramIndex), programManagerProgram.programId);
+        const [vaultPDA] = await getAuthorityPDA(msPDA, new anchor.BN(1,10), program.programId);
+
+        // create a temp keypair to use
+        const bufferKeypair = anchor.web3.Keypair.generate();
+
+        // write the temp buffer keypair to file
+        fs.writeFileSync("tests/tmp/buffer_test_keypair.json", `[${bufferKeypair.secretKey.toString()}]`);
+
+        // deploy/write the buffer
+        writeBuffer("tests/tmp/buffer_test_keypair.json");
+        // set the buffer authority to the vault
+        setBufferAuthority(bufferKeypair.publicKey, vaultPDA);
+
+
+        // check that the buffer has proper authority
+        const parsedBufferAccount = await programProvider.connection.getParsedAccountInfo(bufferKeypair.publicKey);
+        const parsedBufferData = (parsedBufferAccount.value.data as ParsedAccountData).parsed;
+        expect(parsedBufferData.type).to.equal("buffer");
+        expect(parsedBufferData.info.authority).to.equal(vaultPDA.toBase58());
+        // console.log("our program id", programManagerProgram.programId.toBase58());
+        // const parsedProgramAccount = await programProvider.connection.getParsedAccountInfo(programManagerProgram.programId);
+        // console.log("parsed progrm account", parsedProgramAccount);
+        // const parsedProgramData = (parsedProgramAccount.value.data as ParsedAccountData).parsed;
+        // console.log(parsedProgramData);
+        // expect(parsedProgramData.info.authority).to.equal(programProvider.wallet.publicKey.toBase58());
+        
+        // set the program authority
+        setProgramAuthority(programManagerProgram.programId, vaultPDA);
+
+        // add the program
+        const nameString = "The program manager program, itself";
+        try {
+            await programManagerProgram.methods.createManagedProgram(programManagerProgram.programId, nameString)
+                .accounts({
+                    multisig: msPDA,
+                    programManager: pmPDA,
+                    managedProgram: mpPDA,
+                }).rpc();
+        }catch(e){
+            console.log("error creating managed program", e);
+        }
+        const newManagedProgramState = await programManagerProgram.account.managedProgram.fetch(mpPDA);
+        expect(newManagedProgramState.name).to.equal(nameString);
+        expect(newManagedProgramState.managedProgramIndex).to.equal(nextProgramIndex);
+
+        // create the upgrade
+        const nextUpgradeIndex = await getNextUpgradeIndex(programManagerProgram, mpPDA);
+        const [upgradePDA] = await getProgramUpgradePDA(mpPDA, new anchor.BN(nextUpgradeIndex,10), programManagerProgram.programId);
+
+        const testUpgradeName = "Upgrade #1";
+        try {
+            await programManagerProgram.methods.createProgramUpgrade(
+                    bufferKeypair.publicKey,
+                    programProvider.wallet.publicKey,
+                    vaultPDA,
+                    testUpgradeName
+                )
+                .accounts({
+                    multisig: msPDA,
+                    programManager: pmPDA,
+                    managedProgram: mpPDA,
+                    programUpgrade: upgradePDA
+                })
+                .rpc();
+        }catch(e) {
+            console.log("Error creating program upgrade", e);
+        }
+
+        // verify the upgrade account was created, and that the buffers match as well in the ix
+        const addedUpgrade = await programManagerProgram.account.programUpgrade.fetch(upgradePDA);
+        const managedProgramState = await programManagerProgram.account.managedProgram.fetch(mpPDA);
+        expect(addedUpgrade.upgradeIndex).to.equal(managedProgramState.upgradeIndex);
+        expect(addedUpgrade.name).to.equal(testUpgradeName);
+        // check the upgrade Ix accounts match
+        expect(addedUpgrade.upgradeIx.programId.toBase58()).to.equal(BPF_UPGRADE_ID.toBase58());
+        expect(addedUpgrade.upgradeIx.accounts[1].pubkey.toBase58()).to.equal(programManagerProgram.programId.toBase58());
+        expect(addedUpgrade.upgradeIx.accounts[2].pubkey.toBase58()).to.equal(bufferKeypair.publicKey.toBase58());
+        expect(addedUpgrade.upgradeIx.accounts[3].pubkey.toBase58()).to.equal(programProvider.wallet.publicKey.toBase58());
+        expect(addedUpgrade.upgradeIx.accounts[6].pubkey.toBase58()).to.equal(vaultPDA.toBase58());
+
+        // create a new tx for the upgrade
+        const newTxIndex = await getNextTxIndex(program, msPDA);
+        const newTxIndexBN = new anchor.BN(newTxIndex, 10);
+
+        // generate the tx pda
+        const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+
+        // use 1/vault as authority index
+        await program.methods.createTransaction(1)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        // get the current tx state
+        let txState = await program.account.msTransaction.fetch(txPDA);
+        txCount++;
+        const newIxIndex = txState.instructionIndex + 1;
+        const newIxIndexBN = new anchor.BN(newIxIndex, 10);
+
+        // create the instruction pda
+        const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+
+        // the upgrade instruction
+        const upgradeIx = {
+            programId: addedUpgrade.upgradeIx.programId,
+            data: addedUpgrade.upgradeIx.upgradeInstructionData,
+            keys: addedUpgrade.upgradeIx.accounts
+        };
+
+        // attach the upgrade ix
+        await program.methods.addInstruction(upgradeIx)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                instruction: ixPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        // bump up the ix index
+        const newIxIndex2 = newIxIndex + 1;
+        const newIxIndex2BN = new anchor.BN(newIxIndex2, 10);
+
+        // create the instruction pda
+        const [ix2PDA] = await getIxPDA(txPDA, newIxIndex2BN, program.programId);
+
+        // get the upgrade update instruciton to run after the upgrade
+        const updateUpgradeIx = await programManagerProgram.methods.setAsExecuted()
+            .accounts({
+                multisig: msPDA,
+                programManager: pmPDA,
+                managedProgram: mpPDA,
+                programUpgrade: upgradePDA,
+                transaction: txPDA,
+                instruction: ix2PDA,
+                authority: vaultPDA
+            })
+            .instruction();
+        console.log("upgrade ix key", ixPDA.toBase58());
+        console.log("update upgrade ix keys", ix2PDA.toBase58());
+        updateUpgradeIx.keys.forEach(a => {
+            console.log(`${a.pubkey.toBase58()} ${a.isWritable}`);
+        });
+        // attach the upgrade update ix
+        await program.methods.addInstruction(updateUpgradeIx)
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                instruction: ix2PDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        // get the ix
+        let ixState = await program.account.msInstruction.fetch(ixPDA);
+        expect(ixState.instructionIndex).to.equal(1);
+
+        let ix2State = await program.account.msInstruction.fetch(ix2PDA);
+        expect(ix2State.instructionIndex).to.equal(2);
+
+        // acitveate the tx
+        await program.methods.activateTransaction()
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                creator: creator.publicKey
+            })
+            .rpc();
+
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("active");
+
+        // approve the tx
+        await program.methods.approveTransaction()
+            .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                member: creator.publicKey
+            })
+            .rpc();
+
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("executeReady");
+
+        const executeTx = await createExecuteTransactionTx(program, msPDA, txPDA, creator.publicKey);
+        console.log('execute keys', executeTx.instructions[0].keys.length);
+        executeTx.instructions[0].keys.forEach((k,i)=>{
+            if (i > 2) {
+                console.log(`${k.pubkey.toBase58()} ${k.isWritable}`);
+            }
+        });
+        console.log(executeTx);
+        creator.signTransaction(executeTx);
+        try {
+            const res = await programProvider.sendAndConfirm(executeTx);
+        } catch (e) {
+            console.log(e);
+        }
+        
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("executed");
     });
 });
