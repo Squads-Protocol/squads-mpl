@@ -222,6 +222,7 @@ pub struct UpdateUpgrade<'info> {
     // multisig account needs to come from squads-mpl
     #[account(
         owner = squads_mpl::ID,
+        constraint = matches!(multisig.is_member(member.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
     
@@ -272,6 +273,7 @@ pub struct UpdateUpgrade<'info> {
         ],
         bump = transaction.bump,
         seeds::program = squads_mpl::ID,
+        constraint = transaction.status == MsTransactionStatus::Executed @MsError::InvalidInstructionAccount,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -282,23 +284,12 @@ pub struct UpdateUpgrade<'info> {
             transaction.key().as_ref(),
             &instruction.instruction_index.to_le_bytes(),
             b"instruction"
-        ], bump = instruction.bump,
-        constraint = instruction.executed @MsError::InvalidInstructionAccount,
+        ],
+        bump = instruction.bump,
+        seeds::program = squads_mpl::ID,
     )]
     pub instruction: Account<'info, MsInstruction>,
 
-    // check that the authority invoking this is derived from multisig and
-    // part of a tx cpi (authority index)
-    // ie. tx has auth index of 1, runs the upgrade, then invokes update here
-    #[account(
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &transaction.authority_index.to_le_bytes(),
-            b"authority",
-        ],
-        bump = transaction.authority_bump,
-        seeds::program = squads_mpl::ID
-    )]
-    pub authority: Signer<'info>,
+    #[account(mut)]
+    pub member: Signer<'info>,
 }
