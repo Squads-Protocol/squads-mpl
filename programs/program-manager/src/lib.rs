@@ -4,7 +4,6 @@ use squads_mpl::state::*;
 use squads_mpl::errors::*;
 pub mod state;
 
-
 declare_id!("8Y5Qbdb67Ka4LcPCziyhLrGbYN2ftZ1BG11Q5PiHenLP");
 
 #[program]
@@ -49,7 +48,7 @@ pub mod program_manager {
             &spill
         );
         let uix = UpgradeInstruction::from(ix);
-        msg!("PACKED SIZE: {:?}", uix.get_max_size());
+
         // set up the new upgrade account
         program_upgrade.init(
             managed_program.key(),
@@ -73,12 +72,39 @@ pub mod program_manager {
     //     Ok(())
     // }
 
+    // a function to run after an upgrade instruction via squads-mpl that will update some data
+    pub fn set_as_executed(ctx: Context<UpdateUpgrade>) -> Result<()>{
+        // check the keys vec length to make sure they match
+        let instruction_keys_len = ctx.accounts.instruction.keys.len();
+        if instruction_keys_len != ctx.accounts.program_upgrade.upgrade_ix.accounts.len() {
+            return err!(MsError::InvalidInstructionAccount);
+        }
+
+        // check that the saved upgrade instruction matches the upgrade instruction from the transaction
+        (0..instruction_keys_len).try_for_each(|i| {
+            if ctx.accounts.instruction.keys[i].pubkey != ctx.accounts.program_upgrade.upgrade_ix.accounts[i].pubkey {
+                return err!(MsError::InvalidInstructionAccount);
+            }
+            Ok(())
+        }).ok();
+
+        let upgrade_account = &mut ctx.accounts.program_upgrade;
+        let managed_program_account = &mut ctx.accounts.managed_program;
+        // update the upgrade account
+        upgrade_account.upgraded_on = Clock::get().unwrap().unix_timestamp;
+        upgrade_account.executed = true;
+
+        managed_program_account.last_upgrade = Clock::get().unwrap().unix_timestamp;
+        managed_program_account.last_upgrade_index = upgrade_account.upgrade_index;
+        Ok(())
+    }
+
 }
 
 #[derive(Accounts)]
 pub struct CreateManager<'info> {
     #[account(
-        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        owner = squads_mpl::ID,
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
@@ -106,7 +132,7 @@ pub struct CreateManager<'info> {
 #[instruction(program_address: Pubkey, name: String)]
 pub struct CreateManagedProgram<'info> {
     #[account(
-        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        owner = squads_mpl::ID,
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
@@ -146,7 +172,7 @@ pub struct CreateManagedProgram<'info> {
 #[instruction(buffer: Pubkey, spill: Pubkey, authority: Pubkey, name: String)]
 pub struct CreateProgramUpgrade<'info> {
     #[account(
-        owner = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW".parse().unwrap(),
+        owner = squads_mpl::ID,
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
@@ -189,4 +215,82 @@ pub struct CreateProgramUpgrade<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>
+}
+
+#[derive(Accounts)]
+pub struct UpdateUpgrade<'info> {
+    // multisig account needs to come from squads-mpl
+    #[account(
+        owner = squads_mpl::ID,
+        constraint = matches!(multisig.is_member(member.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
+    )]
+    pub multisig: Account<'info, Ms>,
+    
+    // derive the program manager from the multisig
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            b"pmanage"
+        ],
+        bump = program_manager.bump
+    )]
+    pub program_manager: Account<'info, ProgramManager>,
+
+    // derive the managed program from the program manager
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            program_manager.key().as_ref(),
+            &managed_program.managed_program_index.to_le_bytes(),
+            b"program"
+        ],
+        bump = managed_program.bump,
+    )]
+    pub managed_program: Account<'info, ManagedProgram>,
+
+    // derive the upgrade from the managed program
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            managed_program.key().as_ref(),
+            &program_upgrade.upgrade_index.to_le_bytes(),
+            b"pupgrade"
+        ], bump = program_upgrade.bump,
+        constraint = !program_upgrade.executed @MsError::InvalidInstructionAccount,
+    )]
+    pub program_upgrade: Account<'info, ProgramUpgrade>,
+    
+    // check that the transaction is derived from the multisig
+    #[account(
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ],
+        bump = transaction.bump,
+        seeds::program = squads_mpl::ID,
+        constraint = transaction.status == MsTransactionStatus::Executed @MsError::InvalidInstructionAccount,
+    )]
+    pub transaction: Account<'info, MsTransaction>,
+
+    #[account(
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            transaction.key().as_ref(),
+            &instruction.instruction_index.to_le_bytes(),
+            b"instruction"
+        ],
+        bump = instruction.bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub instruction: Account<'info, MsInstruction>,
+
+    #[account(mut)]
+    pub member: Signer<'info>,
 }
