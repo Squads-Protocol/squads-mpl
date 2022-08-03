@@ -246,7 +246,7 @@ pub struct UpdateUpgrade<'info> {
             &managed_program.managed_program_index.to_le_bytes(),
             b"program"
         ],
-        bump = managed_program.bump
+        bump = managed_program.bump,
     )]
     pub managed_program: Account<'info, ManagedProgram>,
 
@@ -258,7 +258,8 @@ pub struct UpdateUpgrade<'info> {
             managed_program.key().as_ref(),
             &program_upgrade.upgrade_index.to_le_bytes(),
             b"pupgrade"
-        ], bump = program_upgrade.bump
+        ], bump = program_upgrade.bump,
+        constraint = !program_upgrade.executed @MsError::InvalidInstructionAccount,
     )]
     pub program_upgrade: Account<'info, ProgramUpgrade>,
     
