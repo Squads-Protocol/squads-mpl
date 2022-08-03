@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.4](https://github.com/squads-dapp/squads-mpl/compare/v1.0.3...v1.0.4) (2022-08-03)
+
+
+### Bug Fixes
+
+* **execute:** range check fix ([a567366](https://github.com/squads-dapp/squads-mpl/commit/a567366cf85d774c9c5b2f6ea17836e4ae18ca6c))
+* **ids:** updated the program addresses ([c96dab5](https://github.com/squads-dapp/squads-mpl/commit/c96dab5f97e4ead188c76431217babee760c8cd4))
+
 ## [1.0.3](https://github.com/squads-dapp/squads-mpl/compare/v1.0.2...v1.0.3) (2022-08-03)
 
 
