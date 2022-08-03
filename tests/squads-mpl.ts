@@ -1132,7 +1132,7 @@ describe('Basic functionality', () => {
     });
 
     it(`Create upgrade with buffer and deploy it - MS ${msPDA.toBase58()}`, async function(){
-        this.timeout(20000);
+        this.timeout(30000);
         const nextProgramIndex = await getNextProgramIndex(programManagerProgram, pmPDA);
         const [mpPDA] = await getManagedProgramPDA(pmPDA, new anchor.BN(nextProgramIndex), programManagerProgram.programId);
         const [vaultPDA] = await getAuthorityPDA(msPDA, new anchor.BN(1,10), program.programId);
@@ -1257,46 +1257,12 @@ describe('Basic functionality', () => {
             })
             .rpc();
 
-        // bump up the ix index
-        const newIxIndex2 = newIxIndex + 1;
-        const newIxIndex2BN = new anchor.BN(newIxIndex2, 10);
-
-        // create the instruction pda
-        const [ix2PDA] = await getIxPDA(txPDA, newIxIndex2BN, program.programId);
-
-        // get the upgrade update instruciton to run after the upgrade
-        const updateUpgradeIx = await programManagerProgram.methods.setAsExecuted()
-            .accounts({
-                multisig: msPDA,
-                programManager: pmPDA,
-                managedProgram: mpPDA,
-                programUpgrade: upgradePDA,
-                transaction: txPDA,
-                instruction: ix2PDA,
-                authority: vaultPDA
-            })
-            .instruction();
         console.log("upgrade ix key", ixPDA.toBase58());
-        console.log("update upgrade ix keys", ix2PDA.toBase58());
-        updateUpgradeIx.keys.forEach(a => {
-            console.log(`${a.pubkey.toBase58()} ${a.isWritable}`);
-        });
-        // attach the upgrade update ix
-        await program.methods.addInstruction(updateUpgradeIx)
-            .accounts({
-                multisig: msPDA,
-                transaction: txPDA,
-                instruction: ix2PDA,
-                creator: creator.publicKey
-            })
-            .rpc();
+        console.log("update upgrade ix keys", ixPDA.toBase58());
 
         // get the ix
         let ixState = await program.account.msInstruction.fetch(ixPDA);
         expect(ixState.instructionIndex).to.equal(1);
-
-        let ix2State = await program.account.msInstruction.fetch(ix2PDA);
-        expect(ix2State.instructionIndex).to.equal(2);
 
         // acitveate the tx
         await program.methods.activateTransaction()
@@ -1321,8 +1287,23 @@ describe('Basic functionality', () => {
 
         txState = await program.account.msTransaction.fetch(txPDA);
         expect(txState.status).to.have.property("executeReady");
+            // get the upgrade update instruciton to run after the upgrade
+        const updateUpgradeIx = await programManagerProgram.methods.setAsExecuted()
+            .accounts({
+                multisig: msPDA,
+                programManager: pmPDA,
+                managedProgram: mpPDA,
+                programUpgrade: upgradePDA,
+                transaction: txPDA,
+                instruction: ixPDA,
+                member: creator.publicKey
+            })
+            .instruction();
 
         const executeTx = await createExecuteTransactionTx(program, msPDA, txPDA, creator.publicKey);
+
+        executeTx.add(updateUpgradeIx);
+
         console.log('execute keys', executeTx.instructions[0].keys.length);
         executeTx.instructions[0].keys.forEach((k,i)=>{
             if (i > 2) {
@@ -1339,5 +1320,7 @@ describe('Basic functionality', () => {
         
         txState = await program.account.msTransaction.fetch(txPDA);
         expect(txState.status).to.have.property("executed");
+        const puState = await programManagerProgram.account.programUpgrade.fetch(upgradePDA);
+        expect(puState.executed).to.be.true;
     });
 });
