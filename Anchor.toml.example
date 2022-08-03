@@ -2,12 +2,16 @@
 squads_mpl = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW"
 program_manager = "8Y5Qbdb67Ka4LcPCziyhLrGbYN2ftZ1BG11Q5PiHenLP"
 
+[programs.mainnet]
+squads_mpl = "SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu"
+program_manager = "SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK"
+
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "localnet"
-wallet = "PATH_TWO_CLI_WALLET_HERE"
+wallet = "PATH_TO_CLI_WALLET_HERE"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
