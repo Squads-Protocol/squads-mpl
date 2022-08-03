@@ -364,7 +364,8 @@ pub mod squads_mpl {
             for account_index in 0..ix_keys.len() {
                 let ix_account_info = next_account_info(ix_iter)?;
 
-                if add_member_discriminator == ix.data[0..8] && account_index == 2 {
+                // check if this data has length of 8 or greater, and is our discriminator
+                if ctx.program_id == ix_program_info.key && Some(add_member_discriminator.as_slice()) == ix.data.get(0..8) && account_index == 2 {
                     // check that the ix account keys match the submitted account keys
                     if *ix_account_info.key != *ctx.accounts.member.key {
                         return err!(MsError::InvalidInstructionAccount);
@@ -375,6 +376,7 @@ pub mod squads_mpl {
                         return err!(MsError::InvalidInstructionAccount);
                     }
                 }
+
                 // check that the ix account writable match the submitted account writable
                 if ix_account_info.is_writable != ix_keys[account_index].is_writable {
                     return err!(MsError::InvalidInstructionAccount);

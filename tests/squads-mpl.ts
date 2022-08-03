@@ -128,7 +128,7 @@ describe('Basic functionality', () => {
     });
 
 
-    it.skip(`Create Tx draft - MS: ${msPDA.toBase58()}`, async () => {
+    it(`Create Tx draft - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -154,7 +154,7 @@ describe('Basic functionality', () => {
         expect(txState.transactionIndex).to.equal(msState.transactionIndex);
     });
 
-    it.skip(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
+    it(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         // get the state of the MS
         const newTxIndex = await getNextTxIndex(program, msPDA);
@@ -208,7 +208,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it.skip(`Tx Activate - MS: ${msPDA.toBase58()}`, async () => {
+    it(`Tx Activate - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -266,7 +266,7 @@ describe('Basic functionality', () => {
 
     });
 
-    it.skip(`Tx Sign - MS: ${msPDA.toBase58()}`, async () => {
+    it(`Tx Sign - MS: ${msPDA.toBase58()}`, async () => {
         // create an transaction draft
         const newTxIndex = await getNextTxIndex(program, msPDA);
         const newTxIndexBN = new anchor.BN(newTxIndex, 10);
@@ -340,7 +340,7 @@ describe('Basic functionality', () => {
         expect(txState.status).to.have.property("executeReady");
     });
 
-    it.skip(`Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
+    it(`Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -443,7 +443,7 @@ describe('Basic functionality', () => {
         expect(testPayeeAccount.value.lamports).to.equal(1000000);
     });
 
-    it.skip(`2X Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
+    it(`2X Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -565,7 +565,7 @@ describe('Basic functionality', () => {
         expect(testPayeeAccount.value.lamports).to.equal(2000000);
     });
 
-    it.skip(`2X Transfer Tx Sequential execute - MS: ${msPDA.toBase58()}`, async () => {
+    it(`2X Transfer Tx Sequential execute - MS: ${msPDA.toBase58()}`, async () => {
         // create authority to use (Vault, index 1)
         const authorityIndexBN = new anchor.BN(1, 10);
         const [authorityPDA] = await getAuthorityPDA(msPDA, authorityIndexBN, program.programId);
@@ -1300,7 +1300,7 @@ describe('Basic functionality', () => {
         expect(addedUpgrade.upgradeIx.programId.toBase58()).to.equal(BPF_UPGRADE_ID.toBase58());
     });
 
-    it(`Create upgrade with buffer and deploy it - MS ${msPDA.toBase58()}`, async function(){
+    it.skip(`Create upgrade with buffer and deploy it - MS ${msPDA.toBase58()}`, async function(){
         this.timeout(30000);
         const nextProgramIndex = await getNextProgramIndex(programManagerProgram, pmPDA);
         const [mpPDA] = await getManagedProgramPDA(pmPDA, new anchor.BN(nextProgramIndex), programManagerProgram.programId);
