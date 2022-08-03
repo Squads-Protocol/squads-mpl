@@ -195,33 +195,24 @@ impl MsTransaction {
 
     // check if a user has voted already
     pub fn has_voted(&self, member: Pubkey) -> bool {
-        let approved = matches!(self.approved.binary_search(&member), Ok(..));
-        let rejected = matches!(self.rejected.binary_search(&member), Ok(..));
+        let approved = self.approved.binary_search(&member).is_ok();
+        let rejected = self.rejected.binary_search(&member).is_ok();
         approved || rejected
     }
 
     // check if a user has signed to approve
     pub fn has_voted_approve(&self, member: Pubkey) -> Option<usize> {
-        match self.approved.binary_search(&member) {
-            Ok(ind)=> Some(ind),
-            _ => None
-        }
+        self.approved.binary_search(&member).ok()
     }
 
     // check if a use has signed to reject
     pub fn has_voted_reject(&self, member: Pubkey) -> Option<usize> {
-        match self.rejected.binary_search(&member) {
-            Ok(ind)=> Some(ind),
-            _ => None
-        }
+        self.rejected.binary_search(&member).ok()
     }
 
     // check if a user has signed to cancel
     pub fn has_cancelled(&self, member: Pubkey) -> Option<usize> {
-        match self.cancelled.binary_search(&member) {
-            Ok(ind)=> Some(ind),
-            _ => None
-        }
+        self.cancelled.binary_search(&member).ok()
     }
 
     pub fn remove_reject(&mut self, index: usize) -> Result<()>{
@@ -270,6 +261,9 @@ impl MsInstruction {
 impl IncomingInstruction {
     pub fn get_max_size(&self) -> usize {
         // add three the size to correlate with the saved instruction account
+        // there are 3 extra bytes in a saved instruction account: index, bump, executed
+        // this is used to determine how much space the incoming instruction
+        // will used when saved
         return get_instance_packed_len(&self).unwrap_or_default().checked_add(3).unwrap_or_default();
     }
 }

@@ -1,5 +1,6 @@
 [programs.localnet]
-squads_mpl = "PROGRAM_ID_HERE"
+squads_mpl = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW"
+program_manager = "8Y5Qbdb67Ka4LcPCziyhLrGbYN2ftZ1BG11Q5PiHenLP"
 
 [registry]
 url = "https://anchor.projectserum.com"
