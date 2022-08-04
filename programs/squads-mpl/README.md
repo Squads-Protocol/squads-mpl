@@ -2,7 +2,7 @@
 The program facilitates signing and executing transactions on behalf of a multisig, and is currently in Alpha. The program is written in [Anchor](https://github.com/coral-xyz/anchor), with instructions and accounts that can be easily deserialized by the program IDL.
 
 ## Get started
-`anchor test` will run through the basic functionality of the multisig. You may need to adjust the declared program id.
+`anchor test --skip-deploy` will run through the basic functionality of the multisig. You may need to adjust the declared program id.
 
 ## Accounts
 There are 3 types of accounts in the program
