@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/squads-dapp/squads-mpl/compare/v1.0.4...v1.0.5) (2022-08-04)
+
+
+### Bug Fixes
+
+* **add-member-realloc:** clean up accountmeta and accountinfo ([b15eed3](https://github.com/squads-dapp/squads-mpl/commit/b15eed3002e401a972f7f717d55b62661d8e46e0))
+
 ## [1.0.4](https://github.com/squads-dapp/squads-mpl/compare/v1.0.3...v1.0.4) (2022-08-03)
 
 
