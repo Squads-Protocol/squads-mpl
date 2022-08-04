@@ -391,9 +391,10 @@ pub mod squads_mpl {
                     if &ix.program_id != ctx.program_id {
                         return err!(MsError::InvalidAuthorityIndex);
                     }
-                    if add_member_discriminator == ix.data[0..8] {
-                        ix.accounts[2].pubkey = *ctx.accounts.member.key;
-                        ix_account_infos[3].key = ctx.accounts.member.key;
+                    // since the add member may need to pay realloc, switch the payer
+                    if Some(add_member_discriminator.as_slice()) == ix.data.get(0..8) {
+                        ix.accounts[2] = AccountMeta::new(*ctx.accounts.member.key, true);
+                        ix_account_infos[3] = ctx.accounts.member.to_account_info();
                     }
                     invoke_signed(
                         &ix,
