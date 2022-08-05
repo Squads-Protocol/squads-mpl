@@ -221,8 +221,13 @@ pub struct CreateProgramUpgrade<'info> {
 pub struct UpdateUpgrade<'info> {
     // multisig account needs to come from squads-mpl
     #[account(
-        owner = squads_mpl::ID,
-        constraint = matches!(multisig.is_member(member.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
     )]
     pub multisig: Account<'info, Ms>,
     
@@ -274,7 +279,6 @@ pub struct UpdateUpgrade<'info> {
         ],
         bump = transaction.bump,
         seeds::program = squads_mpl::ID,
-        constraint = transaction.status == MsTransactionStatus::Executed @MsError::InvalidInstructionAccount,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
@@ -291,6 +295,15 @@ pub struct UpdateUpgrade<'info> {
     )]
     pub instruction: Account<'info, MsInstruction>,
 
-    #[account(mut)]
-    pub member: Signer<'info>,
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.authority_index.to_le_bytes(),
+            b"authority"
+        ],
+        bump = transaction.authority_bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub authority: Signer<'info>,
 }

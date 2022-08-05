@@ -310,7 +310,7 @@ pub mod squads_mpl {
         ];
 
         // unroll account infos from account_list
-        let mapped_remaining_accounts: Vec<AccountInfo>= account_list.iter().map(|&i| {
+        let mapped_remaining_accounts: Vec<AccountInfo> = account_list.iter().map(|&i| {
             let index = usize::from(i);
             ctx.remaining_accounts[index].clone()
         }).collect();
@@ -362,7 +362,7 @@ pub mod squads_mpl {
 
             // loop through the provided remaining accounts
             for account_index in 0..ix_keys.len() {
-                let ix_account_info = next_account_info(ix_iter)?;
+                let ix_account_info = next_account_info(ix_iter)?.clone();
 
                 // check if this data has length of 8 or greater, and is our discriminator
                 if ctx.program_id == ix_program_info.key && Some(add_member_discriminator.as_slice()) == ix.data.get(0..8) && account_index == 2 {
@@ -377,10 +377,6 @@ pub mod squads_mpl {
                     }
                 }
 
-                // check that the ix account writable match the submitted account writable
-                if ix_account_info.is_writable != ix_keys[account_index].is_writable {
-                    return err!(MsError::InvalidInstructionAccount);
-                }
                 ix_account_infos.push(ix_account_info.clone());
             }
 

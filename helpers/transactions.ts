@@ -86,30 +86,7 @@ export const createExecuteTransactionTx = async (program: Program<SquadsMpl>, ms
             return false;
         });
     });
-    // console.log('ix key mapping', keyIndexMap);
-    const keyIndexMapLengthBN = new anchor.BN(keyIndexMap.length, 10);
-    const keyIndexMapLengthBuffer = keyIndexMapLengthBN.toArrayLike(Buffer, "le", 2);
-    const keyIndexMapBuffer = Buffer.from(keyIndexMap);
 
-    let executeKeys = [
-        {
-            pubkey: ms,
-            isSigner: false,
-            isWritable: true
-        },
-        {
-            pubkey: tx,
-            isSigner: false,
-            isWritable: true,
-        },
-        {
-            pubkey: feePayer,
-            isSigner: true,
-            isWritable: true,
-        }
-    ];
-//   const keys = executeKeys.concat(ixKeysList);
-    const keys = executeKeys.concat(keysUnique);
     const {blockhash} = await program.provider.connection.getLatestBlockhash();
     const lastValidBlockHeight = await program.provider.connection.getBlockHeight();
 
@@ -119,10 +96,6 @@ export const createExecuteTransactionTx = async (program: Program<SquadsMpl>, ms
         feePayer
     });
 
-    const sig = anchor.utils.sha256.hash("global:execute_transaction");
-    const ixDiscriminator = Buffer.from(sig, "hex");
-
-    const data = Buffer.concat([ixDiscriminator.slice(0, 16), keyIndexMapLengthBuffer, keyIndexMapBuffer]);
     const executeIx = await program.methods.executeTransaction(Buffer.from(keyIndexMap))
         .accounts({multisig: ms, transaction: tx, member: feePayer})
         .instruction();
