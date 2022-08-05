@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.6](https://github.com/squads-dapp/squads-mpl/compare/v1.0.5...v1.0.6) (2022-08-05)
+
+
+### Bug Fixes
+
+* **package:** update package.json ([13f2f0c](https://github.com/squads-dapp/squads-mpl/commit/13f2f0c50b045dde4b56902e98ee5c34285cde72))
+* **upgrades:** single execute ix for upgrade update ([4e9a0d2](https://github.com/squads-dapp/squads-mpl/commit/4e9a0d2cb32b9d541ea5a7cbd4bfdcab512b894c))
+
 ## [1.0.5](https://github.com/squads-dapp/squads-mpl/compare/v1.0.4...v1.0.5) (2022-08-04)
 
 
