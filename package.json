@@ -12,12 +12,8 @@
         "ts-mocha": "10.0.0",
         "typescript": "^4.3.5"
     },
-<<<<<<< HEAD
-    "version": "1.0.5"
-=======
-    "version": "1.0.4",
+    "version": "1.0.5",
     "scripts": {
         "test": "anchor test --skip-deploy"
     }
->>>>>>> 022cf64 (fix(upgrades): single execute ix for upgrade update)
 }
