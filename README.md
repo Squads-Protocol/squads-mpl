@@ -21,4 +21,9 @@ Both programs are [acnhor verified](https://www.apr.dev/).
 
 Solana needed a multisig the ecosystem could rely on, so we built one.
 
+# Security
 
+To make sure that Squads V3 is secure we did the following:
+  * independent security audit with Bramah Systems
+  * independent security audit with OtterSec
+  * written the program in [Anchor](https://www.anchor-lang.com/)
