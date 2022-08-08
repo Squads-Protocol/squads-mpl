@@ -30,4 +30,9 @@ To make sure that Squads V3 is secure we did the following:
   * written the program in [Anchor](https://www.anchor-lang.com/) (a framework for quickly building secure Solana programs)
   * kept the codebase minimal
   * open sourced the codebase (duh)
-  * 
+
+# Features
+ 
+ Step by step user guides can be found in our [docs](https://docs.squads.so/squads-docs/).
+ 
+# License
