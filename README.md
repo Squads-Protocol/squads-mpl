@@ -29,7 +29,8 @@ To make sure that Squads V3 is secure we did the following:
   * running the [Sec3](https://pro.sec3.dev/) premium tool after any changes to the on-chain code
   * written the program in [Anchor](https://www.anchor-lang.com/) (a framework for quickly building secure Solana programs)
   * kept the codebase minimal
-  * open sourced the codebase (duh)
+  * open sourced the codebase
+  * asked a number of established teams in the ecosystem to review and give their feedback
 
 # Features
  
