@@ -36,4 +36,4 @@ Our goal is to make Squads V3 on-chain program non-upgradeable as soon as possib
  
 # License
 
-
+This software is released under AGPL-3.0 license.
