@@ -33,20 +33,5 @@ To make sure that Squads V3 is secure we did the following:
   * asked a number of established teams in the ecosystem to review the code and give their feedback
 
 Our goal is to make Squads V3 on-chain program non-upgradeable as soon as possible.
-
-# Features
-
-In its current state Squads V3 has:
-
-  * basic multisig functionality (send/deposit fungibles and NFTs)
-  * program upgrades functionality
-  * contact book
-  * Cardinal Twitter identity integration
-  * Bonfida integration allowing to send assets to .sol domains
-  * Dialect notifications integration
-  * responsive mobile support
-  * TX builder allowing to batch arbitrary instructions into transactions to be approved with a multisig
-
- Step by step user guides can be found in our [docs](https://docs.squads.so/squads-docs/).
  
 # License
