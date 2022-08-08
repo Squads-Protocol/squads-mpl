@@ -14,5 +14,11 @@ Technical information about SMPL [can be found in the program README.md](https:/
 
   * Squads V3 on-chain program: [SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu](https://explorer.solana.com/address/SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu)
   * Program manager: [SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK](https://explorer.solana.com/address/SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK)
+  
+Both programs are [acnhor verified](https://www.apr.dev/).
+
+# Our vision
+
+Solana needed a multisig the ecosystem could rely on, so we built one.
 
 
