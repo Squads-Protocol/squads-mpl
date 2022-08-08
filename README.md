@@ -35,3 +35,5 @@ To make sure that Squads V3 is secure we did the following:
 Our goal is to make Squads V3 on-chain program non-upgradeable as soon as possible.
  
 # License
+
+
