@@ -27,7 +27,7 @@ Solana needed a multisig the ecosystem could rely on, so we built one.
 
 To make sure that Squads V3 is secure we did the following:
   * independent security audit with Bramah Systems
-  * independent security audit with OtterSec
+  * independent security audit with [OtterSec](https://github.com/Squads-Protocol/squads-mpl/blob/main/Squads%20V3%20-%20OtterSec%20Audit.pdf)
   * running the [Sec3](https://pro.sec3.dev/) premium tool after any changes to the on-chain code
   * written the program in [Anchor](https://www.anchor-lang.com/) (a framework for quickly building secure Solana programs)
   * kept the codebase minimal
