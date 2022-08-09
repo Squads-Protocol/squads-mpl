@@ -1,19 +1,39 @@
 # Squads Multisig Program Library
 The program facilitates signing and executing transactions on behalf of a multisig. The program is written in [Anchor](https://github.com/coral-xyz/anchor), with instructions and accounts that can be easily deserialized by the program IDL.
 
+## Contents
+* [Get Started](#get-started)
+* [Create a Multisig](#create-a-multisig)
+* [Create a Transaction](#create-a-transaction)
+* [Approve a Transaction](#approve-a-transaction)
+* [Exeucte a Transaction](#execute-a-transaction)
+* [Accounts & Instructions](#accounts-and-instructions)
+* [Contributing](#contributing)
+* [Other Tools and Programs](#other-tools-and-programs)
+
 ## Get started
 `anchor test --skip-deploy` will run through the basic functionality of the multisig. You may need to adjust the declared program id.
 
-## Accounts
+## Create a Multisig
+
+## Create a Transaction
+
+## Approve a Transaction
+
+## Execute a Transaction
+
+## Accounts and Instructions
+### Accounts
 There are 3 types of accounts in the program
 * Multisig ([Ms](https://github.com/squads-dapp/squads-mpl/blob/main/programs/squads-mpl/src/state/ms.rs#L6]))
 * Transaction ([MsTransaction](https://github.com/squads-dapp/squads-mpl/blob/main/programs/squads-mpl/src/state/ms.rs#L94))
 * Instruction ([MsInstruction](https://github.com/squads-dapp/squads-mpl/blob/main/programs/squads-mpl/src/state/ms.rs#L235))
 
-## Instructions
+### Instructions
 Instructions can be categorized as such:
 * Internal Instructions, which are the squads-mpl instructions invoked directly
 * External/Arbitrary Instructions, which can be attached to transactions that will ultimately be executed by the multisig
+
 ### Internal Instructions
 Internal instructions that primarily affect the Ms account:
 * Create
@@ -32,12 +52,12 @@ Internal instructions related to handling MsTransactions:
 * Cancel
 * Execute
 
-## Authorities
+### Authorities
 Each created and executed MsTransaction does so on behalf of an authority. Authorities are derived by a u32, and saved in the MsTransaction account when created (by passing in the `authority_index` argument). The Authority with an index of 0 is reserved for MsTransactions that affect the multisig directly (add member, change threshold, etc). Other authority indexes are agnostic and represent the underlying account/PDA that will be signed for during execution. For example, a multisig can use `authority_index 1` for a vault, `authority_index 2` for a secondary vault, and `authority_index 3` for a program upgrade authority. It is up to the end user to decide how to leverage these and to make sure that the `authority_index` in the created MsTransaction matches the necessary accounts specified in the attached instructions.
 
 There is an additional instruction if the multisig wishes to increment the authority_index saved in the Ms account, to make it easier to derive authority PDAs for a user interface. the authority_index in the Ms account is optionally used as a way to derive authorities that may have been used, but it has no affect on how the multisig operates - it's strictly for convenience. 
 
-## Execute a MsTransaction
+### Execute a MsTransaction
 In order to execute a MsTransaction, in addition to the accounts specified in the IDL, the user/key invoking the execute must also pass in a list of accounts that reference the MsInstructions in this format (example for 2 instructions):
 
 First MsInstruction (`instruction_index of 1`)
@@ -52,6 +72,8 @@ Second MsInstruction (`instruction_index of 2`)
 
 The accounts needed for execution can be derived by the MsTransaction account itself, as the MsTransaction account contains an instruction_index, which when attaching an MsInstruction needs to be incremented sequentially. To execute, first you can fetch the MsTransaction account, and then derive all MsInstruction accounts by working backwards from the instruction_index in the MsTransaction and derive the MsInstruction PDAs, fetch the MsInstruction accounts, and then format the ExecuteInstruction for the multisig as explained above. See how this can be accomplished you can [take a look here at one of the test helper functions](https://github.com/squads-dapp/squads-mpl/blob/main/helpers/transactions.ts#L29). The accounts sent to the ExecuteTransaction instruction should follow a unique array index pattern, where the array has a total number of items that map to the list of expected accounts, with each item representing the index of the account to use from the `remaining_accounts` field in the Context.
 
-## Other
+### Contributing
+
+### Other Tools and Programs
 * [Program Manager](https://github.com/squads-dapp/squads-mpl/tree/main/programs/program-manager) - a program to manage program upgrades for Squads multisigs
 * [Squads Grinder](https://github.com/mralbertchen/squads-grinder) -Vanity authority key grinder if you want to try to grind a vault/authority address
