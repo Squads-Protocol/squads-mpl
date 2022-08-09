@@ -10,3 +10,7 @@ The Program Manager is a simple program used to save upgrade instructions for a 
 The Program Manager has 3 types of accounts: ProgramManager, ManagedProgram, and ProgramUpgrade. In order to use the Program Manager, a member of a Squads multisig should first create a ProgramManager account derived from the Squad PDA. The ProgramManager account will keep track of Programs with the `managed_program_index`, which is used to derive the MangedProgram account address. ManagedProgram accounts simply track the address of a program being managed by the Squad, along with an upgrade_index to further track corresponding upgrade instructions. ProgramUpgrade accounts store data about a specific upgrade along with the actual upgrade instruction itself.
 
 ### Instructions
+* [Create Program Manager](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/program-manager/src/lib.rs#L15)
+* [Create Managed Program](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/program-manager/src/lib.rs#L23)
+* [Create Program Upgrade](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/program-manager/src/lib.rs#L38)
+* [Set as executed](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/program-manager/src/lib.rs#L76)
