@@ -8,7 +8,6 @@ The program facilitates signing and executing transactions on behalf of a multis
   * [Instructions](#instructions)
   * [Internal Instructions](#internal-instructions)
   * [Authorities](#authorities)
-  * [Executing a MsTransaction](#executing-a-mstransaction)
 * [Create a Multisig](#create-a-multisig)
 * [Create a MsTransaction](#create-a-mstransaction)
   * [Initializing](#initializing-a-mstransaction)
@@ -57,21 +56,6 @@ Each created and executed MsTransaction does so on behalf of an authority. Autho
 
 There is an additional instruction if the multisig wishes to increment the authority_index saved in the Ms account, to make it easier to derive authority PDAs for a user interface. the authority_index in the Ms account is optionally used as a way to derive authorities that may have been used, but it has no affect on how the multisig operates - it's strictly for convenience. 
 
-### Execute a MsTransaction
-In order to execute a MsTransaction, in addition to the accounts specified in the IDL, the user/key invoking the execute must also pass in a list of accounts that reference the MsInstructions in this format (example for 2 instructions):
-
-First MsInstruction (`instruction_index of 1`)
-* The PDA of the MsInstruction
-* The program_id that will be invoked by the MsInstruction
-* A list of all other accounts referenced by the attached MsInstruction
-  
-Second MsInstruction (`instruction_index of 2`)
-* The PDA of the MsInstruction
-* The program_id that will be invoked by the MsInstruction
-* A list of all other accounts referenced by the attached MsInstruction
-
-The accounts needed for execution can be derived by the MsTransaction account itself, as the MsTransaction account contains an instruction_index, which when attaching an MsInstruction needs to be incremented sequentially. To execute, first you can fetch the MsTransaction account, and then derive all MsInstruction accounts by working backwards from the instruction_index in the MsTransaction and derive the MsInstruction PDAs, fetch the MsInstruction accounts, and then format the ExecuteInstruction for the multisig as explained above. See how this can be accomplished you can [take a look here at one of the test helper functions](https://github.com/squads-dapp/squads-mpl/blob/main/helpers/transactions.ts#L29). The accounts sent to the ExecuteTransaction instruction should follow a unique array index pattern, where the array has a total number of items that map to the list of expected accounts, with each item representing the index of the account to use from the `remaining_accounts` field in the Context.
-
 ## Create a Multisig
 To create a multisig with the Squads MPL, invoke the `create` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L22). Specify the threshold of the multisig, a preferably random key to seed the multisig address, and the keys that will be required to sign off on any transactions.
 
@@ -89,9 +73,22 @@ After you've attached the desired MsInstructions, the creator of the MsTransacti
 MsTransactions that have a `Active` status can be voted to be approved or rejected. To approve a transaction for execution, use the `approve_transaction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L238). Similarly, to reject a MsTransaction, use the `reject_transaction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L254).
 
 ## Execute a MsTransaction
+In order to execute a MsTransaction, in addition to the accounts specified in the IDL, the user/key invoking the execute must also pass in a list of accounts that reference the MsInstructions in this format (example for 2 instructions):
 
-### Contributing
+First MsInstruction (`instruction_index of 1`)
+* The PDA of the MsInstruction
+* The program_id that will be invoked by the MsInstruction
+* A list of all other accounts referenced by the attached MsInstruction
+  
+Second MsInstruction (`instruction_index of 2`)
+* The PDA of the MsInstruction
+* The program_id that will be invoked by the MsInstruction
+* A list of all other accounts referenced by the attached MsInstruction
 
-### Other Tools and Programs
+The accounts needed for execution can be derived by the MsTransaction account itself, as the MsTransaction account contains an instruction_index, which when attaching an MsInstruction needs to be incremented sequentially. To execute, first you can fetch the MsTransaction account, and then derive all MsInstruction accounts by working backwards from the instruction_index in the MsTransaction and derive the MsInstruction PDAs, fetch the MsInstruction accounts, and then format the ExecuteInstruction for the multisig as explained above. See how this can be accomplished you can [take a look here at one of the test helper functions](https://github.com/squads-dapp/squads-mpl/blob/main/helpers/transactions.ts#L29). The accounts sent to the ExecuteTransaction instruction should follow a unique array index pattern, where the array has a total number of items that map to the list of expected accounts, with each item representing the index of the account to use from the `remaining_accounts` field in the Context.
+
+## Contributing
+
+## Other Tools and Programs
 * [Program Manager](https://github.com/squads-dapp/squads-mpl/tree/main/programs/program-manager) - a program to manage program upgrades for Squads multisigs
 * [Squads Grinder](https://github.com/mralbertchen/squads-grinder) -Vanity authority key grinder if you want to try to grind a vault/authority address
