@@ -8,6 +8,11 @@ The program facilitates signing and executing transactions on behalf of a multis
 * [Approve a Transaction](#approve-a-transaction)
 * [Exeucte a Transaction](#execute-a-transaction)
 * [Accounts & Instructions](#accounts-and-instructions)
+** [Accounts](#accounts)
+** [Instructions](#instructions)
+** [Internal Instructions](#internal-instructions)
+** [Authorities](#authorities)
+** [Executing a MsTransaction](#executing-a-mstransaction)
 * [Contributing](#contributing)
 * [Other Tools and Programs](#other-tools-and-programs)
 
