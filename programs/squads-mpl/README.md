@@ -11,10 +11,10 @@ The program facilitates signing and executing transactions on behalf of a multis
   * [Executing a MsTransaction](#executing-a-mstransaction)
 * [Create a Multisig](#create-a-multisig)
 * [Create a MsTransaction](#create-a-mstransaction)
-  * [Initializing](#initializing-a-mstransaction)\
+  * [Initializing](#initializing-a-mstransaction)
   * [Composing MsInstructions](#attaching-a-msinstruction-to-a-mstransaction)
   * [Activating a MsTransaction](#activating-a-mstransaction)
-* [Approve a MsTransaction](#approve-a-transaction)
+* [Approve a MsTransaction](#approve-or-reject-a-transaction)
 * [Execute a MsTransaction](#execute-a-transaction)
 * [Contributing](#contributing)
 * [Other Tools and Programs](#other-tools-and-programs)
@@ -77,12 +77,16 @@ To create a multisig with the Squads MPL, invoke the `create` [instruction](http
 
 ## Create a MsTransaction
 ### Initializing a MsTransaction
-To create a transaction for the multisig, invoke the `create_transaction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L184) and specify the authority index as the argument. Note that transactions, while able to contain multiple instructions, will only be able to utilize a single authority. After the MsInstruction account is created it will be in a `Draft` status.
-### Attaching MsInstructions to the MsTransaction
-When MsTransactions are in the `Draft` status, the member that created the MsTransaction is free to attach MsInstructions.
-### Activating a MsTransaction
+To create a transaction for the multisig, invoke the `create_transaction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L184) and specify the authority index as the argument. Note that transactions, while able to contain multiple instructions, will only be able to utilize a single authority. After the MsInstruction account is created it will be in a `Draft` status. More information about [authorities here](#authorities).
 
-## Approve a MsTransaction
+### Attaching MsInstructions to the MsTransaction
+When MsTransactions are in the `Draft` status, the member that created the MsTransaction is free to attach MsInstructions. Use the `add_instruction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L222) and pass in the instruction you wish to attach to the MsTransaction as a serialized Solana TransactionInstruction for the argument. Attached instructions will then be saved in the corresponding MsInstruction account with the relevant PDA acting as the address, trackable via the instruction_index of both the [MsTransaction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/state/ms.rs#L104) and relevant [MsInstruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/state/ms.rs#L236) accounts. Note that even though an executor can request more compute cycles there is still a data limit for the execution, so we recommend keeping the total unique accounts required by all attached instructions under 30 accounts, otherwise the MsTransaction will need to be executed sequentially.
+
+### Activating a MsTransaction
+After you've attached the desired MsInstructions, the creator of the MsTransaction can activate the MsTransaction so that the multisig may vote to approve or reject it. Use the `activate_transaction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L214) to switch the status of the MsTransaction from `Draft` to `Active`.
+
+## Approve or Reject a MsTransaction
+MsTransactions that have a `Active` status can be voted to be approved or rejected. To approve a transaction for execution, use the `approve_transaction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L238). Similarly, to reject a MsTransaction, use the `reject_transaction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L254).
 
 ## Execute a MsTransaction
 
