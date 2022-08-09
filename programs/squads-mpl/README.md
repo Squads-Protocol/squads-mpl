@@ -1,31 +1,26 @@
 # Squads Multisig Program Library
-The program facilitates signing and executing transactions on behalf of a multisig. The program is written in [Anchor](https://github.com/coral-xyz/anchor), with instructions and accounts that can be easily deserialized by the program IDL.
+The program facilitates signing and executing transactions on behalf of a multisig. The program is written in [Anchor](https://github.com/coral-xyz/anchor), with instructions and accounts that can be easily deserialized by the program IDL. If you wish to invoke the program via a CPI, you'll need the Anchor discriminator (8 Bytes Hex) prepended to the instruction arguments, followed by the serialized data required.
 
 ## Contents
 * [Get Started](#get-started)
-* [Create a Multisig](#create-a-multisig)
-* [Create a Transaction](#create-a-transaction)
-* [Approve a Transaction](#approve-a-transaction)
-* [Exeucte a Transaction](#execute-a-transaction)
 * [Accounts & Instructions](#accounts-and-instructions)
   * [Accounts](#accounts)
   * [Instructions](#instructions)
   * [Internal Instructions](#internal-instructions)
   * [Authorities](#authorities)
   * [Executing a MsTransaction](#executing-a-mstransaction)
+* [Create a Multisig](#create-a-multisig)
+* [Create a MsTransaction](#create-a-mstransaction)
+  * [Initializing](#initializing-a-mstransaction)\
+  * [Composing MsInstructions](#attaching-a-msinstruction-to-a-mstransaction)
+  * [Activating a MsTransaction](#activating-a-mstransaction)
+* [Approve a MsTransaction](#approve-a-transaction)
+* [Execute a MsTransaction](#execute-a-transaction)
 * [Contributing](#contributing)
 * [Other Tools and Programs](#other-tools-and-programs)
 
 ## Get started
 `anchor test --skip-deploy` will run through the basic functionality of the multisig. You may need to adjust the declared program id.
-
-## Create a Multisig
-
-## Create a Transaction
-
-## Approve a Transaction
-
-## Execute a Transaction
 
 ## Accounts and Instructions
 ### Accounts
@@ -76,6 +71,20 @@ Second MsInstruction (`instruction_index of 2`)
 * A list of all other accounts referenced by the attached MsInstruction
 
 The accounts needed for execution can be derived by the MsTransaction account itself, as the MsTransaction account contains an instruction_index, which when attaching an MsInstruction needs to be incremented sequentially. To execute, first you can fetch the MsTransaction account, and then derive all MsInstruction accounts by working backwards from the instruction_index in the MsTransaction and derive the MsInstruction PDAs, fetch the MsInstruction accounts, and then format the ExecuteInstruction for the multisig as explained above. See how this can be accomplished you can [take a look here at one of the test helper functions](https://github.com/squads-dapp/squads-mpl/blob/main/helpers/transactions.ts#L29). The accounts sent to the ExecuteTransaction instruction should follow a unique array index pattern, where the array has a total number of items that map to the list of expected accounts, with each item representing the index of the account to use from the `remaining_accounts` field in the Context.
+
+## Create a Multisig
+To create a multisig with the Squads MPL, invoke the `create` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L22). Specify the threshold of the multisig, a preferably random key to seed the multisig address, and the keys that will be required to sign off on any transactions.
+
+## Create a MsTransaction
+### Initializing a MsTransaction
+To create a transaction for the multisig, invoke the `create_transaction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L184) and specify the authority index as the argument. Note that transactions, while able to contain multiple instructions, will only be able to utilize a single authority. After the MsInstruction account is created it will be in a `Draft` status.
+### Attaching MsInstructions to the MsTransaction
+When MsTransactions are in the `Draft` status, the member that created the MsTransaction is free to attach MsInstructions.
+### Activating a MsTransaction
+
+## Approve a MsTransaction
+
+## Execute a MsTransaction
 
 ### Contributing
 
