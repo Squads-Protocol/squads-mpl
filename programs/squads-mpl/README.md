@@ -12,7 +12,7 @@ The program facilitates signing and executing transactions on behalf of a multis
 * [Create a Multisig](#create-a-multisig)
 * [Create a MsTransaction](#create-a-mstransaction)
   * [Initializing](#initializing-a-mstransaction)
-  * [Composing MsInstructions](#attaching-a-msinstruction-to-a-mstransaction)
+  * [Composing MsInstructions](#attaching-msinstructions-to-a-mstransaction)
   * [Activating a MsTransaction](#activating-a-mstransaction)
 * [Approve a MsTransaction](#approve-or-reject-a-transaction)
 * [Execute a MsTransaction](#execute-a-transaction)
@@ -79,7 +79,7 @@ To create a multisig with the Squads MPL, invoke the `create` [instruction](http
 ### Initializing a MsTransaction
 To create a transaction for the multisig, invoke the `create_transaction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L184) and specify the authority index as the argument. Note that transactions, while able to contain multiple instructions, will only be able to utilize a single authority. After the MsInstruction account is created it will be in a `Draft` status. More information about [authorities here](#authorities).
 
-### Attaching MsInstructions to the MsTransaction
+### Attaching MsInstructions to a MsTransaction
 When MsTransactions are in the `Draft` status, the member that created the MsTransaction is free to attach MsInstructions. Use the `add_instruction` [instruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/lib.rs#L222) and pass in the instruction you wish to attach to the MsTransaction as a serialized Solana TransactionInstruction for the argument. Attached instructions will then be saved in the corresponding MsInstruction account with the relevant PDA acting as the address, trackable via the instruction_index of both the [MsTransaction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/state/ms.rs#L104) and relevant [MsInstruction](https://github.com/Squads-Protocol/squads-mpl/blob/main/programs/squads-mpl/src/state/ms.rs#L236) accounts. Note that even though an executor can request more compute cycles there is still a data limit for the execution, so we recommend keeping the total unique accounts required by all attached instructions under 30 accounts, otherwise the MsTransaction will need to be executed sequentially.
 
 ### Activating a MsTransaction
