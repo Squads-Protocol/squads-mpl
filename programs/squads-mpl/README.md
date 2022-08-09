@@ -13,7 +13,7 @@ The program facilitates signing and executing transactions on behalf of a multis
   * [Initializing](#initializing-a-mstransaction)
   * [Composing MsInstructions](#attaching-msinstructions-to-a-mstransaction)
   * [Activating a MsTransaction](#activating-a-mstransaction)
-* [Approve a MsTransaction](#approve-or-reject-a-transaction)
+* [Approve or Reject a MsTransaction](#approve-or-reject-a-mstransaction)
 * [Execute a MsTransaction](#execute-a-transaction)
 * [Contributing](#contributing)
 * [Other Tools and Programs](#other-tools-and-programs)
