@@ -18,6 +18,8 @@ Technical information about SMPL [can be found in the program README.md](https:/
   * Program manager: [SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK](https://explorer.solana.com/address/SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK)
   
 Both programs are [Anchor verified](https://www.apr.dev/).
+* [Squads-MPL](https://www.apr.dev/program/SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu)
+* [Program Manager](https://www.apr.dev/program/SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK)
 
 # Our vision
 
