@@ -144,7 +144,6 @@ impl MsTransaction {
     // change status to Active
     pub fn activate(&mut self)-> Result<()>{
         self.status = MsTransactionStatus::Active;
-        self.approved.push(self.creator);
         Ok(())
     }
 

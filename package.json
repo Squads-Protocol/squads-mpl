@@ -1,6 +1,6 @@
 {
     "dependencies": {
-        "@project-serum/anchor": "^0.24.2",
+        "@project-serum/anchor": "^0.25.0",
         "bn.js": "^5.2.1"
     },
     "devDependencies": {

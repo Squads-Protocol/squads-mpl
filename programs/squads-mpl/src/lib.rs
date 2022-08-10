@@ -58,6 +58,9 @@ pub mod squads_mpl {
 
         // check if realloc is needed
         let multisig_account_info = ctx.accounts.multisig.to_account_info();
+        if *multisig_account_info.owner != squads_mpl::ID {
+            return err!(MsError::InvalidInstructionAccount);
+        }
         let curr_data_size = multisig_account_info.data.borrow().len();
         let spots_left = ((curr_data_size - Ms::SIZE_WITHOUT_MEMBERS) / 32 ) - ctx.accounts.multisig.keys.len();
 
