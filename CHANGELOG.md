@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.7](https://github.com/Squads-Protocol/squads-mpl/compare/v1.0.6...v1.0.7) (2022-08-10)
+
+
+### Bug Fixes
+
+* **members:** moved auto approve off chain - member account check ([8671704](https://github.com/Squads-Protocol/squads-mpl/commit/8671704b0a9a434a8b135abfb8b047279453ba19))
+
 ## [1.0.6](https://github.com/squads-dapp/squads-mpl/compare/v1.0.5...v1.0.6) (2022-08-05)
 
 

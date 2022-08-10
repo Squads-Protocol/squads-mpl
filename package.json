@@ -12,7 +12,7 @@
         "ts-mocha": "10.0.0",
         "typescript": "^4.3.5"
     },
-    "version": "1.0.6",
+    "version": "1.0.7",
     "scripts": {
         "test": "anchor test --skip-deploy"
     }
