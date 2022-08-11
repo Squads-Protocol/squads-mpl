@@ -8,23 +8,10 @@ declare class Squads {
         multisigProgramId?: PublicKey;
         programManagerProgramId?: PublicKey;
     });
-    static endpoint({ endpoint, multisigProgramId, programManagerProgramId, }: {
-        endpoint: string;
-        multisigProgramId?: PublicKey;
-        programManagerProgramId?: PublicKey;
-    }): Squads;
-    static mainnet({ multisigProgramId, programManagerProgramId, }: {
-        multisigProgramId?: PublicKey;
-        programManagerProgramId?: PublicKey;
-    }): Squads;
-    static devnet({ multisigProgramId, programManagerProgramId, }: {
-        multisigProgramId?: PublicKey;
-        programManagerProgramId?: PublicKey;
-    }): Squads;
-    static localnet({ multisigProgramId, programManagerProgramId, }: {
-        multisigProgramId?: PublicKey;
-        programManagerProgramId?: PublicKey;
-    }): Squads;
+    static endpoint(endpoint: string, multisigProgramId?: PublicKey, programManagerProgramId?: PublicKey): Squads;
+    static mainnet(multisigProgramId?: PublicKey, programManagerProgramId?: PublicKey): Squads;
+    static devnet(multisigProgramId?: PublicKey, programManagerProgramId?: PublicKey): Squads;
+    static localnet(multisigProgramId?: PublicKey, programManagerProgramId?: PublicKey): Squads;
 }
 export default Squads;
 export * from "./constants";

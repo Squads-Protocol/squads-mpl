@@ -23,15 +23,11 @@ class Squads {
       programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID;
   }
 
-  static endpoint({
-    endpoint,
-    multisigProgramId,
-    programManagerProgramId,
-  }: {
-    endpoint: string;
-    multisigProgramId?: PublicKey;
-    programManagerProgramId?: PublicKey;
-  }) {
+  static endpoint(
+    endpoint: string,
+    multisigProgramId?: PublicKey,
+    programManagerProgramId?: PublicKey
+  ) {
     return new Squads({
       connection: new Connection(endpoint),
       multisigProgramId: multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID,
@@ -39,13 +35,10 @@ class Squads {
         programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
     });
   }
-  static mainnet({
-    multisigProgramId,
-    programManagerProgramId,
-  }: {
-    multisigProgramId?: PublicKey;
-    programManagerProgramId?: PublicKey;
-  }) {
+  static mainnet(
+    multisigProgramId?: PublicKey,
+    programManagerProgramId?: PublicKey
+  ) {
     return new Squads({
       connection: new Connection("https://api.mainnet-beta.solana.com"),
       multisigProgramId: multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID,
@@ -53,13 +46,10 @@ class Squads {
         programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
     });
   }
-  static devnet({
-    multisigProgramId,
-    programManagerProgramId,
-  }: {
-    multisigProgramId?: PublicKey;
-    programManagerProgramId?: PublicKey;
-  }) {
+  static devnet(
+    multisigProgramId?: PublicKey,
+    programManagerProgramId?: PublicKey
+  ) {
     return new Squads({
       connection: new Connection("https://api.devnet.solana.com"),
       multisigProgramId: multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID,
@@ -67,13 +57,10 @@ class Squads {
         programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
     });
   }
-  static localnet({
-    multisigProgramId,
-    programManagerProgramId,
-  }: {
-    multisigProgramId?: PublicKey;
-    programManagerProgramId?: PublicKey;
-  }) {
+  static localnet(
+    multisigProgramId?: PublicKey,
+    programManagerProgramId?: PublicKey
+  ) {
     return new Squads({
       connection: new Connection("http://localhost:8899"),
       multisigProgramId: multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID,

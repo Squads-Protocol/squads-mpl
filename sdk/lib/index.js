@@ -23,28 +23,28 @@ class Squads {
         this.programManagerProgramId =
             programManagerProgramId !== null && programManagerProgramId !== void 0 ? programManagerProgramId : constants_1.DEFAULT_PROGRAM_MANAGER_PROGRAM_ID;
     }
-    static endpoint({ endpoint, multisigProgramId, programManagerProgramId, }) {
+    static endpoint(endpoint, multisigProgramId, programManagerProgramId) {
         return new Squads({
             connection: new web3_js_1.Connection(endpoint),
             multisigProgramId: multisigProgramId !== null && multisigProgramId !== void 0 ? multisigProgramId : constants_1.DEFAULT_MULTISIG_PROGRAM_ID,
             programManagerProgramId: programManagerProgramId !== null && programManagerProgramId !== void 0 ? programManagerProgramId : constants_1.DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
         });
     }
-    static mainnet({ multisigProgramId, programManagerProgramId, }) {
+    static mainnet(multisigProgramId, programManagerProgramId) {
         return new Squads({
             connection: new web3_js_1.Connection("https://api.mainnet-beta.solana.com"),
             multisigProgramId: multisigProgramId !== null && multisigProgramId !== void 0 ? multisigProgramId : constants_1.DEFAULT_MULTISIG_PROGRAM_ID,
             programManagerProgramId: programManagerProgramId !== null && programManagerProgramId !== void 0 ? programManagerProgramId : constants_1.DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
         });
     }
-    static devnet({ multisigProgramId, programManagerProgramId, }) {
+    static devnet(multisigProgramId, programManagerProgramId) {
         return new Squads({
             connection: new web3_js_1.Connection("https://api.devnet.solana.com"),
             multisigProgramId: multisigProgramId !== null && multisigProgramId !== void 0 ? multisigProgramId : constants_1.DEFAULT_MULTISIG_PROGRAM_ID,
             programManagerProgramId: programManagerProgramId !== null && programManagerProgramId !== void 0 ? programManagerProgramId : constants_1.DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
         });
     }
-    static localnet({ multisigProgramId, programManagerProgramId, }) {
+    static localnet(multisigProgramId, programManagerProgramId) {
         return new Squads({
             connection: new web3_js_1.Connection("http://localhost:8899"),
             multisigProgramId: multisigProgramId !== null && multisigProgramId !== void 0 ? multisigProgramId : constants_1.DEFAULT_MULTISIG_PROGRAM_ID,
