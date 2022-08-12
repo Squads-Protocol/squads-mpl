@@ -1,0 +1,319 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.IDL = void 0;
+exports.IDL = {
+    "version": "0.1.0",
+    "name": "program_manager",
+    "instructions": [
+        {
+            "name": "createProgramManager",
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "programManager",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "creator",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "createManagedProgram",
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "programManager",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "managedProgram",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "creator",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": [
+                {
+                    "name": "programAddress",
+                    "type": "publicKey"
+                },
+                {
+                    "name": "name",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "createProgramUpgrade",
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "programManager",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "managedProgram",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "programUpgrade",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "creator",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": [
+                {
+                    "name": "buffer",
+                    "type": "publicKey"
+                },
+                {
+                    "name": "spill",
+                    "type": "publicKey"
+                },
+                {
+                    "name": "authority",
+                    "type": "publicKey"
+                },
+                {
+                    "name": "name",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "setAsExecuted",
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "programManager",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "managedProgram",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "programUpgrade",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "transaction",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "instruction",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "authority",
+                    "isMut": false,
+                    "isSigner": true
+                }
+            ],
+            "args": []
+        }
+    ],
+    "accounts": [
+        {
+            "name": "programManager",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "multisig",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "managedProgramIndex",
+                        "type": "u32"
+                    },
+                    {
+                        "name": "bump",
+                        "type": "u8"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "managedProgram",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "managedProgramIndex",
+                        "type": "u32"
+                    },
+                    {
+                        "name": "programAddress",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "multisig",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "upgradeIndex",
+                        "type": "u32"
+                    },
+                    {
+                        "name": "lastUpgrade",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "lastUpgradeIndex",
+                        "type": "u32"
+                    },
+                    {
+                        "name": "bump",
+                        "type": "u8"
+                    },
+                    {
+                        "name": "name",
+                        "type": "string"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "programUpgrade",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "managedProgramAddress",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "upgradeIndex",
+                        "type": "u32"
+                    },
+                    {
+                        "name": "createdOn",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "upgradedOn",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "executed",
+                        "type": "bool"
+                    },
+                    {
+                        "name": "bump",
+                        "type": "u8"
+                    },
+                    {
+                        "name": "upgradeIx",
+                        "type": {
+                            "defined": "UpgradeInstruction"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "type": "string"
+                    }
+                ]
+            }
+        }
+    ],
+    "types": [
+        {
+            "name": "UpgradeInstruction",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "programId",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "accounts",
+                        "type": {
+                            "vec": {
+                                "defined": "UpgradeAccountMeta"
+                            }
+                        }
+                    },
+                    {
+                        "name": "upgradeInstructionData",
+                        "type": "bytes"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "UpgradeAccountMeta",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "pubkey",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "isSigner",
+                        "type": "bool"
+                    },
+                    {
+                        "name": "isWritable",
+                        "type": "bool"
+                    }
+                ]
+            }
+        }
+    ]
+};

@@ -1,6 +1,5 @@
 {
   "private": true,
-  "main": "index.js",
   "dependencies": {
     "@project-serum/anchor": "^0.24.2",
     "bn.js": "^5.2.1",

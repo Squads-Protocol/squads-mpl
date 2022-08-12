@@ -2,13 +2,13 @@
   "name": "@sqds/sdk",
   "version": "1.0.0",
   "description": "An SDK for easily interacting with Squads Multisig Programs",
-  "main": "lib/index.js",
+  "main": "lib/sdk/src/index.js",
   "files": [
     "lib/"
   ],
   "scripts": {
     "test": "ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts",
-    "build": "npx tsc"
+    "build": "./build.sh"
   },
   "dependencies": {
     "@project-serum/anchor": "^0.24.2",

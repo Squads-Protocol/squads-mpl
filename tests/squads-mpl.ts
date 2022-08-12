@@ -21,9 +21,6 @@ import {
 } from "../helpers/transactions";
 import { execSync } from "child_process";
 import { ParsedAccountData } from "@solana/web3.js";
-import Squads from "@sqds/sdk";
-
-console.log(Squads);
 
 const BPF_UPGRADE_ID = new anchor.web3.PublicKey(
   "BPFLoaderUpgradeab1e11111111111111111111111"

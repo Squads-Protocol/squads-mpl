@@ -3,69 +3,106 @@ import {
   DEFAULT_MULTISIG_PROGRAM_ID,
   DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
 } from "./constants";
+import squadsMplJSON from "../../target/idl/squads_mpl.json";
+import { SquadsMpl } from "../../target/types/squads_mpl";
+import programManagerJSON from "../../target/idl/program_manager.json";
+import { ProgramManager } from "../../target/types/program_manager";
+import { AnchorProvider, Program, Wallet } from "@project-serum/anchor";
 
 class Squads {
-  connection: Connection;
-  multisigProgramId: PublicKey;
-  programManagerProgramId: PublicKey;
+  readonly connection: Connection;
+  readonly wallet: Wallet;
+  readonly multisigProgramId: PublicKey;
+  readonly multisig: Program<SquadsMpl>;
+  readonly programManagerProgramId: PublicKey;
+  readonly programManager: Program<ProgramManager>;
   constructor({
     connection,
+    wallet,
     multisigProgramId,
     programManagerProgramId,
   }: {
     connection: Connection;
+    wallet: Wallet;
     multisigProgramId?: PublicKey;
     programManagerProgramId?: PublicKey;
   }) {
     this.connection = connection;
+    this.wallet = wallet;
     this.multisigProgramId = multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID;
+    this.multisig = new Program<SquadsMpl>(
+      squadsMplJSON as SquadsMpl,
+      this.multisigProgramId,
+      new AnchorProvider(
+        this.connection,
+        this.wallet,
+        AnchorProvider.defaultOptions()
+      )
+    );
     this.programManagerProgramId =
       programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID;
+    this.programManager = new Program<ProgramManager>(
+      programManagerJSON as ProgramManager,
+      this.programManagerProgramId,
+      new AnchorProvider(
+        this.connection,
+        this.wallet,
+        AnchorProvider.defaultOptions()
+      )
+    );
   }
 
   static endpoint(
     endpoint: string,
-    multisigProgramId?: PublicKey,
-    programManagerProgramId?: PublicKey
+    wallet: Wallet,
+    options?: {
+      multisigProgramId?: PublicKey;
+      programManagerProgramId?: PublicKey;
+    }
   ) {
     return new Squads({
       connection: new Connection(endpoint),
-      multisigProgramId: multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID,
-      programManagerProgramId:
-        programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
+      wallet,
+      ...options,
     });
   }
   static mainnet(
-    multisigProgramId?: PublicKey,
-    programManagerProgramId?: PublicKey
+    wallet: Wallet,
+    options?: {
+      multisigProgramId?: PublicKey;
+      programManagerProgramId?: PublicKey;
+    }
   ) {
     return new Squads({
       connection: new Connection("https://api.mainnet-beta.solana.com"),
-      multisigProgramId: multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID,
-      programManagerProgramId:
-        programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
+      wallet,
+      ...options,
     });
   }
   static devnet(
-    multisigProgramId?: PublicKey,
-    programManagerProgramId?: PublicKey
+    wallet: Wallet,
+    options?: {
+      multisigProgramId?: PublicKey;
+      programManagerProgramId?: PublicKey;
+    }
   ) {
     return new Squads({
       connection: new Connection("https://api.devnet.solana.com"),
-      multisigProgramId: multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID,
-      programManagerProgramId:
-        programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
+      wallet,
+      ...options,
     });
   }
   static localnet(
-    multisigProgramId?: PublicKey,
-    programManagerProgramId?: PublicKey
+    wallet: Wallet,
+    options?: {
+      multisigProgramId?: PublicKey;
+      programManagerProgramId?: PublicKey;
+    }
   ) {
     return new Squads({
       connection: new Connection("http://localhost:8899"),
-      multisigProgramId: multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID,
-      programManagerProgramId:
-        programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
+      wallet,
+      ...options,
     });
   }
 }
