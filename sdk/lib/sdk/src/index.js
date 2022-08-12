@@ -36,22 +36,23 @@ class Squads {
         this.connection = connection;
         this.wallet = wallet;
         this.multisigProgramId = multisigProgramId !== null && multisigProgramId !== void 0 ? multisigProgramId : constants_1.DEFAULT_MULTISIG_PROGRAM_ID;
-        this.multisig = new anchor_1.Program(squads_mpl_json_1.default, this.multisigProgramId, new anchor_1.AnchorProvider(this.connection, this.wallet, anchor_1.AnchorProvider.defaultOptions()));
+        const provider = new anchor_1.AnchorProvider(this.connection, this.wallet, anchor_1.AnchorProvider.defaultOptions());
+        this.multisig = new anchor_1.Program(squads_mpl_json_1.default, this.multisigProgramId, provider);
         this.programManagerProgramId =
             programManagerProgramId !== null && programManagerProgramId !== void 0 ? programManagerProgramId : constants_1.DEFAULT_PROGRAM_MANAGER_PROGRAM_ID;
-        this.programManager = new anchor_1.Program(program_manager_json_1.default, this.programManagerProgramId, new anchor_1.AnchorProvider(this.connection, this.wallet, anchor_1.AnchorProvider.defaultOptions()));
+        this.programManager = new anchor_1.Program(program_manager_json_1.default, this.programManagerProgramId, provider);
     }
     static endpoint(endpoint, wallet, options) {
-        return new Squads(Object.assign({ connection: new web3_js_1.Connection(endpoint), wallet }, options));
+        return new Squads(Object.assign({ connection: new web3_js_1.Connection(endpoint, options === null || options === void 0 ? void 0 : options.commitmentOrConfig), wallet }, options));
     }
     static mainnet(wallet, options) {
-        return new Squads(Object.assign({ connection: new web3_js_1.Connection("https://api.mainnet-beta.solana.com"), wallet }, options));
+        return new Squads(Object.assign({ connection: new web3_js_1.Connection("https://api.mainnet-beta.solana.com", options === null || options === void 0 ? void 0 : options.commitmentOrConfig), wallet }, options));
     }
     static devnet(wallet, options) {
-        return new Squads(Object.assign({ connection: new web3_js_1.Connection("https://api.devnet.solana.com"), wallet }, options));
+        return new Squads(Object.assign({ connection: new web3_js_1.Connection("https://api.devnet.solana.com", options === null || options === void 0 ? void 0 : options.commitmentOrConfig), wallet }, options));
     }
     static localnet(wallet, options) {
-        return new Squads(Object.assign({ connection: new web3_js_1.Connection("http://localhost:8899"), wallet }, options));
+        return new Squads(Object.assign({ connection: new web3_js_1.Connection("http://localhost:8899", options === null || options === void 0 ? void 0 : options.commitmentOrConfig), wallet }, options));
     }
     getMultisig(address) {
         return __awaiter(this, void 0, void 0, function* () {

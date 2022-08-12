@@ -1,5 +1,5 @@
-import { Connection, PublicKey } from "@solana/web3.js";
-import { Wallet } from "@project-serum/anchor";
+import { Connection, PublicKey, Commitment, ConnectionConfig } from "@solana/web3.js";
+import { Wallet } from "@project-serum/anchor/dist/cjs/provider";
 import { InstructionAccount, ManagedProgramAccount, MultisigAccount, ProgramManagerAccount, ProgramUpgradeAccount, TransactionAccount } from "./types";
 declare class Squads {
     readonly connection: Connection;
@@ -15,18 +15,22 @@ declare class Squads {
         programManagerProgramId?: PublicKey;
     });
     static endpoint(endpoint: string, wallet: Wallet, options?: {
+        commitmentOrConfig?: Commitment | ConnectionConfig;
         multisigProgramId?: PublicKey;
         programManagerProgramId?: PublicKey;
     }): Squads;
     static mainnet(wallet: Wallet, options?: {
+        commitmentOrConfig?: Commitment | ConnectionConfig;
         multisigProgramId?: PublicKey;
         programManagerProgramId?: PublicKey;
     }): Squads;
     static devnet(wallet: Wallet, options?: {
+        commitmentOrConfig?: Commitment | ConnectionConfig;
         multisigProgramId?: PublicKey;
         programManagerProgramId?: PublicKey;
     }): Squads;
     static localnet(wallet: Wallet, options?: {
+        commitmentOrConfig?: Commitment | ConnectionConfig;
         multisigProgramId?: PublicKey;
         programManagerProgramId?: PublicKey;
     }): Squads;

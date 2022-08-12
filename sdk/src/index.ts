@@ -1,4 +1,9 @@
-import { Connection, PublicKey } from "@solana/web3.js";
+import {
+  Connection,
+  PublicKey,
+  Commitment,
+  ConnectionConfig,
+} from "@solana/web3.js";
 import {
   DEFAULT_MULTISIG_PROGRAM_ID,
   DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
@@ -7,7 +12,8 @@ import squadsMplJSON from "../../target/idl/squads_mpl.json";
 import { SquadsMpl } from "../../target/types/squads_mpl";
 import programManagerJSON from "../../target/idl/program_manager.json";
 import { ProgramManager } from "../../target/types/program_manager";
-import { AnchorProvider, Program, Wallet } from "@project-serum/anchor";
+import { Wallet } from "@project-serum/anchor/dist/cjs/provider";
+import { AnchorProvider, Program } from "@project-serum/anchor";
 import {
   InstructionAccount,
   ManagedProgramAccount,
@@ -39,25 +45,22 @@ class Squads {
     this.connection = connection;
     this.wallet = wallet;
     this.multisigProgramId = multisigProgramId ?? DEFAULT_MULTISIG_PROGRAM_ID;
+    const provider = new AnchorProvider(
+      this.connection,
+      this.wallet,
+      AnchorProvider.defaultOptions()
+    );
     this.multisig = new Program<SquadsMpl>(
       squadsMplJSON as SquadsMpl,
       this.multisigProgramId,
-      new AnchorProvider(
-        this.connection,
-        this.wallet,
-        AnchorProvider.defaultOptions()
-      )
+      provider
     );
     this.programManagerProgramId =
       programManagerProgramId ?? DEFAULT_PROGRAM_MANAGER_PROGRAM_ID;
     this.programManager = new Program<ProgramManager>(
       programManagerJSON as ProgramManager,
       this.programManagerProgramId,
-      new AnchorProvider(
-        this.connection,
-        this.wallet,
-        AnchorProvider.defaultOptions()
-      )
+      provider
     );
   }
 
@@ -65,12 +68,13 @@ class Squads {
     endpoint: string,
     wallet: Wallet,
     options?: {
+      commitmentOrConfig?: Commitment | ConnectionConfig;
       multisigProgramId?: PublicKey;
       programManagerProgramId?: PublicKey;
     }
   ) {
     return new Squads({
-      connection: new Connection(endpoint),
+      connection: new Connection(endpoint, options?.commitmentOrConfig),
       wallet,
       ...options,
     });
@@ -78,12 +82,16 @@ class Squads {
   static mainnet(
     wallet: Wallet,
     options?: {
+      commitmentOrConfig?: Commitment | ConnectionConfig;
       multisigProgramId?: PublicKey;
       programManagerProgramId?: PublicKey;
     }
   ) {
     return new Squads({
-      connection: new Connection("https://api.mainnet-beta.solana.com"),
+      connection: new Connection(
+        "https://api.mainnet-beta.solana.com",
+        options?.commitmentOrConfig
+      ),
       wallet,
       ...options,
     });
@@ -91,12 +99,16 @@ class Squads {
   static devnet(
     wallet: Wallet,
     options?: {
+      commitmentOrConfig?: Commitment | ConnectionConfig;
       multisigProgramId?: PublicKey;
       programManagerProgramId?: PublicKey;
     }
   ) {
     return new Squads({
-      connection: new Connection("https://api.devnet.solana.com"),
+      connection: new Connection(
+        "https://api.devnet.solana.com",
+        options?.commitmentOrConfig
+      ),
       wallet,
       ...options,
     });
@@ -104,12 +116,16 @@ class Squads {
   static localnet(
     wallet: Wallet,
     options?: {
+      commitmentOrConfig?: Commitment | ConnectionConfig;
       multisigProgramId?: PublicKey;
       programManagerProgramId?: PublicKey;
     }
   ) {
     return new Squads({
-      connection: new Connection("http://localhost:8899"),
+      connection: new Connection(
+        "http://localhost:8899",
+        options?.commitmentOrConfig
+      ),
       wallet,
       ...options,
     });

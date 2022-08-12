@@ -8,19 +8,21 @@ import {
   createBlankTransaction,
   createExecuteTransactionTx,
   createTestTransferTransaction,
-  getAuthorityPDA,
-  getIxPDA,
-  getManagedProgramPDA,
-  getMsPDA,
   getNextProgramIndex,
   getNextTxIndex,
   getNextUpgradeIndex,
-  getProgramManagerPDA,
-  getProgramUpgradePDA,
-  getTxPDA,
 } from "../helpers/transactions";
 import { execSync } from "child_process";
 import { ParsedAccountData } from "@solana/web3.js";
+import Squads, {
+  getMsPDA,
+  getIxPDA,
+  getManagedProgramPDA,
+  getProgramManagerPDA,
+  getProgramUpgradePDA,
+  getTxPDA,
+  getAuthorityPDA,
+} from "@sqds/sdk";
 
 const BPF_UPGRADE_ID = new anchor.web3.PublicKey(
   "BPFLoaderUpgradeab1e11111111111111111111111"
@@ -74,21 +76,25 @@ describe("Multisig and Programs", () => {
   console.log("Finished deploying programs.");
 
   // Configure the client to use the local cluster.
-  anchor.setProvider(anchor.AnchorProvider.env());
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
 
-  // the squads-mpl program / provider
   const program = anchor.workspace.SquadsMpl as Program<SquadsMpl>;
-  const programProvider = program.provider as anchor.AnchorProvider;
+  const squads = Squads.localnet(provider.wallet, {
+    commitmentOrConfig: provider.connection.commitment,
+    multisigProgramId: anchor.workspace.SquadsMpl.programId,
+    programManagerProgramId: anchor.workspace.ProgramManager.programId,
+  });
 
   // the program-manager program / provider
   const programManagerProgram = anchor.workspace
     .ProgramManager as Program<ProgramManager>;
 
-  const creator = programProvider.wallet;
+  const creator = (program.provider as anchor.AnchorProvider).wallet;
   // the Multisig PDA to use for the test run
   let randomCreateKey = anchor.web3.Keypair.generate().publicKey;
-  const [msPDA] = getMsPDA(randomCreateKey, program.programId);
-  const [pmPDA] = getProgramManagerPDA(msPDA, programManagerProgram.programId);
+  const [msPDA] = getMsPDA(randomCreateKey, squads.multisigProgramId);
+  const [pmPDA] = getProgramManagerPDA(msPDA, squads.programManagerProgramId);
 
   const member2 = anchor.web3.Keypair.generate();
   const numberOfMembersTotal = 10;
@@ -117,7 +123,7 @@ describe("Multisig and Programs", () => {
       const [vaultPDA] = await getAuthorityPDA(
         msPDA,
         vaultIndex,
-        program.programId
+        squads.multisigProgramId
       );
 
       const fundingTx = await createBlankTransaction(
@@ -131,14 +137,14 @@ describe("Multisig and Programs", () => {
       );
 
       fundingTx.add(fundingIx);
-      creator.signTransaction(fundingTx);
+      await creator.signTransaction(fundingTx);
       try {
-        await programProvider.sendAndConfirm(fundingTx);
+        await provider.sendAndConfirm(fundingTx);
       } catch (e) {
         console.log(e);
       }
 
-      let msState = await program.account.ms.fetch(msPDA);
+      let msState = await squads.getMultisig(msPDA);
       expect(msState.threshold).to.equal(1);
       expect(msState.transactionIndex).to.equal(0);
       expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal);
@@ -154,7 +160,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       await program.methods
         .createTransaction(1)
@@ -165,12 +175,12 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
       expect(txState.instructionIndex).to.equal(0);
       expect(txState.creator.toBase58()).to.equal(creator.publicKey.toBase58());
 
       // check the transaction indexes match
-      const msState = await program.account.ms.fetch(msPDA);
+      const msState = await squads.getMultisig(msPDA);
       expect(txState.transactionIndex).to.equal(msState.transactionIndex);
     });
 
@@ -181,7 +191,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       await program.methods
         .createTransaction(1)
@@ -192,9 +206,9 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
       // check the transaction indexes match
-      const msState = await program.account.ms.fetch(msPDA);
+      const msState = await squads.getMultisig(msPDA);
       expect(txState.instructionIndex).to.equal(0);
       expect(txState.status).to.have.property("draft");
 
@@ -210,7 +224,7 @@ describe("Multisig and Programs", () => {
           newIxIndexBN.toBuffer("le", 1), // note instruction index is a u8 (1 byte)
           anchor.utils.bytes.utf8.encode("instruction"),
         ],
-        program.programId
+        squads.multisigProgramId
       );
 
       const testIx = await createTestTransferTransaction(
@@ -228,8 +242,8 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let ixState = await program.account.msInstruction.fetch(ixPDA);
-      txState = await program.account.msTransaction.fetch(txPDA);
+      let ixState = await squads.getInstruction(ixPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(ixState.instructionIndex).to.equal(newIxIndex);
       expect(txState.instructionIndex).to.equal(newIxIndex);
     });
@@ -240,7 +254,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       await program.methods
         .createTransaction(1)
@@ -251,16 +269,20 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
       // check the transaction indexes match
-      const msState = await program.account.ms.fetch(msPDA);
+      const msState = await squads.getMultisig(msPDA);
 
       // increment the instruction index for this transaction (for new PDA)
       const newIxIndex = txState.instructionIndex + 1;
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
 
       // the test transfer instruction
       const testIx = await createTestTransferTransaction(
@@ -279,7 +301,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
 
       await program.methods
         .activateTransaction()
@@ -290,9 +312,9 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("active");
-      let ixState = await program.account.msInstruction.fetch(ixPDA);
+      let ixState = await squads.getInstruction(ixPDA);
       expect(ixState.programId.toBase58()).to.equal(
         testIx.programId.toBase58()
       );
@@ -304,7 +326,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       await program.methods
         .createTransaction(1)
@@ -315,16 +341,20 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
       // check the transaction indexes match
-      const msState = await program.account.ms.fetch(msPDA);
+      const msState = await squads.getMultisig(msPDA);
 
       // increment the instruction index for this transaction (for new PDA)
       const newIxIndex = txState.instructionIndex + 1;
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
 
       // the test transfer instruction
       const testIx = await createTestTransferTransaction(
@@ -343,7 +373,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
 
       await program.methods
         .activateTransaction()
@@ -354,10 +384,10 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("active");
 
-      let ixState = await program.account.msInstruction.fetch(ixPDA);
+      let ixState = await squads.getInstruction(ixPDA);
       expect(ixState.programId.toBase58()).to.equal(
         testIx.programId.toBase58()
       );
@@ -375,7 +405,7 @@ describe("Multisig and Programs", () => {
         console.log(e);
       }
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.approved.length).to.equal(1);
       expect(txState.status).to.have.property("executeReady");
     });
@@ -386,14 +416,18 @@ describe("Multisig and Programs", () => {
       const [authorityPDA] = await getAuthorityPDA(
         msPDA,
         authorityIndexBN,
-        program.programId
+        squads.multisigProgramId
       );
 
       const newTxIndex = await getNextTxIndex(program, msPDA);
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       const createIx = await program.methods
         .createTransaction(1)
@@ -416,7 +450,11 @@ describe("Multisig and Programs", () => {
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
 
       // add the instruction to the transaction
       const addIx = await program.methods
@@ -448,7 +486,7 @@ describe("Multisig and Programs", () => {
       creator.signTransaction(transferTx);
 
       try {
-        await programProvider.sendAndConfirm(transferTx);
+        await provider.sendAndConfirm(transferTx);
       } catch (e) {
         console.log(e);
       }
@@ -462,7 +500,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("executeReady");
       // transfer lamports to the authorityPDA
       let testPayeeAccount =
@@ -485,7 +523,7 @@ describe("Multisig and Programs", () => {
       moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
       try {
         creator.signTransaction(moveFundsToMsPDATx);
-        await programProvider.sendAndConfirm(moveFundsToMsPDATx);
+        await provider.sendAndConfirm(moveFundsToMsPDATx);
         const authorityPDAFunded =
           await program.provider.connection.getAccountInfo(authorityPDA);
         expect(authorityPDAFunded.lamports).to.equal(2000000);
@@ -502,13 +540,13 @@ describe("Multisig and Programs", () => {
 
       creator.signTransaction(executeTx);
       try {
-        const res = await programProvider.sendAndConfirm(executeTx);
+        const res = await provider.sendAndConfirm(executeTx);
       } catch (e) {
         console.log(e);
       }
 
-      let msState = await program.account.ms.fetch(msPDA);
-      txState = await program.account.msTransaction.fetch(txPDA);
+      let msState = await squads.getMultisig(msPDA);
+      txState = await squads.getTransaction(txPDA);
 
       expect(txState.status).to.have.property("executed");
       testPayeeAccount = await program.provider.connection.getParsedAccountInfo(
@@ -523,7 +561,7 @@ describe("Multisig and Programs", () => {
       const [authorityPDA] = await getAuthorityPDA(
         msPDA,
         authorityIndexBN,
-        program.programId
+        squads.multisigProgramId
       );
 
       // get the state of the MS
@@ -531,7 +569,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       await program.methods
         .createTransaction(1)
@@ -542,10 +584,10 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
 
       // check the transaction indexes match
-      let msState = await program.account.ms.fetch(msPDA);
+      let msState = await squads.getMultisig(msPDA);
 
       // person/entity who gets paid
       const testPayee = anchor.web3.Keypair.generate();
@@ -557,7 +599,11 @@ describe("Multisig and Programs", () => {
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
 
       // the test transfer instruction
       const testIx = await createTestTransferTransaction(
@@ -577,7 +623,7 @@ describe("Multisig and Programs", () => {
 
       //////////////////////////////////////////////////////////
       // add the second transfer ix
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       const newIx2xIndex = txState.instructionIndex + 1;
       const newIx2xIndexBN = new anchor.BN(newIx2xIndex, 10);
 
@@ -585,7 +631,7 @@ describe("Multisig and Programs", () => {
       const [ix2xPDA] = await getIxPDA(
         txPDA,
         newIx2xIndexBN,
-        program.programId
+        squads.multisigProgramId
       );
 
       const testIx2x = await createTestTransferTransaction(
@@ -646,7 +692,7 @@ describe("Multisig and Programs", () => {
       moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
       try {
         creator.signTransaction(moveFundsToMsPDATx);
-        await programProvider.sendAndConfirm(moveFundsToMsPDATx);
+        await provider.sendAndConfirm(moveFundsToMsPDATx);
         const msPDAFunded = await program.provider.connection.getAccountInfo(
           authorityPDA
         );
@@ -664,13 +710,13 @@ describe("Multisig and Programs", () => {
 
       creator.signTransaction(executeTx);
       try {
-        const res = await programProvider.sendAndConfirm(executeTx);
+        const res = await provider.sendAndConfirm(executeTx);
       } catch (e) {
         console.log(e);
       }
 
-      msState = await program.account.ms.fetch(msPDA);
-      txState = await program.account.msTransaction.fetch(txPDA);
+      msState = await squads.getMultisig(msPDA);
+      txState = await squads.getTransaction(txPDA);
 
       expect(txState.status).to.have.property("executed");
       testPayeeAccount = await program.provider.connection.getParsedAccountInfo(
@@ -685,7 +731,7 @@ describe("Multisig and Programs", () => {
       const [authorityPDA] = await getAuthorityPDA(
         msPDA,
         authorityIndexBN,
-        program.programId
+        squads.multisigProgramId
       );
 
       // get the state of the MS
@@ -693,7 +739,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       await program.methods
         .createTransaction(1)
@@ -704,7 +754,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
 
       // person/entity who gets paid
       const testPayee = anchor.web3.Keypair.generate();
@@ -716,7 +766,11 @@ describe("Multisig and Programs", () => {
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
 
       // the test transfer instruction
       const testIx = await createTestTransferTransaction(
@@ -736,7 +790,7 @@ describe("Multisig and Programs", () => {
 
       //////////////////////////////////////////////////////////
       // add the second transfer ix
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       const newIx2xIndex = txState.instructionIndex + 1;
       const newIx2xIndexBN = new anchor.BN(newIx2xIndex, 10);
 
@@ -744,7 +798,7 @@ describe("Multisig and Programs", () => {
       const [ix2xPDA] = await getIxPDA(
         txPDA,
         newIx2xIndexBN,
-        program.programId
+        squads.multisigProgramId
       );
 
       const testIx2x = await createTestTransferTransaction(
@@ -805,7 +859,7 @@ describe("Multisig and Programs", () => {
       moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
       try {
         creator.signTransaction(moveFundsToMsPDATx);
-        await programProvider.sendAndConfirm(moveFundsToMsPDATx);
+        await provider.sendAndConfirm(moveFundsToMsPDATx);
       } catch (e) {
         console.log(e);
       }
@@ -833,8 +887,8 @@ describe("Multisig and Programs", () => {
         })
         .remainingAccounts(testIx1Keys)
         .rpc();
-      const ixUpdatedState = await program.account.msInstruction.fetch(ixPDA);
-      let txUpdatedState = await program.account.msTransaction.fetch(txPDA);
+      const ixUpdatedState = await squads.getInstruction(ixPDA);
+      let txUpdatedState = await squads.getTransaction(txPDA);
 
       expect(ixUpdatedState.executed).to.be.true;
       expect(txUpdatedState.executedIndex).to.equal(1);
@@ -858,8 +912,8 @@ describe("Multisig and Programs", () => {
         .remainingAccounts(testIx2Keys)
         .rpc();
 
-      const ix2UpdatedState = await program.account.msInstruction.fetch(ixPDA);
-      txUpdatedState = await program.account.msTransaction.fetch(txPDA);
+      const ix2UpdatedState = await squads.getInstruction(ixPDA);
+      txUpdatedState = await squads.getTransaction(txPDA);
 
       expect(ix2UpdatedState.executed).to.be.true;
       expect(txUpdatedState.executedIndex).to.equal(2);
@@ -876,7 +930,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       // 1 get the instruction to create a transction
       // 2 get the instruction to add a member
@@ -905,7 +963,11 @@ describe("Multisig and Programs", () => {
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
       let attachIx = await program.methods
         .addInstruction(addMemberIx)
         .accounts({
@@ -935,7 +997,7 @@ describe("Multisig and Programs", () => {
 
       creator.signTransaction(addMemberTx);
       try {
-        const res = await programProvider.sendAndConfirm(addMemberTx);
+        const res = await provider.sendAndConfirm(addMemberTx);
       } catch (e) {
         console.log(e);
       }
@@ -949,7 +1011,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
       expect(txState.status).has.property("executeReady");
 
       const executeTx = await createExecuteTransactionTx(
@@ -961,13 +1023,13 @@ describe("Multisig and Programs", () => {
 
       creator.signTransaction(executeTx);
       try {
-        const res = await programProvider.sendAndConfirm(executeTx);
+        const res = await provider.sendAndConfirm(executeTx);
       } catch (e) {
         console.log(e);
         expect(e.message).contains("Transaction simulation failed");
       }
 
-      const msState = await program.account.ms.fetch(msPDA);
+      const msState = await squads.getMultisig(msPDA);
       msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
       const endRentLamports = msAccount.value.lamports;
       expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 1);
@@ -984,7 +1046,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       // 1 get the instruction to create a transction
       // 2 get the instruction to add a member
@@ -1015,7 +1081,11 @@ describe("Multisig and Programs", () => {
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
       let attachIx = await program.methods
         .addInstruction(addMemberIx)
         .accounts({
@@ -1045,7 +1115,7 @@ describe("Multisig and Programs", () => {
 
       creator.signTransaction(addMemberTx);
       try {
-        const res = await programProvider.sendAndConfirm(addMemberTx);
+        const res = await provider.sendAndConfirm(addMemberTx);
       } catch (e) {
         console.log(e);
       }
@@ -1059,7 +1129,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
       expect(txState.status).has.property("executeReady");
 
       const executeTx = await createExecuteTransactionTx(
@@ -1070,12 +1140,12 @@ describe("Multisig and Programs", () => {
       );
 
       try {
-        const res = await programProvider.sendAndConfirm(executeTx, [member2]);
+        const res = await provider.sendAndConfirm(executeTx, [member2]);
       } catch (e) {
         console.log(e);
       }
 
-      const msState = await program.account.ms.fetch(msPDA);
+      const msState = await squads.getMultisig(msPDA);
       expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 2);
     });
 
@@ -1085,14 +1155,18 @@ describe("Multisig and Programs", () => {
       const [authorityPDA] = await getAuthorityPDA(
         msPDA,
         authorityIndexBN,
-        program.programId
+        squads.multisigProgramId
       );
 
       const newTxIndex = await getNextTxIndex(program, msPDA);
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       await program.methods
         .createTransaction(1)
@@ -1103,17 +1177,21 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
 
       // check the transaction indexes match
-      let msState = await program.account.ms.fetch(msPDA);
+      let msState = await squads.getMultisig(msPDA);
 
       // increment the instruction index for this transaction (for new PDA)
       const newIxIndex = txState.instructionIndex + 1;
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
 
       // the test transfer instruction
       const testPayee = anchor.web3.Keypair.generate();
@@ -1165,14 +1243,14 @@ describe("Multisig and Programs", () => {
 
       creator.signTransaction(executeTx);
       try {
-        const res = await programProvider.sendAndConfirm(executeTx);
+        const res = await provider.sendAndConfirm(executeTx);
       } catch (e) {
         // :(
         expect(e.message).to.include("failed");
       }
 
-      msState = await program.account.ms.fetch(msPDA);
-      txState = await program.account.msTransaction.fetch(txPDA);
+      msState = await squads.getMultisig(msPDA);
+      txState = await squads.getTransaction(txPDA);
 
       expect(txState.status).to.have.property("executeReady");
     });
@@ -1182,7 +1260,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       // use 0 as authority index
       await program.methods
@@ -1195,13 +1277,17 @@ describe("Multisig and Programs", () => {
         .rpc();
 
       // get the current tx state
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
 
       const newIxIndex = txState.instructionIndex + 1;
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
 
       // the test transfer instruction
       const testChangeThresholdIx = await program.methods
@@ -1225,7 +1311,7 @@ describe("Multisig and Programs", () => {
         .rpc();
 
       // get the ix
-      let ixState = await program.account.msInstruction.fetch(ixPDA);
+      let ixState = await squads.getInstruction(ixPDA);
       expect(ixState.instructionIndex).to.equal(1);
 
       // acitveate the tx
@@ -1238,7 +1324,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("active");
 
       // approve the tx
@@ -1254,7 +1340,7 @@ describe("Multisig and Programs", () => {
       // execute the tx
 
       // get the TX
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("executeReady");
 
       const executeTx = await createExecuteTransactionTx(
@@ -1266,13 +1352,13 @@ describe("Multisig and Programs", () => {
 
       creator.signTransaction(executeTx);
       try {
-        const res = await programProvider.sendAndConfirm(executeTx);
+        const res = await provider.sendAndConfirm(executeTx);
       } catch (e) {
         console.log(e);
       }
 
-      const msState = await program.account.ms.fetch(msPDA);
-      txState = await program.account.msTransaction.fetch(txPDA);
+      const msState = await squads.getMultisig(msPDA);
+      txState = await squads.getTransaction(txPDA);
 
       expect(msState.threshold).to.equal(2);
       expect(txState.status).to.have.property("executed");
@@ -1284,7 +1370,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       // use 0 as authority index
       await program.methods
@@ -1297,13 +1387,17 @@ describe("Multisig and Programs", () => {
         .rpc();
 
       // get the current tx state
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
 
       const newIxIndex = txState.instructionIndex + 1;
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
 
       // the test transfer instruction
       const testChangeThresholdIx = await program.methods
@@ -1326,7 +1420,7 @@ describe("Multisig and Programs", () => {
         .rpc();
 
       // get the ix
-      let ixState = await program.account.msInstruction.fetch(ixPDA);
+      let ixState = await squads.getInstruction(ixPDA);
       expect(ixState.instructionIndex).to.equal(1);
 
       // acitveate the tx
@@ -1339,7 +1433,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("active");
 
       // approve the tx
@@ -1363,7 +1457,7 @@ describe("Multisig and Programs", () => {
 
       creator.signTransaction(executeTx);
       try {
-        const res = await programProvider.sendAndConfirm(executeTx);
+        const res = await provider.sendAndConfirm(executeTx);
       } catch (e) {
         expect(e.message).to.contain("Error processing Instruction");
       }
@@ -1374,7 +1468,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       // use 0 as authority index
       await program.methods
@@ -1387,13 +1485,17 @@ describe("Multisig and Programs", () => {
         .rpc();
 
       // get the current tx state
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
 
       const newIxIndex = txState.instructionIndex + 1;
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
 
       // the test transfer instruction
       const testChangeThresholdIx = await program.methods
@@ -1416,7 +1518,7 @@ describe("Multisig and Programs", () => {
         .rpc();
 
       // get the ix
-      let ixState = await program.account.msInstruction.fetch(ixPDA);
+      let ixState = await squads.getInstruction(ixPDA);
       expect(ixState.instructionIndex).to.equal(1);
 
       // acitveate the tx
@@ -1429,7 +1531,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("active");
 
       // approve the tx
@@ -1443,7 +1545,7 @@ describe("Multisig and Programs", () => {
         .rpc();
 
       // check that state is "approved"
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("active");
       expect(
         txState.approved
@@ -1461,7 +1563,7 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("active");
       expect(
         txState.rejected
@@ -1489,8 +1591,7 @@ describe("Multisig and Programs", () => {
       } catch (e) {
         console.log("eror creating program manager", e);
       }
-      const newProgramManager =
-        await programManagerProgram.account.programManager.fetch(pmPDA);
+      const newProgramManager = await squads.getProgramManager(pmPDA);
       expect(newProgramManager.multisig.toBase58()).to.equal(msPDA.toBase58());
     });
 
@@ -1518,8 +1619,7 @@ describe("Multisig and Programs", () => {
       } catch (e) {
         console.log("error creating managed program", e);
       }
-      const newManagedProgramState =
-        await programManagerProgram.account.managedProgram.fetch(mpPDA);
+      const newManagedProgramState = await squads.getManagedProgram(mpPDA);
       expect(newManagedProgramState.name).to.equal(nameString);
       expect(newManagedProgramState.managedProgramIndex).to.equal(
         nextProgramIndex
@@ -1551,8 +1651,7 @@ describe("Multisig and Programs", () => {
       } catch (e) {
         console.log("error creating managed program", e);
       }
-      const newManagedProgramState =
-        await programManagerProgram.account.managedProgram.fetch(mpPDA);
+      const newManagedProgramState = await squads.getManagedProgram(mpPDA);
       expect(newManagedProgramState.name).to.equal(nameString);
       expect(newManagedProgramState.managedProgramIndex).to.equal(
         nextProgramIndex
@@ -1591,10 +1690,8 @@ describe("Multisig and Programs", () => {
         console.log("Error creating program upgrade", e);
       }
 
-      const addedUpgrade =
-        await programManagerProgram.account.programUpgrade.fetch(upgradePDA);
-      const managedProgramState =
-        await programManagerProgram.account.managedProgram.fetch(mpPDA);
+      const addedUpgrade = await squads.getProgramUpgrade(upgradePDA);
+      const managedProgramState = await squads.getManagedProgram(mpPDA);
       expect(addedUpgrade.upgradeIndex).to.equal(
         managedProgramState.upgradeIndex
       );
@@ -1618,7 +1715,7 @@ describe("Multisig and Programs", () => {
       const [vaultPDA] = await getAuthorityPDA(
         msPDA,
         new anchor.BN(1, 10),
-        program.programId
+        squads.multisigProgramId
       );
 
       // create a temp keypair to use
@@ -1637,9 +1734,7 @@ describe("Multisig and Programs", () => {
 
       // check that the buffer has proper authority
       const parsedBufferAccount =
-        await programProvider.connection.getParsedAccountInfo(
-          bufferKeypair.publicKey
-        );
+        await provider.connection.getParsedAccountInfo(bufferKeypair.publicKey);
       const parsedBufferData = (
         parsedBufferAccount.value.data as ParsedAccountData
       ).parsed;
@@ -1663,8 +1758,7 @@ describe("Multisig and Programs", () => {
       } catch (e) {
         console.log("error creating managed program", e);
       }
-      const newManagedProgramState =
-        await programManagerProgram.account.managedProgram.fetch(mpPDA);
+      const newManagedProgramState = await squads.getManagedProgram(mpPDA);
       expect(newManagedProgramState.name).to.equal(nameString);
       expect(newManagedProgramState.managedProgramIndex).to.equal(
         nextProgramIndex
@@ -1686,7 +1780,7 @@ describe("Multisig and Programs", () => {
         await programManagerProgram.methods
           .createProgramUpgrade(
             bufferKeypair.publicKey,
-            programProvider.wallet.publicKey,
+            provider.wallet.publicKey,
             vaultPDA,
             testUpgradeName
           )
@@ -1702,10 +1796,8 @@ describe("Multisig and Programs", () => {
       }
 
       // verify the upgrade account was created, and that the buffers match as well in the ix
-      const addedUpgrade =
-        await programManagerProgram.account.programUpgrade.fetch(upgradePDA);
-      const managedProgramState =
-        await programManagerProgram.account.managedProgram.fetch(mpPDA);
+      const addedUpgrade = await squads.getProgramUpgrade(upgradePDA);
+      const managedProgramState = await squads.getManagedProgram(mpPDA);
       expect(addedUpgrade.upgradeIndex).to.equal(
         managedProgramState.upgradeIndex
       );
@@ -1721,7 +1813,7 @@ describe("Multisig and Programs", () => {
         bufferKeypair.publicKey.toBase58()
       );
       expect(addedUpgrade.upgradeIx.accounts[3].pubkey.toBase58()).to.equal(
-        programProvider.wallet.publicKey.toBase58()
+        provider.wallet.publicKey.toBase58()
       );
       expect(addedUpgrade.upgradeIx.accounts[6].pubkey.toBase58()).to.equal(
         vaultPDA.toBase58()
@@ -1732,7 +1824,11 @@ describe("Multisig and Programs", () => {
       const newTxIndexBN = new anchor.BN(newTxIndex, 10);
 
       // generate the tx pda
-      const [txPDA] = await getTxPDA(msPDA, newTxIndexBN, program.programId);
+      const [txPDA] = await getTxPDA(
+        msPDA,
+        newTxIndexBN,
+        squads.multisigProgramId
+      );
 
       // use 1/vault as authority index
       await program.methods
@@ -1745,16 +1841,24 @@ describe("Multisig and Programs", () => {
         .rpc();
 
       // get the current tx state
-      let txState = await program.account.msTransaction.fetch(txPDA);
+      let txState = await squads.getTransaction(txPDA);
 
       const newIxIndex = txState.instructionIndex + 1;
       const newIxIndexBN = new anchor.BN(newIxIndex, 10);
       const newIx2IndexBN = new anchor.BN(newIxIndex + 1, 10);
 
       // create the instruction pda
-      const [ixPDA] = await getIxPDA(txPDA, newIxIndexBN, program.programId);
+      const [ixPDA] = await getIxPDA(
+        txPDA,
+        newIxIndexBN,
+        squads.multisigProgramId
+      );
       // create the instruction pda
-      const [ix2PDA] = await getIxPDA(txPDA, newIx2IndexBN, program.programId);
+      const [ix2PDA] = await getIxPDA(
+        txPDA,
+        newIx2IndexBN,
+        squads.multisigProgramId
+      );
 
       // the upgrade instruction
       const upgradeIx = {
@@ -1777,7 +1881,7 @@ describe("Multisig and Programs", () => {
       const [authorityPDA] = await getAuthorityPDA(
         msPDA,
         new anchor.BN(1, 10),
-        program.programId
+        squads.multisigProgramId
       );
 
       // get the upgrade update instruciton to run after the upgrade
@@ -1807,20 +1911,20 @@ describe("Multisig and Programs", () => {
       addUpgradeTx.add(addUpgradeFollowupIx);
 
       try {
-        await programProvider.sendAndConfirm(addUpgradeTx);
+        await provider.sendAndConfirm(addUpgradeTx);
       } catch (e) {
         console.log(e);
       }
 
       // get the ix
-      let ixState = await program.account.msInstruction.fetch(ixPDA);
+      let ixState = await squads.getInstruction(ixPDA);
       expect(ixState.instructionIndex).to.equal(1);
 
       // get the ix 2
-      let ix2State = await program.account.msInstruction.fetch(ix2PDA);
+      let ix2State = await squads.getInstruction(ix2PDA);
       expect(ix2State.instructionIndex).to.equal(2);
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.instructionIndex).to.equal(2);
 
       // acitveate the tx
@@ -1833,14 +1937,14 @@ describe("Multisig and Programs", () => {
         })
         .rpc();
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("active");
 
-      const msState = await program.account.ms.fetch(msPDA);
+      const msState = await squads.getMultisig(msPDA);
       // if the threshold has changed, use the other members to approve as well
       for (let i = 0; i < memberList.length; i++) {
         // check to see if we need more signers
-        const approvalState = await program.account.msTransaction.fetch(txPDA);
+        const approvalState = await squads.getTransaction(txPDA);
         if (Object.keys(approvalState.status).indexOf("active") < 0) {
           return false;
         }
@@ -1854,7 +1958,7 @@ describe("Multisig and Programs", () => {
           return false;
         }
         try {
-          await programProvider.connection.requestAirdrop(
+          await provider.connection.requestAirdrop(
             memberList[i].publicKey,
             anchor.web3.LAMPORTS_PER_SOL
           );
@@ -1868,7 +1972,7 @@ describe("Multisig and Programs", () => {
             .signers([memberList[i]])
             .transaction();
           try {
-            await programProvider.sendAndConfirm(approveTx, [memberList[i]]);
+            await provider.sendAndConfirm(approveTx, [memberList[i]]);
             return true;
           } catch (e) {
             console.log(memberList[i].publicKey.toBase58(), " signing error");
@@ -1880,7 +1984,7 @@ describe("Multisig and Programs", () => {
         }
       }
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       console.log("txState", txState);
       expect(txState.status).to.have.property("executeReady");
 
@@ -1891,16 +1995,14 @@ describe("Multisig and Programs", () => {
         creator.publicKey
       );
       try {
-        const res = await programProvider.sendAndConfirm(executeTx);
+        const res = await provider.sendAndConfirm(executeTx);
       } catch (e) {
         console.log(e);
       }
 
-      txState = await program.account.msTransaction.fetch(txPDA);
+      txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("executed");
-      const puState = await programManagerProgram.account.programUpgrade.fetch(
-        upgradePDA
-      );
+      const puState = await squads.getProgramUpgrade(upgradePDA);
       expect(puState.executed).to.be.true;
       expect(puState.upgradedOn.toNumber()).to.be.greaterThan(0);
     });
