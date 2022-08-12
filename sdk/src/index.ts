@@ -13,9 +13,10 @@ class Squads {
   readonly connection: Connection;
   readonly wallet: Wallet;
   readonly multisigProgramId: PublicKey;
-  readonly multisig: Program<SquadsMpl>;
+  private readonly multisig: Program<SquadsMpl>;
   readonly programManagerProgramId: PublicKey;
-  readonly programManager: Program<ProgramManager>;
+  private readonly programManager: Program<ProgramManager>;
+
   constructor({
     connection,
     wallet,
@@ -105,8 +106,38 @@ class Squads {
       ...options,
     });
   }
+
+  async getMultisig() {}
+  async getMultisigs() {}
+  async getTransaction() {}
+  async getTransactions() {}
+  async getInstruction() {}
+  async getInstructions() {}
+
+  async getProgramManager() {}
+  async getProgramManagers() {}
+  async getManagedProgram() {}
+  async getManagedPrograms() {}
+  async getProgramUpgrade() {}
+  async getProgramUpgrades() {}
+
+  async createMultisig() {}
+  async createTransaction() {}
+  async addInstruction() {}
+  async activateTransaction() {}
+  async approveTransaction() {}
+  async rejectTransaction() {}
+  async cancelTransaction() {}
+  async executeTransaction() {}
+  async executeInstruction() {}
+
+  async createProgramManager() {}
+  async createManagedProgram() {}
+  async createProgramUpgrade() {}
+  async markUpgradeCompleted() {}
 }
 
 export default Squads;
 
 export * from "./constants";
+export * from "./address";
