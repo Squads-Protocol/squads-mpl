@@ -8,6 +8,14 @@ import { SquadsMpl } from "../../target/types/squads_mpl";
 import programManagerJSON from "../../target/idl/program_manager.json";
 import { ProgramManager } from "../../target/types/program_manager";
 import { AnchorProvider, Program, Wallet } from "@project-serum/anchor";
+import {
+  InstructionAccount,
+  ManagedProgramAccount,
+  MultisigAccount,
+  ProgramManagerAccount,
+  ProgramUpgradeAccount,
+  TransactionAccount,
+} from "./types";
 
 class Squads {
   readonly connection: Connection;
@@ -107,19 +115,65 @@ class Squads {
     });
   }
 
-  async getMultisig() {}
-  async getMultisigs() {}
-  async getTransaction() {}
-  async getTransactions() {}
-  async getInstruction() {}
-  async getInstructions() {}
+  async getMultisig(address: PublicKey): Promise<MultisigAccount> {
+    return (await this.multisig.account.ms.fetch(address)) as MultisigAccount;
+  }
+  async getMultisigs(addresses: PublicKey[]): Promise<MultisigAccount[]> {
+    return (await this.multisig.account.ms.fetchMultiple(
+      addresses
+    )) as MultisigAccount[];
+  }
+  async getTransaction(address: PublicKey): Promise<TransactionAccount> {
+    return await this.multisig.account.msTransaction.fetch(address);
+  }
+  async getTransactions(
+    addresses: PublicKey[]
+  ): Promise<(TransactionAccount | null)[]> {
+    return (await this.multisig.account.msTransaction.fetchMultiple(
+      addresses
+    )) as (TransactionAccount | null)[];
+  }
+  async getInstruction(address: PublicKey): Promise<InstructionAccount> {
+    return await this.multisig.account.msInstruction.fetch(address);
+  }
+  async getInstructions(
+    addresses: PublicKey[]
+  ): Promise<(InstructionAccount | null)[]> {
+    return (await this.multisig.account.msInstruction.fetchMultiple(
+      addresses
+    )) as (InstructionAccount | null)[];
+  }
 
-  async getProgramManager() {}
-  async getProgramManagers() {}
-  async getManagedProgram() {}
-  async getManagedPrograms() {}
-  async getProgramUpgrade() {}
-  async getProgramUpgrades() {}
+  async getProgramManager(address: PublicKey): Promise<ProgramManagerAccount> {
+    return await this.programManager.account.programManager.fetch(address);
+  }
+  async getProgramManagers(
+    addresses: PublicKey[]
+  ): Promise<(ProgramManagerAccount | null)[]> {
+    return (await this.programManager.account.programManager.fetchMultiple(
+      addresses
+    )) as (ProgramManagerAccount | null)[];
+  }
+  async getManagedProgram(address: PublicKey): Promise<ManagedProgramAccount> {
+    return await this.programManager.account.managedProgram.fetch(address);
+  }
+  async getManagedPrograms(
+    addresses: PublicKey[]
+  ): Promise<(ManagedProgramAccount | null)[]> {
+    return (await this.programManager.account.managedProgram.fetchMultiple(
+      addresses
+    )) as (ManagedProgramAccount | null)[];
+  }
+  async getProgramUpgrade(address: PublicKey): Promise<ProgramUpgradeAccount> {
+    return await this.programManager.account.programUpgrade.fetch(address);
+  }
+  async getProgramUpgrades(
+    addresses: PublicKey[]
+  ): Promise<(ProgramUpgradeAccount | null)[]> {
+    return (await this.programManager.account.programUpgrade.fetchMultiple(
+      addresses
+    )) as (ProgramUpgradeAccount | null)[];
+  }
 
   async createMultisig() {}
   async createTransaction() {}

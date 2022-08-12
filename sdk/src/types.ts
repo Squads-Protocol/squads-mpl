@@ -1,14 +1,28 @@
 import { SquadsMpl } from "../../target/types/squads_mpl";
 import { ProgramManager } from "../../target/types/program_manager";
-import { AccountNamespace } from "@project-serum/anchor";
+import { Idl, IdlTypes } from "@project-serum/anchor";
+import { IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl";
+import { TypeDef } from "@project-serum/anchor/dist/cjs/program/namespace/types";
 
-export type MultisigAccount = AccountNamespace<SquadsMpl>["ms"];
-export type TransactionAccount = AccountNamespace<SquadsMpl>["msTransaction"];
-export type InstructionAccount = AccountNamespace<SquadsMpl>["msInstruction"];
+// Copied from @project-serum/anchor/src/program/namespace/types (not exported)
+type TypeDefDictionary<T extends IdlTypeDef[], Defined> = {
+  [K in T[number]["name"]]: TypeDef<T[number] & { name: K }, Defined>;
+};
+
+type AccountDefDictionary<T extends Idl> = TypeDefDictionary<
+  NonNullable<T["accounts"]>,
+  IdlTypes<T>
+>;
+
+export type MultisigAccount = AccountDefDictionary<SquadsMpl>["ms"];
+export type TransactionAccount =
+  AccountDefDictionary<SquadsMpl>["msTransaction"];
+export type InstructionAccount =
+  AccountDefDictionary<SquadsMpl>["msInstruction"];
 
 export type ProgramManagerAccount =
-  AccountNamespace<ProgramManager>["programManager"];
+  AccountDefDictionary<ProgramManager>["programManager"];
 export type ManagedProgramAccount =
-  AccountNamespace<ProgramManager>["managedProgram"];
+  AccountDefDictionary<ProgramManager>["managedProgram"];
 export type ProgramUpgradeAccount =
-  AccountNamespace<ProgramManager>["programUpgrade"];
+  AccountDefDictionary<ProgramManager>["programUpgrade"];
