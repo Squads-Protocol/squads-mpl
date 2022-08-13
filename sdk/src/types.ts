@@ -42,3 +42,8 @@ export type SquadsMethodsNamespace = MethodsNamespace<
   SquadsMpl,
   AllInstructions<SquadsMpl>
 >;
+
+export type ProgramManagerMethodsNamespace = MethodsNamespace<
+  ProgramManager,
+  AllInstructions<ProgramManager>
+>;

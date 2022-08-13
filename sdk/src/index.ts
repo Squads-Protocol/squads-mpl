@@ -24,7 +24,15 @@ import {
   SquadsMethods,
   TransactionAccount,
 } from "./types";
-import { getAuthorityPDA, getIxPDA, getMsPDA, getTxPDA } from "./address";
+import {
+  getAuthorityPDA,
+  getIxPDA,
+  getManagedProgramPDA,
+  getMsPDA,
+  getProgramManagerPDA,
+  getProgramUpgradePDA,
+  getTxPDA,
+} from "./address";
 import BN from "bn.js";
 import * as anchor from "@project-serum/anchor";
 import { TransactionBuilder } from "./tx_builder";
@@ -151,6 +159,7 @@ class Squads {
     const multisig = await this.getMultisig(multisigPDA);
     return new TransactionBuilder(
       this.multisig.methods,
+      this.programManager.methods,
       this.provider,
       multisig,
       authorityIndex,
@@ -696,10 +705,76 @@ class Squads {
     return await methods.instruction();
   }
 
-  async createProgramManager() {}
-  async createManagedProgram() {}
-  async createProgramUpgrade() {}
-  async markUpgradeCompleted() {}
+  async createProgramManager(
+    multisigPDA: PublicKey
+  ): Promise<ProgramManagerAccount> {
+    const [programManagerPDA] = getProgramManagerPDA(
+      multisigPDA,
+      this.programManagerProgramId
+    );
+    await this.programManager.methods
+      .createProgramManager()
+      .accounts({ multisig: multisigPDA, programManager: programManagerPDA })
+      .rpc();
+    return await this.getProgramManager(programManagerPDA);
+  }
+  async createManagedProgram(
+    multisigPDA: PublicKey,
+    programAddress: PublicKey,
+    name: string
+  ): Promise<ManagedProgramAccount> {
+    const [programManagerPDA] = getProgramManagerPDA(
+      multisigPDA,
+      this.programManagerProgramId
+    );
+    const [managedProgramPDA] = getManagedProgramPDA(
+      programManagerPDA,
+      new BN(await this.getNextProgramIndex(programManagerPDA), 10),
+      this.programManagerProgramId
+    );
+    await this.programManager.methods
+      .createManagedProgram(programAddress, name)
+      .accounts({
+        multisig: multisigPDA,
+        programManager: programManagerPDA,
+        managedProgram: managedProgramPDA,
+      })
+      .rpc();
+    return await this.getManagedProgram(managedProgramPDA);
+  }
+  async createProgramUpgrade(
+    multisigPDA: PublicKey,
+    managedProgramPDA: PublicKey,
+    bufferAddress: PublicKey,
+    spillAddress: PublicKey,
+    authorityAddress: PublicKey,
+    upgradeName: string
+  ): Promise<ProgramUpgradeAccount> {
+    const [programManagerPDA] = getProgramManagerPDA(
+      multisigPDA,
+      this.programManagerProgramId
+    );
+    const [programUpgradePDA] = getProgramUpgradePDA(
+      managedProgramPDA,
+      new BN(await this.getNextUpgradeIndex(managedProgramPDA), 10),
+      this.programManagerProgramId
+    );
+    await this.programManager.methods
+      .createProgramUpgrade(
+        bufferAddress,
+        spillAddress,
+        authorityAddress,
+        upgradeName
+      )
+      .accounts({
+        multisig: multisigPDA,
+        programManager: programManagerPDA,
+        managedProgram: managedProgramPDA,
+        programUpgrade: programUpgradePDA,
+      })
+      .rpc();
+    return await this.getProgramUpgrade(programUpgradePDA);
+  }
 }
 
 export default Squads;

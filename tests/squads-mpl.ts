@@ -13,10 +13,7 @@ import { ParsedAccountData } from "@solana/web3.js";
 import Squads, {
   getMsPDA,
   getIxPDA,
-  getManagedProgramPDA,
   getProgramManagerPDA,
-  getProgramUpgradePDA,
-  getTxPDA,
   getAuthorityPDA,
 } from "@sqds/sdk";
 import BN from "bn.js";
@@ -496,13 +493,7 @@ describe("Multisig and Programs", () => {
       const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
       const [txInstructions, txPDA] = await (
         await txBuilder.withChangeThreshold(2)
-      ).getInstructions();
-      const emptyTx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      emptyTx.add(...txInstructions);
-      await provider.sendAndConfirm(emptyTx);
+      ).executeInstructions();
 
       // get the ix
       let ixState = await squads.getInstruction(
@@ -529,13 +520,7 @@ describe("Multisig and Programs", () => {
       const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
       const [txInstructions, txPDA] = await (
         await txBuilder.withChangeThreshold(2)
-      ).getInstructions();
-      const emptyTx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      emptyTx.add(...txInstructions);
-      await provider.sendAndConfirm(emptyTx);
+      ).executeInstructions();
 
       // get the ix
       let ixState = await squads.getInstruction(
@@ -574,114 +559,49 @@ describe("Multisig and Programs", () => {
     });
   });
 
-  describe.skip("Program upgrades", () => {
+  describe("Program upgrades", () => {
     it(`Create a program manager - MS: ${msPDA.toBase58()}`, async () => {
-      try {
-        await programManagerProgram.methods
-          .createProgramManager()
-          .accounts({
-            multisig: msPDA,
-            programManager: pmPDA,
-          })
-          .rpc();
-      } catch (e) {
-        console.log("eror creating program manager", e);
-      }
-      const newProgramManager = await squads.getProgramManager(pmPDA);
+      const newProgramManager = await squads.createProgramManager(msPDA);
       expect(newProgramManager.multisig.toBase58()).to.equal(msPDA.toBase58());
     });
 
     it(`Create a program to manage - MS ${msPDA.toBase58()}`, async () => {
-      const nextProgramIndex = await squads.getNextProgramIndex(pmPDA);
       const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
-      const [mpPDA] = await getManagedProgramPDA(
-        pmPDA,
-        new anchor.BN(nextProgramIndex),
-        programManagerProgram.programId
-      );
       const nameString = "This is my test Program";
-      try {
-        await programManagerProgram.methods
-          .createManagedProgram(testProgramAddress, nameString)
-          .accounts({
-            multisig: msPDA,
-            programManager: pmPDA,
-            managedProgram: mpPDA,
-          })
-          .rpc();
-      } catch (e) {
-        console.log("error creating managed program", e);
-      }
-      const newManagedProgramState = await squads.getManagedProgram(mpPDA);
-      expect(newManagedProgramState.name).to.equal(nameString);
-      expect(newManagedProgramState.managedProgramIndex).to.equal(
-        nextProgramIndex
+      const mpState = await squads.createManagedProgram(
+        msPDA,
+        testProgramAddress,
+        nameString
       );
+      expect(mpState.name).to.equal(nameString);
+      expect(mpState.managedProgramIndex).to.equal(1);
     });
-
     it(`Create a program to manage and create upgrade - MS ${msPDA.toBase58()}`, async () => {
-      const nextProgramIndex = await squads.getNextProgramIndex(pmPDA);
       const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
-      const [mpPDA] = await getManagedProgramPDA(
-        pmPDA,
-        new anchor.BN(nextProgramIndex),
-        programManagerProgram.programId
-      );
-
       const nameString = "This is my test Program 2";
-      try {
-        await programManagerProgram.methods
-          .createManagedProgram(testProgramAddress, nameString)
-          .accounts({
-            multisig: msPDA,
-            programManager: pmPDA,
-            managedProgram: mpPDA,
-          })
-          .rpc();
-      } catch (e) {
-        console.log("error creating managed program", e);
-      }
-      const newManagedProgramState = await squads.getManagedProgram(mpPDA);
-      expect(newManagedProgramState.name).to.equal(nameString);
-      expect(newManagedProgramState.managedProgramIndex).to.equal(
-        nextProgramIndex
+      let mpState = await squads.createManagedProgram(
+        msPDA,
+        testProgramAddress,
+        nameString
       );
-
-      const nextUpgradeIndex = await squads.getNextUpgradeIndex(mpPDA);
-      const [upgradePDA] = await getProgramUpgradePDA(
-        mpPDA,
-        new anchor.BN(nextUpgradeIndex, 10),
-        programManagerProgram.programId
-      );
+      expect(mpState.name).to.equal(nameString);
+      expect(mpState.managedProgramIndex).to.equal(2);
 
       const testBufferAddress = anchor.web3.Keypair.generate().publicKey;
       const testSpillAddress = anchor.web3.Keypair.generate().publicKey;
       const testAuthorityAddress = anchor.web3.Keypair.generate().publicKey;
       const testUpgradeName = "Upgrade #1";
-      try {
-        await programManagerProgram.methods
-          .createProgramUpgrade(
-            testBufferAddress,
-            testSpillAddress,
-            testAuthorityAddress,
-            testUpgradeName
-          )
-          .accounts({
-            multisig: msPDA,
-            programManager: pmPDA,
-            managedProgram: mpPDA,
-            programUpgrade: upgradePDA,
-          })
-          .rpc();
-      } catch (e) {
-        console.log("Error creating program upgrade", e);
-      }
 
-      const addedUpgrade = await squads.getProgramUpgrade(upgradePDA);
-      const managedProgramState = await squads.getManagedProgram(mpPDA);
-      expect(addedUpgrade.upgradeIndex).to.equal(
-        managedProgramState.upgradeIndex
+      const addedUpgrade = await squads.createProgramUpgrade(
+        msPDA,
+        mpState.publicKey,
+        testBufferAddress,
+        testSpillAddress,
+        testAuthorityAddress,
+        testUpgradeName
       );
+      mpState = await squads.getManagedProgram(mpState.publicKey);
+      expect(addedUpgrade.upgradeIndex).to.equal(mpState.upgradeIndex);
       expect(addedUpgrade.name).to.equal(testUpgradeName);
       expect(addedUpgrade.upgradeIx.programId.toBase58()).to.equal(
         BPF_UPGRADE_ID.toBase58()
@@ -690,11 +610,8 @@ describe("Multisig and Programs", () => {
 
     it(`Create upgrade with buffer and deploy it - MS ${msPDA.toBase58()}`, async function () {
       this.timeout(30000);
-      const nextProgramIndex = await squads.getNextProgramIndex(pmPDA);
-      const [mpPDA] = await getManagedProgramPDA(
-        pmPDA,
-        new anchor.BN(nextProgramIndex),
-        programManagerProgram.programId
+      const nextProgramIndex = await squads.getNextProgramIndex(
+        getProgramManagerPDA(msPDA, squads.programManagerProgramId)[0]
       );
       const [vaultPDA] = await getAuthorityPDA(
         msPDA,
@@ -717,8 +634,9 @@ describe("Multisig and Programs", () => {
       setBufferAuthority(bufferKeypair.publicKey, vaultPDA);
 
       // check that the buffer has proper authority
-      const parsedBufferAccount =
-        await provider.connection.getParsedAccountInfo(bufferKeypair.publicKey);
+      const parsedBufferAccount = await squads.connection.getParsedAccountInfo(
+        bufferKeypair.publicKey
+      );
       const parsedBufferData = (
         parsedBufferAccount.value.data as ParsedAccountData
       ).parsed;
@@ -730,152 +648,81 @@ describe("Multisig and Programs", () => {
 
       // add the program
       const nameString = "The program manager program, itself";
-      try {
-        await programManagerProgram.methods
-          .createManagedProgram(programManagerProgram.programId, nameString)
-          .accounts({
-            multisig: msPDA,
-            programManager: pmPDA,
-            managedProgram: mpPDA,
-          })
-          .rpc();
-      } catch (e) {
-        console.log("error creating managed program", e);
-      }
-      const newManagedProgramState = await squads.getManagedProgram(mpPDA);
-      expect(newManagedProgramState.name).to.equal(nameString);
-      expect(newManagedProgramState.managedProgramIndex).to.equal(
-        nextProgramIndex
+      const mpState = await squads.createManagedProgram(
+        msPDA,
+        programManagerProgram.programId,
+        nameString
       );
+      expect(mpState.name).to.equal(nameString);
+      expect(mpState.managedProgramIndex).to.equal(nextProgramIndex);
 
       // create the upgrade
-      const nextUpgradeIndex = await squads.getNextUpgradeIndex(mpPDA);
-      const [upgradePDA] = await getProgramUpgradePDA(
-        mpPDA,
-        new anchor.BN(nextUpgradeIndex, 10),
-        programManagerProgram.programId
-      );
 
       const testUpgradeName = "Upgrade #1";
-      try {
-        await programManagerProgram.methods
-          .createProgramUpgrade(
-            bufferKeypair.publicKey,
-            provider.wallet.publicKey,
-            vaultPDA,
-            testUpgradeName
-          )
-          .accounts({
-            multisig: msPDA,
-            programManager: pmPDA,
-            managedProgram: mpPDA,
-            programUpgrade: upgradePDA,
-          })
-          .rpc();
-      } catch (e) {
-        console.log("Error creating program upgrade", e);
-      }
+      const upgradeState = await squads.createProgramUpgrade(
+        msPDA,
+        mpState.publicKey,
+        bufferKeypair.publicKey,
+        squads.wallet.publicKey,
+        vaultPDA,
+        testUpgradeName
+      );
 
       // verify the upgrade account was created, and that the buffers match as well in the ix
-      const addedUpgrade = await squads.getProgramUpgrade(upgradePDA);
-      const managedProgramState = await squads.getManagedProgram(mpPDA);
-      expect(addedUpgrade.upgradeIndex).to.equal(
+      const managedProgramState = await squads.getManagedProgram(
+        mpState.publicKey
+      );
+      expect(upgradeState.upgradeIndex).to.equal(
         managedProgramState.upgradeIndex
       );
-      expect(addedUpgrade.name).to.equal(testUpgradeName);
+      expect(upgradeState.name).to.equal(testUpgradeName);
       // check the upgrade Ix accounts match
-      expect(addedUpgrade.upgradeIx.programId.toBase58()).to.equal(
+      expect(upgradeState.upgradeIx.programId.toBase58()).to.equal(
         BPF_UPGRADE_ID.toBase58()
       );
-      expect(addedUpgrade.upgradeIx.accounts[1].pubkey.toBase58()).to.equal(
+      expect(upgradeState.upgradeIx.accounts[1].pubkey.toBase58()).to.equal(
         programManagerProgram.programId.toBase58()
       );
-      expect(addedUpgrade.upgradeIx.accounts[2].pubkey.toBase58()).to.equal(
+      expect(upgradeState.upgradeIx.accounts[2].pubkey.toBase58()).to.equal(
         bufferKeypair.publicKey.toBase58()
       );
-      expect(addedUpgrade.upgradeIx.accounts[3].pubkey.toBase58()).to.equal(
+      expect(upgradeState.upgradeIx.accounts[3].pubkey.toBase58()).to.equal(
         provider.wallet.publicKey.toBase58()
       );
-      expect(addedUpgrade.upgradeIx.accounts[6].pubkey.toBase58()).to.equal(
+      expect(upgradeState.upgradeIx.accounts[6].pubkey.toBase58()).to.equal(
         vaultPDA.toBase58()
       );
 
       // create a new tx for the upgrade
-      let txState = await squads.createTransaction(msPDA, 1);
-      let txPDA = txState.publicKey;
-
-      const newIxIndex = txState.instructionIndex + 1;
-      const newIxIndexBN = new anchor.BN(newIxIndex, 10);
-      const newIx2IndexBN = new anchor.BN(newIxIndex + 1, 10);
-
-      // create the instruction pda
-      const [ixPDA] = await getIxPDA(
-        txPDA,
-        newIxIndexBN,
-        squads.multisigProgramId
-      );
-      // create the instruction pda
-      const [ix2PDA] = await getIxPDA(
-        txPDA,
-        newIx2IndexBN,
-        squads.multisigProgramId
-      );
-
+      let txBuilder = await squads.getTransactionBuilder(msPDA, 1);
       // the upgrade instruction
       const upgradeIx = {
-        programId: addedUpgrade.upgradeIx.programId,
-        data: addedUpgrade.upgradeIx.upgradeInstructionData,
-        keys: addedUpgrade.upgradeIx.accounts,
+        programId: upgradeState.upgradeIx.programId,
+        data: upgradeState.upgradeIx.upgradeInstructionData as Buffer,
+        keys: upgradeState.upgradeIx.accounts as anchor.web3.AccountMeta[],
       };
-
-      // attach the upgrade ix
-      const addUpgradeTx = await program.methods
-        .addInstruction(upgradeIx)
-        .accounts({
-          multisig: msPDA,
-          transaction: txPDA,
-          instruction: ixPDA,
-          creator: creator.publicKey,
-        })
-        .transaction();
-
-      const [authorityPDA] = await getAuthorityPDA(
-        msPDA,
-        new anchor.BN(1, 10),
+      const [ixPDA] = getIxPDA(
+        txBuilder.transactionPDA(),
+        new BN(1, 10),
         squads.multisigProgramId
       );
+      const [ix2PDA] = getIxPDA(
+        txBuilder.transactionPDA(),
+        new BN(2, 10),
+        squads.multisigProgramId
+      );
+      txBuilder = await txBuilder
+        .withInstruction(upgradeIx)
+        .withSetAsExecuted(
+          pmPDA,
+          mpState.publicKey,
+          upgradeState.publicKey,
+          txBuilder.transactionPDA(),
+          ixPDA,
+          1
+        );
 
-      // get the upgrade update instruciton to run after the upgrade
-      const updateUpgradeIx = await programManagerProgram.methods
-        .setAsExecuted()
-        .accounts({
-          multisig: msPDA,
-          programManager: pmPDA,
-          managedProgram: mpPDA,
-          programUpgrade: upgradePDA,
-          transaction: txPDA,
-          instruction: ixPDA,
-          authority: authorityPDA,
-        })
-        .instruction();
-
-      const addUpgradeFollowupIx = await program.methods
-        .addInstruction(updateUpgradeIx)
-        .accounts({
-          multisig: msPDA,
-          transaction: txPDA,
-          instruction: ix2PDA,
-          creator: creator.publicKey,
-        })
-        .instruction();
-
-      addUpgradeTx.add(addUpgradeFollowupIx);
-
-      try {
-        await provider.sendAndConfirm(addUpgradeTx);
-      } catch (e) {
-        console.log(e);
-      }
+      const [, txPDA] = await txBuilder.executeInstructions();
 
       // get the ix
       let ixState = await squads.getInstruction(ixPDA);
@@ -885,18 +732,11 @@ describe("Multisig and Programs", () => {
       let ix2State = await squads.getInstruction(ix2PDA);
       expect(ix2State.instructionIndex).to.equal(2);
 
-      txState = await squads.getTransaction(txPDA);
+      let txState = await squads.getTransaction(txPDA);
       expect(txState.instructionIndex).to.equal(2);
 
-      // acitveate the tx
-      await program.methods
-        .activateTransaction()
-        .accounts({
-          multisig: msPDA,
-          transaction: txPDA,
-          creator: creator.publicKey,
-        })
-        .rpc();
+      // activate the tx
+      await squads.activateTransaction(txPDA);
 
       txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("active");
@@ -946,14 +786,13 @@ describe("Multisig and Programs", () => {
       }
 
       txState = await squads.getTransaction(txPDA);
-      console.log("txState", txState);
       expect(txState.status).to.have.property("executeReady");
 
       await squads.executeTransaction(txPDA);
 
       txState = await squads.getTransaction(txPDA);
       expect(txState.status).to.have.property("executed");
-      const puState = await squads.getProgramUpgrade(upgradePDA);
+      const puState = await squads.getProgramUpgrade(upgradeState.publicKey);
       expect(puState.executed).to.be.true;
       expect(puState.upgradedOn.toNumber()).to.be.greaterThan(0);
     });

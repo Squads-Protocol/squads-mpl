@@ -76,7 +76,7 @@ class Squads {
     getTransactionBuilder(multisigPDA, authorityIndex) {
         return __awaiter(this, void 0, void 0, function* () {
             const multisig = yield this.getMultisig(multisigPDA);
-            return new tx_builder_1.TransactionBuilder(this.multisig.methods, this.provider, multisig, authorityIndex, this.multisigProgramId);
+            return new tx_builder_1.TransactionBuilder(this.multisig.methods, this.programManager.methods, this.provider, multisig, authorityIndex, this.multisigProgramId);
         });
     }
     getMultisig(address) {
@@ -472,17 +472,46 @@ class Squads {
             return yield methods.instruction();
         });
     }
-    createProgramManager() {
-        return __awaiter(this, void 0, void 0, function* () { });
+    createProgramManager(multisigPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [programManagerPDA] = (0, address_1.getProgramManagerPDA)(multisigPDA, this.programManagerProgramId);
+            yield this.programManager.methods
+                .createProgramManager()
+                .accounts({ multisig: multisigPDA, programManager: programManagerPDA })
+                .rpc();
+            return yield this.getProgramManager(programManagerPDA);
+        });
     }
-    createManagedProgram() {
-        return __awaiter(this, void 0, void 0, function* () { });
+    createManagedProgram(multisigPDA, programAddress, name) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [programManagerPDA] = (0, address_1.getProgramManagerPDA)(multisigPDA, this.programManagerProgramId);
+            const [managedProgramPDA] = (0, address_1.getManagedProgramPDA)(programManagerPDA, new bn_js_1.default(yield this.getNextProgramIndex(programManagerPDA), 10), this.programManagerProgramId);
+            yield this.programManager.methods
+                .createManagedProgram(programAddress, name)
+                .accounts({
+                multisig: multisigPDA,
+                programManager: programManagerPDA,
+                managedProgram: managedProgramPDA,
+            })
+                .rpc();
+            return yield this.getManagedProgram(managedProgramPDA);
+        });
     }
-    createProgramUpgrade() {
-        return __awaiter(this, void 0, void 0, function* () { });
-    }
-    markUpgradeCompleted() {
-        return __awaiter(this, void 0, void 0, function* () { });
+    createProgramUpgrade(multisigPDA, managedProgramPDA, bufferAddress, spillAddress, authorityAddress, upgradeName) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [programManagerPDA] = (0, address_1.getProgramManagerPDA)(multisigPDA, this.programManagerProgramId);
+            const [programUpgradePDA] = (0, address_1.getProgramUpgradePDA)(managedProgramPDA, new bn_js_1.default(yield this.getNextUpgradeIndex(managedProgramPDA), 10), this.programManagerProgramId);
+            yield this.programManager.methods
+                .createProgramUpgrade(bufferAddress, spillAddress, authorityAddress, upgradeName)
+                .accounts({
+                multisig: multisigPDA,
+                programManager: programManagerPDA,
+                managedProgram: managedProgramPDA,
+                programUpgrade: programUpgradePDA,
+            })
+                .rpc();
+            return yield this.getProgramUpgrade(programUpgradePDA);
+        });
     }
 }
 exports.default = Squads;

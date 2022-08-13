@@ -1,4 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -15,9 +38,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TransactionBuilder = void 0;
 const address_1 = require("./address");
 const bn_js_1 = __importDefault(require("bn.js"));
+const anchor = __importStar(require("@project-serum/anchor"));
 class TransactionBuilder {
-    constructor(methods, provider, multisig, authorityIndex, programId, instructions) {
+    constructor(methods, managerMethods, provider, multisig, authorityIndex, programId, instructions) {
         this.methods = methods;
+        this.managerMethods = managerMethods;
         this.provider = provider;
         this.multisig = multisig;
         this.authorityIndex = authorityIndex;
@@ -39,7 +64,11 @@ class TransactionBuilder {
         });
     }
     _cloneWithInstructions(instructions) {
-        return new TransactionBuilder(this.methods, this.provider, this.multisig, this.authorityIndex, this.programId, instructions);
+        return new TransactionBuilder(this.methods, this.managerMethods, this.provider, this.multisig, this.authorityIndex, this.programId, instructions);
+    }
+    transactionPDA() {
+        const [transactionPDA] = (0, address_1.getTxPDA)(this.multisig.publicKey, new bn_js_1.default(this.multisig.transactionIndex + 1), this.programId);
+        return transactionPDA;
     }
     withInstruction(instruction) {
         return this._cloneWithInstructions(this.instructions.concat(instruction));
@@ -80,9 +109,27 @@ class TransactionBuilder {
     }
     // async withAddAuthority(): Promise<TransactionBuilder> {}
     // async withSetExternalExecute(): Promise<TransactionBuilder> {}
+    withSetAsExecuted(programManagerPDA, managedProgramPDA, programUpgradePDA, transactionPDA, instructionPDA, authorityIndex) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [authorityPDA] = (0, address_1.getAuthorityPDA)(this.multisig.publicKey, new bn_js_1.default(authorityIndex, 10), this.programId);
+            const instruction = yield this.managerMethods
+                .setAsExecuted()
+                .accounts({
+                multisig: this.multisig.publicKey,
+                programManager: programManagerPDA,
+                managedProgram: managedProgramPDA,
+                programUpgrade: programUpgradePDA,
+                transaction: transactionPDA,
+                instruction: instructionPDA,
+                authority: authorityPDA,
+            })
+                .instruction();
+            return this.withInstruction(instruction);
+        });
+    }
     getInstructions() {
         return __awaiter(this, void 0, void 0, function* () {
-            const [transactionPDA] = (0, address_1.getTxPDA)(this.multisig.publicKey, new bn_js_1.default(this.multisig.transactionIndex + 1), this.programId);
+            const transactionPDA = this.transactionPDA();
             const wrappedAddInstructions = yield Promise.all(this.instructions.map((rawInstruction, index) => this._buildAddInstruction(transactionPDA, rawInstruction, index + 1)));
             const createTxInstruction = yield this.methods
                 .createTransaction(this.authorityIndex)
@@ -93,6 +140,22 @@ class TransactionBuilder {
             })
                 .instruction();
             const instructions = [createTxInstruction, ...wrappedAddInstructions];
+            this.instructions = [];
+            return [instructions, transactionPDA];
+        });
+    }
+    executeInstructions() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [instructions, transactionPDA] = yield this.getInstructions();
+            const { blockhash } = yield this.provider.connection.getLatestBlockhash();
+            const lastValidBlockHeight = yield this.provider.connection.getBlockHeight();
+            const transaction = new anchor.web3.Transaction({
+                blockhash,
+                lastValidBlockHeight,
+                feePayer: this.provider.wallet.publicKey,
+            });
+            transaction.add(...instructions);
+            yield this.provider.sendAndConfirm(transaction);
             return [instructions, transactionPDA];
         });
     }

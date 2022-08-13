@@ -82,10 +82,9 @@ declare class Squads {
     private _executeInstruction;
     executeInstruction(transactionPDA: PublicKey, instructionPDA: PublicKey): Promise<InstructionAccount>;
     buildExecuteInstruction(transactionPDA: PublicKey, instructionPDA: PublicKey): Promise<TransactionInstruction>;
-    createProgramManager(): Promise<void>;
-    createManagedProgram(): Promise<void>;
-    createProgramUpgrade(): Promise<void>;
-    markUpgradeCompleted(): Promise<void>;
+    createProgramManager(multisigPDA: PublicKey): Promise<ProgramManagerAccount>;
+    createManagedProgram(multisigPDA: PublicKey, programAddress: PublicKey, name: string): Promise<ManagedProgramAccount>;
+    createProgramUpgrade(multisigPDA: PublicKey, managedProgramPDA: PublicKey, bufferAddress: PublicKey, spillAddress: PublicKey, authorityAddress: PublicKey, upgradeName: string): Promise<ProgramUpgradeAccount>;
 }
 export default Squads;
 export * from "./constants";
