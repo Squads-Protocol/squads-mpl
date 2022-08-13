@@ -3,10 +3,13 @@ import { ProgramManager } from "../../target/types/program_manager";
 import { Idl, IdlTypes } from "@project-serum/anchor";
 import { IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl";
 import { TypeDef } from "@project-serum/anchor/dist/cjs/program/namespace/types";
+import { PublicKey } from "@solana/web3.js";
 declare type TypeDefDictionary<T extends IdlTypeDef[], Defined> = {
     [K in T[number]["name"]]: TypeDef<T[number] & {
         name: K;
-    }, Defined>;
+    }, Defined> & {
+        publicKey: PublicKey;
+    };
 };
 declare type AccountDefDictionary<T extends Idl> = TypeDefDictionary<NonNullable<T["accounts"]>, IdlTypes<T>>;
 export declare type MultisigAccount = AccountDefDictionary<SquadsMpl>["ms"];

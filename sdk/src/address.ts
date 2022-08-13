@@ -12,12 +12,12 @@ export const getMsPDA = (create_key: PublicKey, programId: PublicKey) =>
     programId
   );
 
-export const getTxPDA = async (
+export const getTxPDA = (
   msPDA: PublicKey,
   txIndexBN: BN,
   programId: PublicKey
 ) =>
-  await PublicKey.findProgramAddress(
+  PublicKey.findProgramAddressSync(
     [
       utils.bytes.utf8.encode("squad"),
       msPDA.toBuffer(),
@@ -27,12 +27,12 @@ export const getTxPDA = async (
     programId
   );
 
-export const getIxPDA = async (
+export const getIxPDA = (
   txPDA: PublicKey,
   iXIndexBN: BN,
   programId: PublicKey
 ) =>
-  await PublicKey.findProgramAddress(
+  PublicKey.findProgramAddressSync(
     [
       utils.bytes.utf8.encode("squad"),
       txPDA.toBuffer(),
@@ -42,12 +42,12 @@ export const getIxPDA = async (
     programId
   );
 
-export const getAuthorityPDA = async (
+export const getAuthorityPDA = (
   msPDA: PublicKey,
   authorityIndexBN: BN,
   programId: PublicKey
 ) =>
-  await PublicKey.findProgramAddress(
+  PublicKey.findProgramAddressSync(
     [
       utils.bytes.utf8.encode("squad"),
       msPDA.toBuffer(),
@@ -67,12 +67,12 @@ export const getProgramManagerPDA = (msPDA: PublicKey, programId: PublicKey) =>
     programId
   );
 
-export const getManagedProgramPDA = async (
+export const getManagedProgramPDA = (
   programManagerPDA: PublicKey,
   managedProgramIndexBN: BN,
   programId: PublicKey
 ) =>
-  await PublicKey.findProgramAddress(
+  PublicKey.findProgramAddressSync(
     [
       utils.bytes.utf8.encode("squad"),
       programManagerPDA.toBuffer(),
@@ -82,12 +82,12 @@ export const getManagedProgramPDA = async (
     programId
   );
 
-export const getProgramUpgradePDA = async (
+export const getProgramUpgradePDA = (
   managedProgramPDA: PublicKey,
   upgradeIndexBN: BN,
   programId: PublicKey
 ) =>
-  await PublicKey.findProgramAddress(
+  PublicKey.findProgramAddressSync(
     [
       utils.bytes.utf8.encode("squad"),
       managedProgramPDA.toBuffer(),

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -e
+trap 'echo "❌ Build failed"' ERR
 
 echo "Building @sqds/sdk..."
 echo ">> Building TS files"
