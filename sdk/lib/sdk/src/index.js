@@ -46,6 +46,7 @@ const anchor_1 = require("@project-serum/anchor");
 const address_1 = require("./address");
 const bn_js_1 = __importDefault(require("bn.js"));
 const anchor = __importStar(require("@project-serum/anchor"));
+const tx_builder_1 = require("./tx_builder");
 class Squads {
     constructor({ connection, wallet, multisigProgramId, programManagerProgramId, }) {
         this.connection = connection;
@@ -71,6 +72,12 @@ class Squads {
     }
     _addPublicKeys(items, addresses) {
         return items.map((item, index) => item ? Object.assign(Object.assign({}, item), { publicKey: addresses[index] }) : null);
+    }
+    getTransactionBuilder(multisigPDA, authorityIndex) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const multisig = yield this.getMultisig(multisigPDA);
+            return new tx_builder_1.TransactionBuilder(this.multisig.methods, this.provider, multisig, authorityIndex, this.multisigProgramId);
+        });
     }
     getMultisig(address) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -168,109 +175,183 @@ class Squads {
             return managedProgram.upgradeIndex + 1;
         });
     }
+    getAuthorityPDA(multisigPDA, authorityIndex) {
+        return (0, address_1.getAuthorityPDA)(multisigPDA, new bn_js_1.default(authorityIndex, 10), this.multisigProgramId)[0];
+    }
+    _createMultisig(threshold, createKey, initialMembers) {
+        if (!initialMembers.find((member) => member.equals(this.wallet.publicKey))) {
+            initialMembers.push(this.wallet.publicKey);
+        }
+        const [multisigPDA] = (0, address_1.getMsPDA)(createKey, this.multisigProgramId);
+        return [
+            this.multisig.methods
+                .create(threshold, createKey, initialMembers)
+                .accounts({ multisig: multisigPDA, creator: this.wallet.publicKey }),
+            multisigPDA,
+        ];
+    }
     createMultisig(threshold, createKey, initialMembers) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!initialMembers.find((member) => member.equals(this.wallet.publicKey))) {
-                initialMembers.push(this.wallet.publicKey);
-            }
-            const [multisigPDA] = (0, address_1.getMsPDA)(createKey, this.multisigProgramId);
-            yield this.multisig.methods
-                .create(threshold, createKey, initialMembers)
-                .accounts({ multisig: multisigPDA, creator: this.wallet.publicKey })
-                .rpc();
+            const [methods, multisigPDA] = this._createMultisig(threshold, createKey, initialMembers);
+            yield methods.rpc();
             return yield this.getMultisig(multisigPDA);
+        });
+    }
+    buildCreateMultisig(threshold, createKey, initialMembers) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [methods] = this._createMultisig(threshold, createKey, initialMembers);
+            return yield methods.instruction();
+        });
+    }
+    _createTransaction(multisigPDA, authorityIndex, transactionIndex) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [transactionPDA] = (0, address_1.getTxPDA)(multisigPDA, new bn_js_1.default(transactionIndex, 10), this.multisigProgramId);
+            return [
+                this.multisig.methods.createTransaction(authorityIndex).accounts({
+                    multisig: multisigPDA,
+                    transaction: transactionPDA,
+                    creator: this.wallet.publicKey,
+                }),
+                transactionPDA,
+            ];
         });
     }
     createTransaction(multisigPDA, authorityIndex) {
         return __awaiter(this, void 0, void 0, function* () {
             const nextTransactionIndex = yield this.getNextTransactionIndex(multisigPDA);
-            const [transactionPDA] = (0, address_1.getTxPDA)(multisigPDA, new bn_js_1.default(nextTransactionIndex, 10), this.multisigProgramId);
-            yield this.multisig.methods
-                .createTransaction(authorityIndex)
-                .accounts({
-                multisig: multisigPDA,
-                transaction: transactionPDA,
-                creator: this.wallet.publicKey,
-            })
-                .rpc();
+            const [methods, transactionPDA] = yield this._createTransaction(multisigPDA, authorityIndex, nextTransactionIndex);
+            yield methods.rpc();
             return yield this.getTransaction(transactionPDA);
+        });
+    }
+    buildCreateTransaction(multisigPDA, authorityIndex, transactionIndex) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [methods] = yield this._createTransaction(multisigPDA, authorityIndex, transactionIndex);
+            return yield methods.instruction();
+        });
+    }
+    _addInstruction(multisigPDA, transactionPDA, instruction, instructionIndex) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [instructionPDA] = (0, address_1.getIxPDA)(transactionPDA, new bn_js_1.default(instructionIndex, 10), this.multisigProgramId);
+            return [
+                this.multisig.methods.addInstruction(instruction).accounts({
+                    multisig: multisigPDA,
+                    transaction: transactionPDA,
+                    instruction: instructionPDA,
+                    creator: this.wallet.publicKey,
+                }),
+                instructionPDA,
+            ];
         });
     }
     addInstruction(transactionPDA, instruction) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
-            const [instructionPDA] = (0, address_1.getIxPDA)(transactionPDA, new bn_js_1.default(transaction.instructionIndex + 1, 10), this.multisigProgramId);
-            yield this.multisig.methods
-                .addInstruction(instruction)
-                .accounts({
-                multisig: transaction.ms,
-                transaction: transactionPDA,
-                instruction: instructionPDA,
-                creator: this.wallet.publicKey,
-            })
-                .rpc();
+            const [methods, instructionPDA] = yield this._addInstruction(transaction.ms, transactionPDA, instruction, transaction.instructionIndex + 1);
+            yield methods.rpc();
             return yield this.getInstruction(instructionPDA);
+        });
+    }
+    buildAddInstruction(multisigPDA, transactionPDA, instruction, instructionIndex) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [methods] = yield this._addInstruction(multisigPDA, transactionPDA, instruction, instructionIndex);
+            return yield methods.instruction();
+        });
+    }
+    _activateTransaction(multisigPDA, transactionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.multisig.methods.activateTransaction().accounts({
+                multisig: multisigPDA,
+                transaction: transactionPDA,
+                creator: this.wallet.publicKey,
+            });
         });
     }
     activateTransaction(transactionPDA) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
-            yield this.multisig.methods
-                .activateTransaction()
-                .accounts({
-                multisig: transaction.ms,
-                transaction: transactionPDA,
-                creator: this.wallet.publicKey,
-            })
-                .rpc();
+            const methods = yield this._activateTransaction(transaction.ms, transactionPDA);
+            yield methods.rpc();
             return yield this.getTransaction(transactionPDA);
+        });
+    }
+    buildActivateTransaction(multisigPDA, transactionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const methods = yield this._activateTransaction(multisigPDA, transactionPDA);
+            return yield methods.instruction();
+        });
+    }
+    _approveTransaction(multisigPDA, transactionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.multisig.methods.approveTransaction().accounts({
+                multisig: multisigPDA,
+                transaction: transactionPDA,
+                member: this.wallet.publicKey,
+            });
         });
     }
     approveTransaction(transactionPDA) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
-            yield this.multisig.methods
-                .approveTransaction()
-                .accounts({
-                multisig: transaction.ms,
+            const methods = yield this._approveTransaction(transaction.ms, transactionPDA);
+            yield methods.rpc();
+            return yield this.getTransaction(transactionPDA);
+        });
+    }
+    buildApproveTransaction(multisigPDA, transactionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const methods = yield this._approveTransaction(multisigPDA, transactionPDA);
+            return yield methods.instruction();
+        });
+    }
+    _rejectTransaction(multisigPDA, transactionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.multisig.methods.rejectTransaction().accounts({
+                multisig: multisigPDA,
                 transaction: transactionPDA,
                 member: this.wallet.publicKey,
-            })
-                .rpc();
-            return yield this.getTransaction(transactionPDA);
+            });
         });
     }
     rejectTransaction(transactionPDA) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
-            yield this.multisig.methods
-                .rejectTransaction()
-                .accounts({
-                multisig: transaction.ms,
+            const methods = yield this._rejectTransaction(transaction.ms, transactionPDA);
+            yield methods.rpc();
+            return yield this.getTransaction(transactionPDA);
+        });
+    }
+    buildRejectTransaction(multisigPDA, transactionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const methods = yield this._rejectTransaction(multisigPDA, transactionPDA);
+            return yield methods.instruction();
+        });
+    }
+    _cancelTransaction(multisigPDA, transactionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.multisig.methods.cancelTransaction().accounts({
+                multisig: multisigPDA,
                 transaction: transactionPDA,
                 member: this.wallet.publicKey,
-            })
-                .rpc();
-            return yield this.getTransaction(transactionPDA);
+            });
         });
     }
     cancelTransaction(transactionPDA) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
-            yield this.multisig.methods
-                .cancelTransaction()
-                .accounts({
-                multisig: transaction.ms,
-                transaction: transactionPDA,
-                member: this.wallet.publicKey,
-            })
-                .rpc();
+            const methods = yield this._cancelTransaction(transaction.ms, transactionPDA);
+            yield methods.rpc();
             return yield this.getTransaction(transactionPDA);
         });
     }
-    executeTransaction(transactionPDA, feePayer) {
+    buildCancelTransaction(multisigPDA, transactionPDA) {
         return __awaiter(this, void 0, void 0, function* () {
-            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet;
+            const methods = yield this._cancelTransaction(multisigPDA, transactionPDA);
+            return yield methods.instruction();
+        });
+    }
+    _executeTransaction(transactionPDA, payer) {
+        return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
             const ixList = yield Promise.all([...new Array(transaction.instructionIndex)].map((a, i) => __awaiter(this, void 0, void 0, function* () {
                 const ixIndexBN = new anchor.BN(i + 1, 10);
@@ -326,13 +407,6 @@ class Squads {
                 return keysUnique.findIndex((k) => k.pubkey.toBase58() === a.pubkey.toBase58() &&
                     k.isWritable === a.isWritable);
             });
-            const { blockhash } = yield this.connection.getLatestBlockhash();
-            const lastValidBlockHeight = yield this.connection.getBlockHeight();
-            const executeTx = new anchor.web3.Transaction({
-                blockhash,
-                lastValidBlockHeight,
-                feePayer: payer.publicKey,
-            });
             const executeIx = yield this.multisig.methods
                 .executeTransaction(Buffer.from(keyIndexMap))
                 .accounts({
@@ -342,19 +416,39 @@ class Squads {
             })
                 .instruction();
             executeIx.keys = executeIx.keys.concat(keysUnique);
+            return executeIx;
+        });
+    }
+    executeTransaction(transactionPDA, feePayer) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet;
+            const executeIx = yield this._executeTransaction(transactionPDA, payer);
+            const { blockhash } = yield this.connection.getLatestBlockhash();
+            const lastValidBlockHeight = yield this.connection.getBlockHeight();
+            const executeTx = new anchor.web3.Transaction({
+                blockhash,
+                lastValidBlockHeight,
+                feePayer: payer.publicKey,
+            });
             executeTx.add(executeIx);
             yield this.provider.sendAndConfirm(executeTx);
             return yield this.getTransaction(transactionPDA);
         });
     }
-    executeInstruction(transactionPDA, instructionPDA) {
+    buildExecuteTransaction(transactionPDA, feePayer) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet;
+            return yield this._executeTransaction(transactionPDA, payer);
+        });
+    }
+    _executeInstruction(transactionPDA, instructionPDA) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
             const instruction = yield this.getInstruction(instructionPDA);
             const remainingAccountKeys = [
                 { pubkey: instruction.programId, isSigner: false, isWritable: false },
             ].concat(instruction.keys.map((key) => (Object.assign(Object.assign({}, key), { isSigner: false }))));
-            yield this.multisig.methods
+            return this.multisig.methods
                 .executeInstruction()
                 .accounts({
                 multisig: transaction.ms,
@@ -362,9 +456,20 @@ class Squads {
                 instruction: instructionPDA,
                 member: this.wallet.publicKey,
             })
-                .remainingAccounts(remainingAccountKeys)
-                .rpc();
+                .remainingAccounts(remainingAccountKeys);
+        });
+    }
+    executeInstruction(transactionPDA, instructionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const methods = yield this._executeInstruction(transactionPDA, instructionPDA);
+            yield methods.rpc();
             return yield this.getInstruction(instructionPDA);
+        });
+    }
+    buildExecuteInstruction(transactionPDA, instructionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const methods = yield this._executeInstruction(transactionPDA, instructionPDA);
+            return yield methods.instruction();
         });
     }
     createProgramManager() {

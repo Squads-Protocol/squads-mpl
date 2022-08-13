@@ -1,9 +1,10 @@
 import { SquadsMpl } from "../../target/types/squads_mpl";
 import { ProgramManager } from "../../target/types/program_manager";
-import { Idl, IdlTypes } from "@project-serum/anchor";
+import { Idl, IdlTypes, MethodsNamespace } from "@project-serum/anchor";
 import { IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl";
-import { TypeDef } from "@project-serum/anchor/dist/cjs/program/namespace/types";
+import { AllInstructions, TypeDef } from "@project-serum/anchor/dist/cjs/program/namespace/types";
 import { PublicKey } from "@solana/web3.js";
+import { MethodsBuilder } from "@project-serum/anchor/dist/cjs/program/namespace/methods";
 declare type TypeDefDictionary<T extends IdlTypeDef[], Defined> = {
     [K in T[number]["name"]]: TypeDef<T[number] & {
         name: K;
@@ -18,4 +19,6 @@ export declare type InstructionAccount = AccountDefDictionary<SquadsMpl>["msInst
 export declare type ProgramManagerAccount = AccountDefDictionary<ProgramManager>["programManager"];
 export declare type ManagedProgramAccount = AccountDefDictionary<ProgramManager>["managedProgram"];
 export declare type ProgramUpgradeAccount = AccountDefDictionary<ProgramManager>["programUpgrade"];
+export declare type SquadsMethods = MethodsBuilder<SquadsMpl, AllInstructions<SquadsMpl>>;
+export declare type SquadsMethodsNamespace = MethodsNamespace<SquadsMpl, AllInstructions<SquadsMpl>>;
 export {};

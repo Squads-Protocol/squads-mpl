@@ -1,9 +1,13 @@
 import { SquadsMpl } from "../../target/types/squads_mpl";
 import { ProgramManager } from "../../target/types/program_manager";
-import { Idl, IdlTypes } from "@project-serum/anchor";
+import { Idl, IdlTypes, MethodsNamespace } from "@project-serum/anchor";
 import { IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl";
-import { TypeDef } from "@project-serum/anchor/dist/cjs/program/namespace/types";
+import {
+  AllInstructions,
+  TypeDef,
+} from "@project-serum/anchor/dist/cjs/program/namespace/types";
 import { PublicKey } from "@solana/web3.js";
+import { MethodsBuilder } from "@project-serum/anchor/dist/cjs/program/namespace/methods";
 
 // Copied (with slight modification) from @project-serum/anchor/src/program/namespace/types (not exported)
 type TypeDefDictionary<T extends IdlTypeDef[], Defined> = {
@@ -29,3 +33,12 @@ export type ManagedProgramAccount =
   AccountDefDictionary<ProgramManager>["managedProgram"];
 export type ProgramUpgradeAccount =
   AccountDefDictionary<ProgramManager>["programUpgrade"];
+
+export type SquadsMethods = MethodsBuilder<
+  SquadsMpl,
+  AllInstructions<SquadsMpl>
+>;
+export type SquadsMethodsNamespace = MethodsNamespace<
+  SquadsMpl,
+  AllInstructions<SquadsMpl>
+>;

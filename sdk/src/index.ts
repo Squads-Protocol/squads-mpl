@@ -21,11 +21,13 @@ import {
   MultisigAccount,
   ProgramManagerAccount,
   ProgramUpgradeAccount,
+  SquadsMethods,
   TransactionAccount,
 } from "./types";
-import { getIxPDA, getMsPDA, getTxPDA } from "./address";
+import { getAuthorityPDA, getIxPDA, getMsPDA, getTxPDA } from "./address";
 import BN from "bn.js";
 import * as anchor from "@project-serum/anchor";
+import { TransactionBuilder } from "./tx_builder";
 
 class Squads {
   readonly connection: Connection;
@@ -142,6 +144,19 @@ class Squads {
     );
   }
 
+  async getTransactionBuilder(
+    multisigPDA: PublicKey,
+    authorityIndex: number
+  ): Promise<TransactionBuilder> {
+    const multisig = await this.getMultisig(multisigPDA);
+    return new TransactionBuilder(
+      this.multisig.methods,
+      this.provider,
+      multisig,
+      authorityIndex,
+      this.multisigProgramId
+    );
+  }
   async getMultisig(address: PublicKey): Promise<MultisigAccount> {
     const accountData = await this.multisig.account.ms.fetch(address);
     return { ...accountData, publicKey: address } as MultisigAccount;
@@ -259,22 +274,75 @@ class Squads {
     return managedProgram.upgradeIndex + 1;
   }
 
-  async createMultisig(
+  getAuthorityPDA(multisigPDA: PublicKey, authorityIndex: number): PublicKey {
+    return getAuthorityPDA(
+      multisigPDA,
+      new BN(authorityIndex, 10),
+      this.multisigProgramId
+    )[0];
+  }
+
+  private _createMultisig(
     threshold: number,
     createKey: PublicKey,
     initialMembers: PublicKey[]
-  ): Promise<MultisigAccount> {
+  ): [SquadsMethods, PublicKey] {
     if (
       !initialMembers.find((member) => member.equals(this.wallet.publicKey))
     ) {
       initialMembers.push(this.wallet.publicKey);
     }
     const [multisigPDA] = getMsPDA(createKey, this.multisigProgramId);
-    await this.multisig.methods
-      .create(threshold, createKey, initialMembers)
-      .accounts({ multisig: multisigPDA, creator: this.wallet.publicKey })
-      .rpc();
+    return [
+      this.multisig.methods
+        .create(threshold, createKey, initialMembers)
+        .accounts({ multisig: multisigPDA, creator: this.wallet.publicKey }),
+      multisigPDA,
+    ];
+  }
+  async createMultisig(
+    threshold: number,
+    createKey: PublicKey,
+    initialMembers: PublicKey[]
+  ): Promise<MultisigAccount> {
+    const [methods, multisigPDA] = this._createMultisig(
+      threshold,
+      createKey,
+      initialMembers
+    );
+    await methods.rpc();
     return await this.getMultisig(multisigPDA);
+  }
+  async buildCreateMultisig(
+    threshold: number,
+    createKey: PublicKey,
+    initialMembers: PublicKey[]
+  ): Promise<TransactionInstruction> {
+    const [methods] = this._createMultisig(
+      threshold,
+      createKey,
+      initialMembers
+    );
+    return await methods.instruction();
+  }
+  private async _createTransaction(
+    multisigPDA: PublicKey,
+    authorityIndex: number,
+    transactionIndex: number
+  ): Promise<[SquadsMethods, PublicKey]> {
+    const [transactionPDA] = getTxPDA(
+      multisigPDA,
+      new BN(transactionIndex, 10),
+      this.multisigProgramId
+    );
+    return [
+      this.multisig.methods.createTransaction(authorityIndex).accounts({
+        multisig: multisigPDA,
+        transaction: transactionPDA,
+        creator: this.wallet.publicKey,
+      }),
+      transactionPDA,
+    ];
   }
   async createTransaction(
     multisigPDA: PublicKey,
@@ -283,103 +351,194 @@ class Squads {
     const nextTransactionIndex = await this.getNextTransactionIndex(
       multisigPDA
     );
-    const [transactionPDA] = getTxPDA(
+    const [methods, transactionPDA] = await this._createTransaction(
       multisigPDA,
-      new BN(nextTransactionIndex, 10),
+      authorityIndex,
+      nextTransactionIndex
+    );
+    await methods.rpc();
+    return await this.getTransaction(transactionPDA);
+  }
+  async buildCreateTransaction(
+    multisigPDA: PublicKey,
+    authorityIndex: number,
+    transactionIndex: number
+  ): Promise<TransactionInstruction> {
+    const [methods] = await this._createTransaction(
+      multisigPDA,
+      authorityIndex,
+      transactionIndex
+    );
+    return await methods.instruction();
+  }
+  private async _addInstruction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey,
+    instruction: TransactionInstruction,
+    instructionIndex: number
+  ): Promise<[SquadsMethods, PublicKey]> {
+    const [instructionPDA] = getIxPDA(
+      transactionPDA,
+      new BN(instructionIndex, 10),
       this.multisigProgramId
     );
-    await this.multisig.methods
-      .createTransaction(authorityIndex)
-      .accounts({
+    return [
+      this.multisig.methods.addInstruction(instruction).accounts({
         multisig: multisigPDA,
         transaction: transactionPDA,
+        instruction: instructionPDA,
         creator: this.wallet.publicKey,
-      })
-      .rpc();
-    return await this.getTransaction(transactionPDA);
+      }),
+      instructionPDA,
+    ];
   }
   async addInstruction(
     transactionPDA: PublicKey,
     instruction: TransactionInstruction
   ): Promise<InstructionAccount> {
     const transaction = await this.getTransaction(transactionPDA);
-    const [instructionPDA] = getIxPDA(
+    const [methods, instructionPDA] = await this._addInstruction(
+      transaction.ms,
       transactionPDA,
-      new BN(transaction.instructionIndex + 1, 10),
-      this.multisigProgramId
+      instruction,
+      transaction.instructionIndex + 1
     );
-    await this.multisig.methods
-      .addInstruction(instruction)
-      .accounts({
-        multisig: transaction.ms,
-        transaction: transactionPDA,
-        instruction: instructionPDA,
-        creator: this.wallet.publicKey,
-      })
-      .rpc();
+    await methods.rpc();
     return await this.getInstruction(instructionPDA);
+  }
+  async buildAddInstruction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey,
+    instruction: TransactionInstruction,
+    instructionIndex: number
+  ): Promise<TransactionInstruction> {
+    const [methods] = await this._addInstruction(
+      multisigPDA,
+      transactionPDA,
+      instruction,
+      instructionIndex
+    );
+    return await methods.instruction();
+  }
+  private async _activateTransaction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey
+  ): Promise<SquadsMethods> {
+    return this.multisig.methods.activateTransaction().accounts({
+      multisig: multisigPDA,
+      transaction: transactionPDA,
+      creator: this.wallet.publicKey,
+    });
   }
   async activateTransaction(
     transactionPDA: PublicKey
   ): Promise<TransactionAccount> {
     const transaction = await this.getTransaction(transactionPDA);
-    await this.multisig.methods
-      .activateTransaction()
-      .accounts({
-        multisig: transaction.ms,
-        transaction: transactionPDA,
-        creator: this.wallet.publicKey,
-      })
-      .rpc();
+    const methods = await this._activateTransaction(
+      transaction.ms,
+      transactionPDA
+    );
+    await methods.rpc();
     return await this.getTransaction(transactionPDA);
+  }
+  async buildActivateTransaction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey
+  ): Promise<TransactionInstruction> {
+    const methods = await this._activateTransaction(
+      multisigPDA,
+      transactionPDA
+    );
+    return await methods.instruction();
+  }
+  private async _approveTransaction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey
+  ): Promise<SquadsMethods> {
+    return this.multisig.methods.approveTransaction().accounts({
+      multisig: multisigPDA,
+      transaction: transactionPDA,
+      member: this.wallet.publicKey,
+    });
   }
   async approveTransaction(
     transactionPDA: PublicKey
   ): Promise<TransactionAccount> {
     const transaction = await this.getTransaction(transactionPDA);
-    await this.multisig.methods
-      .approveTransaction()
-      .accounts({
-        multisig: transaction.ms,
-        transaction: transactionPDA,
-        member: this.wallet.publicKey,
-      })
-      .rpc();
+    const methods = await this._approveTransaction(
+      transaction.ms,
+      transactionPDA
+    );
+    await methods.rpc();
     return await this.getTransaction(transactionPDA);
+  }
+  async buildApproveTransaction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey
+  ): Promise<TransactionInstruction> {
+    const methods = await this._approveTransaction(multisigPDA, transactionPDA);
+    return await methods.instruction();
+  }
+  private async _rejectTransaction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey
+  ): Promise<SquadsMethods> {
+    return this.multisig.methods.rejectTransaction().accounts({
+      multisig: multisigPDA,
+      transaction: transactionPDA,
+      member: this.wallet.publicKey,
+    });
   }
   async rejectTransaction(
     transactionPDA: PublicKey
   ): Promise<TransactionAccount> {
     const transaction = await this.getTransaction(transactionPDA);
-    await this.multisig.methods
-      .rejectTransaction()
-      .accounts({
-        multisig: transaction.ms,
-        transaction: transactionPDA,
-        member: this.wallet.publicKey,
-      })
-      .rpc();
+    const methods = await this._rejectTransaction(
+      transaction.ms,
+      transactionPDA
+    );
+    await methods.rpc();
     return await this.getTransaction(transactionPDA);
+  }
+  async buildRejectTransaction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey
+  ): Promise<TransactionInstruction> {
+    const methods = await this._rejectTransaction(multisigPDA, transactionPDA);
+    return await methods.instruction();
+  }
+  private async _cancelTransaction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey
+  ): Promise<SquadsMethods> {
+    return this.multisig.methods.cancelTransaction().accounts({
+      multisig: multisigPDA,
+      transaction: transactionPDA,
+      member: this.wallet.publicKey,
+    });
   }
   async cancelTransaction(
     transactionPDA: PublicKey
   ): Promise<TransactionAccount> {
     const transaction = await this.getTransaction(transactionPDA);
-    await this.multisig.methods
-      .cancelTransaction()
-      .accounts({
-        multisig: transaction.ms,
-        transaction: transactionPDA,
-        member: this.wallet.publicKey,
-      })
-      .rpc();
+    const methods = await this._cancelTransaction(
+      transaction.ms,
+      transactionPDA
+    );
+    await methods.rpc();
     return await this.getTransaction(transactionPDA);
   }
-  async executeTransaction(
+  async buildCancelTransaction(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey
+  ): Promise<TransactionInstruction> {
+    const methods = await this._cancelTransaction(multisigPDA, transactionPDA);
+    return await methods.instruction();
+  }
+  private async _executeTransaction(
     transactionPDA: PublicKey,
-    feePayer?: Wallet
-  ): Promise<TransactionAccount> {
-    const payer = feePayer ?? this.wallet;
+    payer: Wallet
+  ): Promise<TransactionInstruction> {
     const transaction = await this.getTransaction(transactionPDA);
     const ixList = await Promise.all(
       [...new Array(transaction.instructionIndex)].map(async (a, i) => {
@@ -455,15 +614,6 @@ class Squads {
       );
     });
 
-    const { blockhash } = await this.connection.getLatestBlockhash();
-    const lastValidBlockHeight = await this.connection.getBlockHeight();
-
-    const executeTx = new anchor.web3.Transaction({
-      blockhash,
-      lastValidBlockHeight,
-      feePayer: payer.publicKey,
-    });
-
     const executeIx = await this.multisig.methods
       .executeTransaction(Buffer.from(keyIndexMap))
       .accounts({
@@ -473,14 +623,37 @@ class Squads {
       })
       .instruction();
     executeIx.keys = executeIx.keys.concat(keysUnique);
+    return executeIx;
+  }
+  async executeTransaction(
+    transactionPDA: PublicKey,
+    feePayer?: Wallet
+  ): Promise<TransactionAccount> {
+    const payer = feePayer ?? this.wallet;
+    const executeIx = await this._executeTransaction(transactionPDA, payer);
+
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    const lastValidBlockHeight = await this.connection.getBlockHeight();
+    const executeTx = new anchor.web3.Transaction({
+      blockhash,
+      lastValidBlockHeight,
+      feePayer: payer.publicKey,
+    });
     executeTx.add(executeIx);
     await this.provider.sendAndConfirm(executeTx);
     return await this.getTransaction(transactionPDA);
   }
-  async executeInstruction(
+  async buildExecuteTransaction(
+    transactionPDA: PublicKey,
+    feePayer?: Wallet
+  ): Promise<TransactionInstruction> {
+    const payer = feePayer ?? this.wallet;
+    return await this._executeTransaction(transactionPDA, payer);
+  }
+  private async _executeInstruction(
     transactionPDA: PublicKey,
     instructionPDA: PublicKey
-  ): Promise<InstructionAccount> {
+  ): Promise<SquadsMethods> {
     const transaction = await this.getTransaction(transactionPDA);
     const instruction = await this.getInstruction(instructionPDA);
     const remainingAccountKeys: anchor.web3.AccountMeta[] = [
@@ -491,7 +664,7 @@ class Squads {
         isSigner: false,
       }))
     );
-    await this.multisig.methods
+    return this.multisig.methods
       .executeInstruction()
       .accounts({
         multisig: transaction.ms,
@@ -499,10 +672,28 @@ class Squads {
         instruction: instructionPDA,
         member: this.wallet.publicKey,
       })
-      .remainingAccounts(remainingAccountKeys)
-      .rpc();
-
+      .remainingAccounts(remainingAccountKeys);
+  }
+  async executeInstruction(
+    transactionPDA: PublicKey,
+    instructionPDA: PublicKey
+  ): Promise<InstructionAccount> {
+    const methods = await this._executeInstruction(
+      transactionPDA,
+      instructionPDA
+    );
+    await methods.rpc();
     return await this.getInstruction(instructionPDA);
+  }
+  async buildExecuteInstruction(
+    transactionPDA: PublicKey,
+    instructionPDA: PublicKey
+  ): Promise<TransactionInstruction> {
+    const methods = await this._executeInstruction(
+      transactionPDA,
+      instructionPDA
+    );
+    return await methods.instruction();
   }
 
   async createProgramManager() {}
