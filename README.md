@@ -13,11 +13,13 @@ Currently SMPL contains:
 Technical information about SMPL [can be found in the program README.md](https://github.com/squads-dapp/squads-mpl/blob/main/programs/squads-mpl/README.md)
 
 # Addresses
-
+### Mainnet & Devnet
   * Squads V3 on-chain program: [SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu](https://explorer.solana.com/address/SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu)
   * Program manager: [SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK](https://explorer.solana.com/address/SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK)
   
 Both programs are [Anchor verified](https://www.apr.dev/).
+* [Squads-MPL](https://www.apr.dev/program/SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu)
+* [Program Manager](https://www.apr.dev/program/SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK)
 
 # Our vision
 
@@ -26,8 +28,8 @@ Solana needed a multisig the ecosystem could rely on, so we built one.
 # Security
 
 To make sure that Squads V3 is secure we did the following:
-  * independent security audit with Bramah Systems
-  * independent security audit with OtterSec
+  * independent security audit with [Bramah Systems](https://github.com/Squads-Protocol/squads-mpl/blob/main/Squads_V3_Audit_Bramah.pdf)
+  * independent security audit with [OtterSec](https://github.com/Squads-Protocol/squads-mpl/blob/main/Squads%20V3%20-%20OtterSec%20Audit.pdf)
   * running the [Sec3](https://pro.sec3.dev/) premium tool after any changes to the on-chain code
   * written the program in [Anchor](https://www.anchor-lang.com/) (a framework for quickly building secure Solana programs)
   * kept the codebase minimal
