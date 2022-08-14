@@ -85,4 +85,5 @@ For any proposed fixes and features, please submit a pull request for review.
 
 ### Building & Testing
 `yarn build` will build the package into the `lib/` directory. The directory will contain compiled CommonJS files (.cjs), TypeScript declaration files (.d.ts), and Anchor IDL files (.json) which comprise the package. This command must be run in order to have changes to `src/` reflected in tests or actual package use.
+
 `yarn test` will run only the tests within the `sdk/` directory (not much at the moment). More robust testing (including localnet-deployed programs and RPC calls) is done by running `yarn test` in the root directory of this repository (`../`).
