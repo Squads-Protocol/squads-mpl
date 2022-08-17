@@ -1,9 +1,8 @@
 
 .anchor
 .DS_Store
-target
+/target
 **/*.rs.bk
 node_modules
 Anchor.toml
 .idea/
-tests/tmp
