@@ -362,13 +362,17 @@ pub mod squads_mpl {
             ix_account_infos.push(ix_program_info.clone());
 
             let add_member_discriminator = Vec::from_hex("0d747b827ec63922").unwrap();
-
+            let add_member_and_change_threshold_discriminator = Vec::from_hex("72d53b2fd69d96aa").unwrap();
             // loop through the provided remaining accounts
             for account_index in 0..ix_keys.len() {
                 let ix_account_info = next_account_info(ix_iter)?.clone();
 
                 // check if this data has length of 8 or greater, and is our discriminator
-                if ctx.program_id == ix_program_info.key && Some(add_member_discriminator.as_slice()) == ix.data.get(0..8) && account_index == 2 {
+                if ctx.program_id == ix_program_info.key && 
+                    (
+                        Some(add_member_discriminator.as_slice()) == ix.data.get(0..8) || 
+                        Some(add_member_and_change_threshold_discriminator.as_slice()) == ix.data.get(0..8)
+                    ) && account_index == 2 {
                     // check that the ix account keys match the submitted account keys
                     if *ix_account_info.key != *ctx.accounts.member.key {
                         return err!(MsError::InvalidInstructionAccount);

@@ -87,14 +87,49 @@ class TransactionBuilder {
                 .accounts({
                 multisig: this.multisig.publicKey,
                 multisigAuth: this.multisig.publicKey,
+                member,
             })
                 .instruction();
             return this.withInstruction(instruction);
         });
     }
-    // async withAddMemberAndChangeThreshold(): Promise<TransactionBuilder> {}
-    // async withRemoveMember(): Promise<TransactionBuilder> {}
-    // async withRemoveMemberAndChangeThreshold(): Promise<TransactionBuilder> {}
+    withAddMemberAndChangeThreshold(member, threshold) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const instruction = yield this.methods
+                .addMemberAndChangeThreshold(member, threshold)
+                .accounts({
+                multisig: this.multisig.publicKey,
+                multisigAuth: this.multisig.publicKey,
+                member,
+            })
+                .instruction();
+            return this.withInstruction(instruction);
+        });
+    }
+    withRemoveMember(member) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const instruction = yield this.methods
+                .removeMember(member)
+                .accounts({
+                multisig: this.multisig.publicKey,
+                multisigAuth: this.multisig.publicKey,
+            })
+                .instruction();
+            return this.withInstruction(instruction);
+        });
+    }
+    withRemoveMemberAndChangeThreshold(member, threshold) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const instruction = yield this.methods
+                .removeMemberAndChangeThreshold(member, threshold)
+                .accounts({
+                multisig: this.multisig.publicKey,
+                multisigAuth: this.multisig.publicKey,
+            })
+                .instruction();
+            return this.withInstruction(instruction);
+        });
+    }
     withChangeThreshold(threshold) {
         return __awaiter(this, void 0, void 0, function* () {
             const instruction = yield this.methods
