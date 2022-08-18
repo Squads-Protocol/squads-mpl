@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/Squads-Protocol/squads-mpl/compare/v1.0.7...v1.1.0) (2022-08-18)
+
+
+### Features
+
+* **add_member_with_threshold:** added discriminator ([716f249](https://github.com/Squads-Protocol/squads-mpl/commit/716f2496566e3170be6e70dda62a6b9a1a6d5764))
+
+
+### Bug Fixes
+
+* **tests:** added test for add/change combo ([4ed4717](https://github.com/Squads-Protocol/squads-mpl/commit/4ed47176344ec65a7854ad43046e7a6922baf3cf))
+* **tests:** remove duplicate ([28d9dbd](https://github.com/Squads-Protocol/squads-mpl/commit/28d9dbd5c1a767e6e2def36f4309c86ddd654533))
+
 ## [1.0.7](https://github.com/Squads-Protocol/squads-mpl/compare/v1.0.6...v1.0.7) (2022-08-10)
 
 
