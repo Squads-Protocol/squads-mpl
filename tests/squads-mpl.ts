@@ -590,6 +590,79 @@ describe("Multisig and Programs", () => {
           .indexOf(creator.publicKey.toBase58())
       ).is.lessThan(0);
     });
+
+    it(`Add a new member & change threshold (conjoined) - MS: ${msPDA.toBase58()}`, async () => {
+      const newMember = anchor.web3.Keypair.generate().publicKey;
+      const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
+      const [txInstructions, txPDA] = await (
+        await txBuilder.withAddMemberAndChangeThreshold(newMember, 1)
+      ).getInstructions();
+      const activateIx = await squads.buildActivateTransaction(msPDA, txPDA);
+
+      let addMemberTx = await createBlankTransaction(
+        squads.connection,
+        creator.publicKey
+      );
+      addMemberTx.add(...txInstructions);
+      addMemberTx.add(activateIx);
+
+      await provider.sendAndConfirm(addMemberTx);
+      let msState = await squads.getMultisig(msPDA);
+      // get necessary signers
+      // if the threshold has changed, use the other members to approve as well
+      for (let i = 0; i < memberList.length; i++) {
+        // check to see if we need more signers
+        const approvalState = await squads.getTransaction(txPDA);
+        if (Object.keys(approvalState.status).indexOf("active") < 0) {
+          return false;
+        }
+
+        const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
+          (k) => {
+            return k.toBase58() == memberList[i].publicKey.toBase58();
+          }
+        );
+        if (inMultisig < 0) {
+          return false;
+        }
+        try {
+          await provider.connection.requestAirdrop(
+            memberList[i].publicKey,
+            anchor.web3.LAMPORTS_PER_SOL
+          );
+          const approveTx = await program.methods
+            .approveTransaction()
+            .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              member: memberList[i].publicKey,
+            })
+            .signers([memberList[i]])
+            .transaction();
+          try {
+            await provider.sendAndConfirm(approveTx, [memberList[i]]);
+            return true;
+          } catch (e) {
+            console.log(memberList[i].publicKey.toBase58(), " signing error");
+            return false;
+          }
+        } catch (e) {
+          console.log(e);
+          return false;
+        }
+      }
+
+      let txState = await squads.getTransaction(txPDA);
+      expect(txState.status).has.property("executeReady");
+
+      await squads.executeTransaction(txPDA);
+      txState = await squads.getTransaction(txPDA);
+      expect(txState.status).has.property("executed");
+      msState = await squads.getMultisig(msPDA);
+      threshold = msState.threshold;
+      expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 3);
+      expect(msState.threshold).to.equal(1);
+    });
   });
 
   describe("Program upgrades", () => {
