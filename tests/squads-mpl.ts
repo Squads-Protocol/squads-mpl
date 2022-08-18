@@ -422,39 +422,6 @@ describe("Multisig and Programs", () => {
       expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 2);
     });
 
-    it(`Add a new member and change threshold but creator is not executor - MS: ${msPDA.toBase58()}`, async () => {
-      // 1 get the instruction to create a transaction
-      // 2 get the instruction to add a member
-      // 3 get the instruction to 'activate' the tx
-      // 4 send over the transaction to the ms program with 1 - 3
-      // use 0 as authority index
-      const newMember = anchor.web3.Keypair.generate().publicKey;
-      const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
-      const [txInstructions, txPDA] = await (
-          await txBuilder.withAddMemberAndChangeThreshold(newMember, 2)
-      ).getInstructions();
-      const activateIx = await squads.buildActivateTransaction(msPDA, txPDA);
-
-      let addMemberTx = await createBlankTransaction(
-          squads.connection,
-          creator.publicKey
-      );
-      addMemberTx.add(...txInstructions);
-      addMemberTx.add(activateIx);
-
-      await provider.sendAndConfirm(addMemberTx);
-
-      await squads.approveTransaction(txPDA);
-
-      let txState = await squads.getTransaction(txPDA);
-      expect(txState.status).has.property("executeReady");
-
-      await squads.executeTransaction(txPDA);
-
-      const msState = await squads.getMultisig(msPDA);
-      expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 2);
-    });
-
     it(`Transaction instruction failure - MS: ${msPDA.toBase58()}`, async () => {
       // create authority to use (Vault, index 1)
       const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
