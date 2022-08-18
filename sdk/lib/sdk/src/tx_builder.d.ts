@@ -16,6 +16,9 @@ export declare class TransactionBuilder {
     withInstruction(instruction: TransactionInstruction): TransactionBuilder;
     withInstructions(instructions: TransactionInstruction[]): TransactionBuilder;
     withAddMember(member: PublicKey): Promise<TransactionBuilder>;
+    withAddMemberAndChangeThreshold(member: PublicKey, threshold: number): Promise<TransactionBuilder>;
+    withRemoveMember(member: PublicKey): Promise<TransactionBuilder>;
+    withRemoveMemberAndChangeThreshold(member: PublicKey, threshold: number): Promise<TransactionBuilder>;
     withChangeThreshold(threshold: number): Promise<TransactionBuilder>;
     withSetAsExecuted(programManagerPDA: PublicKey, managedProgramPDA: PublicKey, programUpgradePDA: PublicKey, transactionPDA: PublicKey, instructionPDA: PublicKey, authorityIndex: number): Promise<TransactionBuilder>;
     getInstructions(): Promise<[TransactionInstruction[], PublicKey]>;

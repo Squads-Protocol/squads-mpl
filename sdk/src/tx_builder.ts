@@ -94,13 +94,48 @@ export class TransactionBuilder {
       .accounts({
         multisig: this.multisig.publicKey,
         multisigAuth: this.multisig.publicKey,
+        member,
       })
       .instruction();
     return this.withInstruction(instruction);
   }
-  // async withAddMemberAndChangeThreshold(): Promise<TransactionBuilder> {}
-  // async withRemoveMember(): Promise<TransactionBuilder> {}
-  // async withRemoveMemberAndChangeThreshold(): Promise<TransactionBuilder> {}
+  async withAddMemberAndChangeThreshold(
+    member: PublicKey,
+    threshold: number
+  ): Promise<TransactionBuilder> {
+    const instruction = await this.methods
+      .addMemberAndChangeThreshold(member, threshold)
+      .accounts({
+        multisig: this.multisig.publicKey,
+        multisigAuth: this.multisig.publicKey,
+        member,
+      })
+      .instruction();
+    return this.withInstruction(instruction);
+  }
+  async withRemoveMember(member: PublicKey): Promise<TransactionBuilder> {
+    const instruction = await this.methods
+      .removeMember(member)
+      .accounts({
+        multisig: this.multisig.publicKey,
+        multisigAuth: this.multisig.publicKey,
+      })
+      .instruction();
+    return this.withInstruction(instruction);
+  }
+  async withRemoveMemberAndChangeThreshold(
+    member: PublicKey,
+    threshold: number
+  ): Promise<TransactionBuilder> {
+    const instruction = await this.methods
+      .removeMemberAndChangeThreshold(member, threshold)
+      .accounts({
+        multisig: this.multisig.publicKey,
+        multisigAuth: this.multisig.publicKey,
+      })
+      .instruction();
+    return this.withInstruction(instruction);
+  }
   async withChangeThreshold(threshold: number): Promise<TransactionBuilder> {
     const instruction = await this.methods
       .changeThreshold(threshold)
