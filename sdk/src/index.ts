@@ -566,13 +566,16 @@ class Squads {
       .map(({ pubkey, ixItem }) => {
         const ixKeys: anchor.web3.AccountMeta[] =
           ixItem.keys as anchor.web3.AccountMeta[];
-        const sig = anchor.utils.sha256.hash("global:add_member");
-        const ixDiscriminator = Buffer.from(sig, "hex");
-        const data = Buffer.concat([ixDiscriminator.slice(0, 8)]);
+        const addSig = anchor.utils.sha256.hash("global:add_member");
+        const ixDiscriminator = Buffer.from(addSig, "hex");
+        const addData = Buffer.concat([ixDiscriminator.slice(0, 8)]);
+        const addAndThreshSig = anchor.utils.sha256.hash("global:add_member_and_change_threshold");
+        const ixAndThreshDiscriminator = Buffer.from(addAndThreshSig, "hex");
+        const addAndThreshData = Buffer.concat([ixAndThreshDiscriminator.slice(0, 8)]);
         const ixData = ixItem.data as any;
 
         const formattedKeys = ixKeys.map((ixKey, keyInd) => {
-          if (ixData.includes(data) && keyInd === 2) {
+          if ((ixData.includes(addData) || ixData.includes(addAndThreshData)) && keyInd === 2) {
             return {
               pubkey: payer.publicKey,
               isSigner: false,
