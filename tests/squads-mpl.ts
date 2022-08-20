@@ -622,7 +622,9 @@ describe("Multisig and Programs", () => {
       let txState = await squads.getTransaction(txPDA);
       expect(txState.status).has.property("executeReady");
 
-      await squads.executeTransaction(txPDA);
+      const payer = memberList[4];
+      await provider.connection.requestAirdrop(payer.publicKey, anchor.web3.LAMPORTS_PER_SOL);
+      await squads.executeTransaction(txPDA, new anchor.Wallet(payer));
       txState = await squads.getTransaction(txPDA);
       expect(txState.status).has.property("executed");
       msState = await squads.getMultisig(msPDA);
