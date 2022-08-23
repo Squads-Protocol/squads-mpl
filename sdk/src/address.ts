@@ -21,7 +21,7 @@ export const getTxPDA = (
     [
       utils.bytes.utf8.encode("squad"),
       msPDA.toBuffer(),
-      txIndexBN.toBuffer("le", 4),
+      txIndexBN.toArrayLike(Buffer, "le", 4),
       utils.bytes.utf8.encode("transaction"),
     ],
     programId
@@ -36,7 +36,7 @@ export const getIxPDA = (
     [
       utils.bytes.utf8.encode("squad"),
       txPDA.toBuffer(),
-      iXIndexBN.toBuffer("le", 1), // note instruction index is an u8 (1 byte)
+      iXIndexBN.toArrayLike(Buffer, "le", 1), // note instruction index is an u8 (1 byte)
       utils.bytes.utf8.encode("instruction"),
     ],
     programId
@@ -51,7 +51,7 @@ export const getAuthorityPDA = (
     [
       utils.bytes.utf8.encode("squad"),
       msPDA.toBuffer(),
-      authorityIndexBN.toBuffer("le", 4), // note authority index is an u32 (4 byte)
+      authorityIndexBN.toArrayLike(Buffer, "le", 4), // note authority index is an u32 (4 byte)
       utils.bytes.utf8.encode("authority"),
     ],
     programId
@@ -76,7 +76,7 @@ export const getManagedProgramPDA = (
     [
       utils.bytes.utf8.encode("squad"),
       programManagerPDA.toBuffer(),
-      managedProgramIndexBN.toBuffer("le", 4), // note authority index is an u32 (4 byte)
+      managedProgramIndexBN.toArrayLike(Buffer, "le", 4), // note authority index is an u32 (4 byte)
       utils.bytes.utf8.encode("program"),
     ],
     programId
@@ -91,7 +91,7 @@ export const getProgramUpgradePDA = (
     [
       utils.bytes.utf8.encode("squad"),
       managedProgramPDA.toBuffer(),
-      upgradeIndexBN.toBuffer("le", 4), // note authority index is an u32 (4 byte)
+      upgradeIndexBN.toArrayLike(Buffer, "le", 4), // note authority index is an u32 (4 byte)
       utils.bytes.utf8.encode("pupgrade"),
     ],
     programId
