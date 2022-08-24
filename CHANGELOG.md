@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/Squads-Protocol/squads-mpl/compare/v1.1.0...v1.1.1) (2022-08-24)
+
+
+### Bug Fixes
+
+* **sdk:** update sdk dependency ver ([a31b09b](https://github.com/Squads-Protocol/squads-mpl/commit/a31b09b2e9ad2f254ad02c9b3de6f295d40685f0))
+
 ## [1.1.0](https://github.com/Squads-Protocol/squads-mpl/compare/v1.0.7...v1.1.0) (2022-08-18)
 
 
