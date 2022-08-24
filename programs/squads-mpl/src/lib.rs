@@ -395,7 +395,8 @@ pub mod squads_mpl {
                         return err!(MsError::InvalidAuthorityIndex);
                     }
                     // since the add member may need to pay realloc, switch the payer
-                    if Some(add_member_discriminator.as_slice()) == ix.data.get(0..8) {
+                    if Some(add_member_discriminator.as_slice()) == ix.data.get(0..8) ||
+                    Some(add_member_and_change_threshold_discriminator.as_slice()) == ix.data.get(0..8) {
                         ix.accounts[2] = AccountMeta::new(*ctx.accounts.member.key, true);
                         ix_account_infos[3] = ctx.accounts.member.to_account_info();
                     }

@@ -350,7 +350,7 @@ class Squads {
             return yield methods.instruction();
         });
     }
-    _executeTransaction(transactionPDA, payer) {
+    _executeTransaction(transactionPDA, feePayer) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
             const ixList = yield Promise.all([...new Array(transaction.instructionIndex)].map((a, i) => __awaiter(this, void 0, void 0, function* () {
@@ -367,12 +367,16 @@ class Squads {
                 const addData = Buffer.concat([ixDiscriminator.slice(0, 8)]);
                 const addAndThreshSig = anchor.utils.sha256.hash("global:add_member_and_change_threshold");
                 const ixAndThreshDiscriminator = Buffer.from(addAndThreshSig, "hex");
-                const addAndThreshData = Buffer.concat([ixAndThreshDiscriminator.slice(0, 8)]);
+                const addAndThreshData = Buffer.concat([
+                    ixAndThreshDiscriminator.slice(0, 8),
+                ]);
                 const ixData = ixItem.data;
                 const formattedKeys = ixKeys.map((ixKey, keyInd) => {
-                    if ((ixData.includes(addData) || ixData.includes(addAndThreshData)) && keyInd === 2) {
+                    if ((ixData.includes(addData) || ixData.includes(addAndThreshData)) &&
+                        keyInd === 2) {
+                        console.log("swapping key from", ixKey.pubkey.toString(), "to", feePayer.toString());
                         return {
-                            pubkey: payer.publicKey,
+                            pubkey: feePayer,
                             isSigner: false,
                             isWritable: ixKey.isWritable,
                         };
@@ -383,6 +387,9 @@ class Squads {
                         isWritable: ixKey.isWritable,
                     };
                 });
+                if (ixData.includes(addData) || ixData.includes(addAndThreshData)) {
+                    console.log(formattedKeys.map((f) => f.pubkey.toString()));
+                }
                 return [
                     { pubkey, isSigner: false, isWritable: false },
                     { pubkey: ixItem.programId, isSigner: false, isWritable: false },
@@ -415,32 +422,32 @@ class Squads {
                 .accounts({
                 multisig: transaction.ms,
                 transaction: transactionPDA,
-                member: payer.publicKey,
+                member: feePayer,
             })
                 .instruction();
             executeIx.keys = executeIx.keys.concat(keysUnique);
             return executeIx;
         });
     }
-    executeTransaction(transactionPDA, feePayer) {
+    executeTransaction(transactionPDA, feePayer, signers) {
         return __awaiter(this, void 0, void 0, function* () {
-            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet;
+            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet.publicKey;
             const executeIx = yield this._executeTransaction(transactionPDA, payer);
             const { blockhash } = yield this.connection.getLatestBlockhash();
             const lastValidBlockHeight = yield this.connection.getBlockHeight();
             const executeTx = new anchor.web3.Transaction({
                 blockhash,
                 lastValidBlockHeight,
-                feePayer: payer.publicKey,
+                feePayer: payer,
             });
             executeTx.add(executeIx);
-            yield this.provider.sendAndConfirm(executeTx);
+            yield this.provider.sendAndConfirm(executeTx, signers);
             return yield this.getTransaction(transactionPDA);
         });
     }
     buildExecuteTransaction(transactionPDA, feePayer) {
         return __awaiter(this, void 0, void 0, function* () {
-            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet;
+            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet.publicKey;
             return yield this._executeTransaction(transactionPDA, payer);
         });
     }
