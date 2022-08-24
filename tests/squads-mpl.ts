@@ -581,7 +581,7 @@ describe("Multisig and Programs", () => {
         // check to see if we need more signers
         const approvalState = await squads.getTransaction(txPDA);
         if (Object.keys(approvalState.status).indexOf("active") < 0) {
-          return false;
+          break;
         }
 
         const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
@@ -590,7 +590,7 @@ describe("Multisig and Programs", () => {
           }
         );
         if (inMultisig < 0) {
-          return false;
+          continue;
         }
         try {
           await provider.connection.requestAirdrop(
@@ -608,14 +608,11 @@ describe("Multisig and Programs", () => {
             .transaction();
           try {
             await provider.sendAndConfirm(approveTx, [memberList[i]]);
-            return true;
           } catch (e) {
             console.log(memberList[i].publicKey.toBase58(), " signing error");
-            return false;
           }
         } catch (e) {
           console.log(e);
-          return false;
         }
       }
 
@@ -822,7 +819,7 @@ describe("Multisig and Programs", () => {
         // check to see if we need more signers
         const approvalState = await squads.getTransaction(txPDA);
         if (Object.keys(approvalState.status).indexOf("active") < 0) {
-          return false;
+          break;
         }
 
         const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
@@ -831,7 +828,7 @@ describe("Multisig and Programs", () => {
           }
         );
         if (inMultisig < 0) {
-          return false;
+          continue;
         }
         try {
           await provider.connection.requestAirdrop(
@@ -849,14 +846,11 @@ describe("Multisig and Programs", () => {
             .transaction();
           try {
             await provider.sendAndConfirm(approveTx, [memberList[i]]);
-            return true;
           } catch (e) {
             console.log(memberList[i].publicKey.toBase58(), " signing error");
-            return false;
           }
         } catch (e) {
           console.log(e);
-          return false;
         }
       }
 
