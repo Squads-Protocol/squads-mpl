@@ -4,6 +4,7 @@ import {
   Commitment,
   ConnectionConfig,
   TransactionInstruction,
+  Signer,
 } from "@solana/web3.js";
 import {
   DEFAULT_MULTISIG_PROGRAM_ID,
@@ -546,7 +547,7 @@ class Squads {
   }
   private async _executeTransaction(
     transactionPDA: PublicKey,
-    payer: Wallet
+    feePayer: PublicKey
   ): Promise<TransactionInstruction> {
     const transaction = await this.getTransaction(transactionPDA);
     const ixList = await Promise.all(
@@ -569,15 +570,22 @@ class Squads {
         const addSig = anchor.utils.sha256.hash("global:add_member");
         const ixDiscriminator = Buffer.from(addSig, "hex");
         const addData = Buffer.concat([ixDiscriminator.slice(0, 8)]);
-        const addAndThreshSig = anchor.utils.sha256.hash("global:add_member_and_change_threshold");
+        const addAndThreshSig = anchor.utils.sha256.hash(
+          "global:add_member_and_change_threshold"
+        );
         const ixAndThreshDiscriminator = Buffer.from(addAndThreshSig, "hex");
-        const addAndThreshData = Buffer.concat([ixAndThreshDiscriminator.slice(0, 8)]);
+        const addAndThreshData = Buffer.concat([
+          ixAndThreshDiscriminator.slice(0, 8),
+        ]);
         const ixData = ixItem.data as any;
 
         const formattedKeys = ixKeys.map((ixKey, keyInd) => {
-          if ((ixData.includes(addData) || ixData.includes(addAndThreshData)) && keyInd === 2) {
+          if (
+            (ixData.includes(addData) || ixData.includes(addAndThreshData)) &&
+            keyInd === 2
+          ) {
             return {
-              pubkey: payer.publicKey,
+              pubkey: feePayer,
               isSigner: false,
               isWritable: ixKey.isWritable,
             };
@@ -631,7 +639,7 @@ class Squads {
       .accounts({
         multisig: transaction.ms,
         transaction: transactionPDA,
-        member: payer.publicKey,
+        member: feePayer,
       })
       .instruction();
     executeIx.keys = executeIx.keys.concat(keysUnique);
@@ -639,9 +647,10 @@ class Squads {
   }
   async executeTransaction(
     transactionPDA: PublicKey,
-    feePayer?: Wallet
+    feePayer?: PublicKey,
+    signers?: Signer[]
   ): Promise<TransactionAccount> {
-    const payer = feePayer ?? this.wallet;
+    const payer = feePayer ?? this.wallet.publicKey;
     const executeIx = await this._executeTransaction(transactionPDA, payer);
 
     const { blockhash } = await this.connection.getLatestBlockhash();
@@ -649,17 +658,17 @@ class Squads {
     const executeTx = new anchor.web3.Transaction({
       blockhash,
       lastValidBlockHeight,
-      feePayer: payer.publicKey,
+      feePayer: payer,
     });
     executeTx.add(executeIx);
-    await this.provider.sendAndConfirm(executeTx);
+    await this.provider.sendAndConfirm(executeTx, signers);
     return await this.getTransaction(transactionPDA);
   }
   async buildExecuteTransaction(
     transactionPDA: PublicKey,
-    feePayer?: Wallet
+    feePayer?: PublicKey
   ): Promise<TransactionInstruction> {
-    const payer = feePayer ?? this.wallet;
+    const payer = feePayer ?? this.wallet.publicKey;
     return await this._executeTransaction(transactionPDA, payer);
   }
   private async _executeInstruction(

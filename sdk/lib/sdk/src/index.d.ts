@@ -1,4 +1,4 @@
-import { Connection, PublicKey, Commitment, ConnectionConfig, TransactionInstruction } from "@solana/web3.js";
+import { Connection, PublicKey, Commitment, ConnectionConfig, TransactionInstruction, Signer } from "@solana/web3.js";
 import { Wallet } from "@project-serum/anchor/dist/cjs/provider";
 import { InstructionAccount, ManagedProgramAccount, MultisigAccount, ProgramManagerAccount, ProgramUpgradeAccount, TransactionAccount } from "./types";
 import { TransactionBuilder } from "./tx_builder";
@@ -77,8 +77,8 @@ declare class Squads {
     cancelTransaction(transactionPDA: PublicKey): Promise<TransactionAccount>;
     buildCancelTransaction(multisigPDA: PublicKey, transactionPDA: PublicKey): Promise<TransactionInstruction>;
     private _executeTransaction;
-    executeTransaction(transactionPDA: PublicKey, feePayer?: Wallet): Promise<TransactionAccount>;
-    buildExecuteTransaction(transactionPDA: PublicKey, feePayer?: Wallet): Promise<TransactionInstruction>;
+    executeTransaction(transactionPDA: PublicKey, feePayer?: PublicKey, signers?: Signer[]): Promise<TransactionAccount>;
+    buildExecuteTransaction(transactionPDA: PublicKey, feePayer?: PublicKey): Promise<TransactionInstruction>;
     private _executeInstruction;
     executeInstruction(transactionPDA: PublicKey, instructionPDA: PublicKey): Promise<InstructionAccount>;
     buildExecuteInstruction(transactionPDA: PublicKey, instructionPDA: PublicKey): Promise<TransactionInstruction>;

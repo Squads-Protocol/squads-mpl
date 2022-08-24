@@ -416,7 +416,7 @@ describe("Multisig and Programs", () => {
       let txState = await squads.getTransaction(txPDA);
       expect(txState.status).has.property("executeReady");
 
-      await squads.executeTransaction(txPDA);
+      await squads.executeTransaction(txPDA, member2.publicKey, [member2]);
 
       const msState = await squads.getMultisig(msPDA);
       expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 2);
@@ -620,8 +620,11 @@ describe("Multisig and Programs", () => {
       expect(txState.status).has.property("executeReady");
 
       const payer = memberList[4];
-      await provider.connection.requestAirdrop(payer.publicKey, anchor.web3.LAMPORTS_PER_SOL);
-      await squads.executeTransaction(txPDA, new anchor.Wallet(payer));
+      await provider.connection.requestAirdrop(
+        payer.publicKey,
+        anchor.web3.LAMPORTS_PER_SOL
+      );
+      await squads.executeTransaction(txPDA, payer.publicKey, [payer]);
       txState = await squads.getTransaction(txPDA);
       expect(txState.status).has.property("executed");
       msState = await squads.getMultisig(msPDA);
