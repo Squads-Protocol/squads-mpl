@@ -52,7 +52,7 @@ class Squads {
         this.connection = connection;
         this.wallet = wallet;
         this.multisigProgramId = multisigProgramId !== null && multisigProgramId !== void 0 ? multisigProgramId : constants_1.DEFAULT_MULTISIG_PROGRAM_ID;
-        this.provider = new anchor_1.AnchorProvider(this.connection, this.wallet, anchor_1.AnchorProvider.defaultOptions());
+        this.provider = new anchor_1.AnchorProvider(this.connection, this.wallet, Object.assign(Object.assign({}, anchor_1.AnchorProvider.defaultOptions()), { commitment: "confirmed", preflightCommitment: "confirmed" }));
         this.multisig = new anchor_1.Program(squads_mpl_json_1.default, this.multisigProgramId, this.provider);
         this.programManagerProgramId =
             programManagerProgramId !== null && programManagerProgramId !== void 0 ? programManagerProgramId : constants_1.DEFAULT_PROGRAM_MANAGER_PROGRAM_ID;
@@ -81,73 +81,73 @@ class Squads {
     }
     getMultisig(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.multisig.account.ms.fetch(address);
+            const accountData = yield this.multisig.account.ms.fetch(address, "processed");
             return Object.assign(Object.assign({}, accountData), { publicKey: address });
         });
     }
     getMultisigs(addresses) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.multisig.account.ms.fetchMultiple(addresses);
+            const accountData = yield this.multisig.account.ms.fetchMultiple(addresses, "processed");
             return this._addPublicKeys(accountData, addresses);
         });
     }
     getTransaction(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.multisig.account.msTransaction.fetch(address);
+            const accountData = yield this.multisig.account.msTransaction.fetch(address, "processed");
             return Object.assign(Object.assign({}, accountData), { publicKey: address });
         });
     }
     getTransactions(addresses) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.multisig.account.msTransaction.fetchMultiple(addresses);
+            const accountData = yield this.multisig.account.msTransaction.fetchMultiple(addresses, "processed");
             return this._addPublicKeys(accountData, addresses);
         });
     }
     getInstruction(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.multisig.account.msInstruction.fetch(address);
+            const accountData = yield this.multisig.account.msInstruction.fetch(address, "processed");
             return Object.assign(Object.assign({}, accountData), { publicKey: address });
         });
     }
     getInstructions(addresses) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.multisig.account.msInstruction.fetchMultiple(addresses);
+            const accountData = yield this.multisig.account.msInstruction.fetchMultiple(addresses, "processed");
             return this._addPublicKeys(accountData, addresses);
         });
     }
     getProgramManager(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.programManager.account.programManager.fetch(address);
+            const accountData = yield this.programManager.account.programManager.fetch(address, "processed");
             return Object.assign(Object.assign({}, accountData), { publicKey: address });
         });
     }
     getProgramManagers(addresses) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.programManager.account.programManager.fetchMultiple(addresses);
+            const accountData = yield this.programManager.account.programManager.fetchMultiple(addresses, "processed");
             return this._addPublicKeys(accountData, addresses);
         });
     }
     getManagedProgram(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.programManager.account.managedProgram.fetch(address);
+            const accountData = yield this.programManager.account.managedProgram.fetch(address, "processed");
             return Object.assign(Object.assign({}, accountData), { publicKey: address });
         });
     }
     getManagedPrograms(addresses) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.programManager.account.managedProgram.fetchMultiple(addresses);
+            const accountData = yield this.programManager.account.managedProgram.fetchMultiple(addresses, "processed");
             return this._addPublicKeys(accountData, addresses);
         });
     }
     getProgramUpgrade(address) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.programManager.account.programUpgrade.fetch(address);
+            const accountData = yield this.programManager.account.programUpgrade.fetch(address, "processed");
             return Object.assign(Object.assign({}, accountData), { publicKey: address });
         });
     }
     getProgramUpgrades(addresses) {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.programManager.account.programUpgrade.fetchMultiple(addresses);
+            const accountData = yield this.programManager.account.programUpgrade.fetchMultiple(addresses, "processed");
             return this._addPublicKeys(accountData, addresses);
         });
     }
@@ -374,7 +374,6 @@ class Squads {
                 const formattedKeys = ixKeys.map((ixKey, keyInd) => {
                     if ((ixData.includes(addData) || ixData.includes(addAndThreshData)) &&
                         keyInd === 2) {
-                        console.log("swapping key from", ixKey.pubkey.toString(), "to", feePayer.toString());
                         return {
                             pubkey: feePayer,
                             isSigner: false,
@@ -387,9 +386,6 @@ class Squads {
                         isWritable: ixKey.isWritable,
                     };
                 });
-                if (ixData.includes(addData) || ixData.includes(addAndThreshData)) {
-                    console.log(formattedKeys.map((f) => f.pubkey.toString()));
-                }
                 return [
                     { pubkey, isSigner: false, isWritable: false },
                     { pubkey: ixItem.programId, isSigner: false, isWritable: false },

@@ -1,6 +1,6 @@
 {
   "name": "@sqds/sdk",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "An SDK for easily interacting with Squads Multisig Programs",
   "main": "lib/sdk/src/index.js",
   "files": [
@@ -11,7 +11,8 @@
     "build": "./build.sh"
   },
   "dependencies": {
-    "@project-serum/anchor": "^0.24.2",
+    "@project-serum/anchor": "^0.25.0",
+    "@solana/web3.js": "^1.53.0",
     "bn.js": "^5.2.1"
   },
   "devDependencies": {

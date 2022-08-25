@@ -64,7 +64,7 @@ class Squads {
     this.provider = new AnchorProvider(
       this.connection,
       this.wallet,
-      AnchorProvider.defaultOptions()
+      {...AnchorProvider.defaultOptions(), commitment: "confirmed", preflightCommitment: "confirmed"}
     );
     this.multisig = new Program<SquadsMpl>(
       squadsMplJSON as SquadsMpl,
@@ -168,13 +168,13 @@ class Squads {
     );
   }
   async getMultisig(address: PublicKey): Promise<MultisigAccount> {
-    const accountData = await this.multisig.account.ms.fetch(address);
+    const accountData = await this.multisig.account.ms.fetch(address, "processed");
     return { ...accountData, publicKey: address } as MultisigAccount;
   }
   async getMultisigs(
     addresses: PublicKey[]
   ): Promise<(MultisigAccount | null)[]> {
-    const accountData = await this.multisig.account.ms.fetchMultiple(addresses);
+    const accountData = await this.multisig.account.ms.fetchMultiple(addresses, "processed");
     return this._addPublicKeys(
       accountData,
       addresses
@@ -182,7 +182,8 @@ class Squads {
   }
   async getTransaction(address: PublicKey): Promise<TransactionAccount> {
     const accountData = await this.multisig.account.msTransaction.fetch(
-      address
+      address,
+      "processed"
     );
     return { ...accountData, publicKey: address };
   }
@@ -190,7 +191,8 @@ class Squads {
     addresses: PublicKey[]
   ): Promise<(TransactionAccount | null)[]> {
     const accountData = await this.multisig.account.msTransaction.fetchMultiple(
-      addresses
+      addresses,
+      "processed"
     );
     return this._addPublicKeys(
       accountData,
@@ -199,7 +201,8 @@ class Squads {
   }
   async getInstruction(address: PublicKey): Promise<InstructionAccount> {
     const accountData = await this.multisig.account.msInstruction.fetch(
-      address
+      address,
+      "processed"
     );
     return { ...accountData, publicKey: address };
   }
@@ -207,7 +210,8 @@ class Squads {
     addresses: PublicKey[]
   ): Promise<(InstructionAccount | null)[]> {
     const accountData = await this.multisig.account.msInstruction.fetchMultiple(
-      addresses
+      addresses,
+      "processed"
     );
     return this._addPublicKeys(
       accountData,
@@ -217,7 +221,8 @@ class Squads {
 
   async getProgramManager(address: PublicKey): Promise<ProgramManagerAccount> {
     const accountData = await this.programManager.account.programManager.fetch(
-      address
+      address,
+      "processed"
     );
     return { ...accountData, publicKey: address };
   }
@@ -225,7 +230,7 @@ class Squads {
     addresses: PublicKey[]
   ): Promise<(ProgramManagerAccount | null)[]> {
     const accountData =
-      await this.programManager.account.programManager.fetchMultiple(addresses);
+      await this.programManager.account.programManager.fetchMultiple(addresses, "processed");
     return this._addPublicKeys(
       accountData,
       addresses
@@ -233,7 +238,8 @@ class Squads {
   }
   async getManagedProgram(address: PublicKey): Promise<ManagedProgramAccount> {
     const accountData = await this.programManager.account.managedProgram.fetch(
-      address
+      address,
+      "processed"
     );
     return { ...accountData, publicKey: address };
   }
@@ -241,7 +247,7 @@ class Squads {
     addresses: PublicKey[]
   ): Promise<(ManagedProgramAccount | null)[]> {
     const accountData =
-      await this.programManager.account.managedProgram.fetchMultiple(addresses);
+      await this.programManager.account.managedProgram.fetchMultiple(addresses, "processed");
     return this._addPublicKeys(
       accountData,
       addresses
@@ -249,7 +255,8 @@ class Squads {
   }
   async getProgramUpgrade(address: PublicKey): Promise<ProgramUpgradeAccount> {
     const accountData = await this.programManager.account.programUpgrade.fetch(
-      address
+      address,
+      "processed"
     );
     return { ...accountData, publicKey: address };
   }
@@ -257,7 +264,7 @@ class Squads {
     addresses: PublicKey[]
   ): Promise<(ProgramUpgradeAccount | null)[]> {
     const accountData =
-      await this.programManager.account.programUpgrade.fetchMultiple(addresses);
+      await this.programManager.account.programUpgrade.fetchMultiple(addresses, "processed");
     return this._addPublicKeys(
       accountData,
       addresses
