@@ -1,0 +1,25 @@
+[package]
+name = "mesh"
+version = "0.0.1"
+description = "Squads Mesh Program"
+authors = ["Sean Lars Ganser <sean@sqds.io>"]
+homepage = "https://squads.so"
+repository = "https://github.com/squads-protocol/squads-mpl"
+edition = "2018"
+keywords = ["squads", "solana", "program", "smart-contract", "multisig"]
+readme = "README.md"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "mesh"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.25.0"
+hex = "0.3.1"

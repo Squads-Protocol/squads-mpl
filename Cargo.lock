@@ -776,6 +776,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mesh"
+version = "0.0.1"
+dependencies = [
+ "anchor-lang",
+ "hex",
+]
+
+[[package]]
 name = "num-derive"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

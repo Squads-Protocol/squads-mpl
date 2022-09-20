@@ -4,9 +4,12 @@ import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
 import { SquadsMpl } from "../target/types/squads_mpl";
 import { ProgramManager } from "../target/types/program_manager";
+import { Mesh } from "../target/types/mesh";
+
 import {
   createBlankTransaction,
   createTestTransferTransaction,
+  executeTransaction,
 } from "../helpers/transactions";
 import { execSync } from "child_process";
 import { ParsedAccountData } from "@solana/web3.js";
@@ -15,6 +18,7 @@ import Squads, {
   getIxPDA,
   getProgramManagerPDA,
   getAuthorityPDA,
+  getTxPDA,
 } from "@sqds/sdk";
 import BN from "bn.js";
 
@@ -29,6 +33,11 @@ const deploySmpl = () => {
 
 const deployPm = () => {
   const deployCmd = `solana program deploy --url localhost -v --program-id $(pwd)/target/deploy/program_manager-keypair.json $(pwd)/target/deploy/program_manager.so`;
+  execSync(deployCmd);
+};
+
+const deployMesh = () => {
+  const deployCmd = `solana program deploy --url localhost -v --program-id $(pwd)/target/deploy/mesh-keypair.json $(pwd)/target/deploy/mesh.so`;
   execSync(deployCmd);
 };
 
@@ -61,812 +70,1275 @@ const setProgramAuthority = (
   }
 };
 
-describe("Multisig and Programs", () => {
-  console.log("Deploying programs...");
-  deploySmpl();
-  console.log("✔ SMPL Program deployed.");
-  deployPm();
-  console.log("✔ Program Manager Program deployed.");
-  console.log("Finished deploying programs.");
+const getIxAuthority = async (txPda: anchor.web3.PublicKey, index: anchor.BN, programId: anchor.web3.PublicKey) => {
+  return anchor.web3.PublicKey.findProgramAddress([
+      anchor.utils.bytes.utf8.encode("squad"),
+      txPda.toBuffer(),
+      index.toArrayLike(Buffer, "le", 4),
+      anchor.utils.bytes.utf8.encode("ix_authority")],
+      programId
+  );
+};
 
-  // Configure the client to use the local cluster.
-  const provider = anchor.AnchorProvider.env();
-  anchor.setProvider(provider);
+let provider;
 
-  const program = anchor.workspace.SquadsMpl as Program<SquadsMpl>;
-  const squads = Squads.localnet(provider.wallet, {
-    commitmentOrConfig: provider.connection.commitment,
-    multisigProgramId: anchor.workspace.SquadsMpl.programId,
-    programManagerProgramId: anchor.workspace.ProgramManager.programId,
+describe("Programs", function(){
+
+  this.beforeAll(function(){
+    // Configure the client to use the local cluster.
+    provider = anchor.AnchorProvider.env();
+    anchor.setProvider(provider);
   });
 
-  // the program-manager program / provider
-  const programManagerProgram = anchor.workspace
-    .ProgramManager as Program<ProgramManager>;
+  describe("SPML & Program Manager", function(){
 
-  const creator = (program.provider as anchor.AnchorProvider).wallet;
-  // the Multisig PDA to use for the test run
-  let randomCreateKey = anchor.web3.Keypair.generate().publicKey;
-  const [msPDA] = getMsPDA(randomCreateKey, squads.multisigProgramId);
-  const [pmPDA] = getProgramManagerPDA(msPDA, squads.programManagerProgramId);
-
-  const member2 = anchor.web3.Keypair.generate();
-  const numberOfMembersTotal = 10;
-
-  const memberList = [...new Array(numberOfMembersTotal - 1)].map(() => {
-    return anchor.web3.Keypair.generate();
-  });
-
-  let threshold = 1;
-  // test suite
-  describe("Basic functionality", () => {
-    it(`Create Multisig - MS: ${msPDA.toBase58()}`, async () => {
-      await squads.createMultisig(
-        threshold,
-        randomCreateKey,
-        memberList.map((m) => m.publicKey)
-      );
-      const vaultPDA = squads.getAuthorityPDA(msPDA, 1);
-
-      const fundingTx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      const fundingIx = await createTestTransferTransaction(
-        creator.publicKey,
-        vaultPDA,
-        0.001 * 1000000000
-      );
-
-      fundingTx.add(fundingIx);
-      await provider.sendAndConfirm(fundingTx);
-
-      let msState = await squads.getMultisig(msPDA);
-      expect(msState.threshold).to.equal(1);
-      expect(msState.transactionIndex).to.equal(0);
-      expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal);
-
-      const vaultAccount = await squads.connection.getParsedAccountInfo(
-        vaultPDA
-      );
-      expect(vaultAccount.value.lamports).to.equal(0.001 * 1000000000);
+    let program;
+    let squads;
+    let creator;
+    let programManagerProgram;
+    let randomCreateKey;
+    let msPDA;
+    let pmPDA;
+    let member2;
+    const numberOfMembersTotal = 10;
+    const memberList = [...new Array(numberOfMembersTotal - 1)].map(() => {
+      return anchor.web3.Keypair.generate();
     });
 
-    it(`Create Tx draft - MS: ${msPDA.toBase58()}`, async () => {
-      // create a transaction draft
-      const txState = await squads.createTransaction(msPDA, 1);
-      expect(txState.instructionIndex).to.equal(0);
-      expect(txState.creator.toBase58()).to.equal(creator.publicKey.toBase58());
+    let threshold = 1;
 
-      // check the transaction indexes match
-      const msState = await squads.getMultisig(msPDA);
-      expect(txState.transactionIndex).to.equal(msState.transactionIndex);
-    });
+    // test suite
+    describe("SMPL Basic functionality", function(){
+      this.beforeAll(function(){
+        console.log("Deploying programs...");
+        deploySmpl();
+        console.log("✔ SMPL Program deployed.");
+        deployPm();
+        console.log("✔ Program Manager Program deployed.");
+        console.log("Finished deploying programs.");
+  
+        program = anchor.workspace.SquadsMpl as Program<SquadsMpl>;
+        squads = Squads.localnet(provider.wallet, {
+          commitmentOrConfig: provider.connection.commitment,
+          multisigProgramId: anchor.workspace.SquadsMpl.programId,
+          programManagerProgramId: anchor.workspace.ProgramManager.programId,
+        });
+      
+        // the program-manager program / provider
+        programManagerProgram = anchor.workspace
+          .ProgramManager as Program<ProgramManager>;
+      
+        creator = (program.provider as anchor.AnchorProvider).wallet;
+  
+        // the Multisig PDA to use for the test run
+        randomCreateKey = anchor.web3.Keypair.generate().publicKey;
+        [msPDA] = getMsPDA(randomCreateKey, squads.multisigProgramId);
+        [pmPDA] = getProgramManagerPDA(msPDA, squads.programManagerProgramId);
+      
+        member2 = anchor.web3.Keypair.generate();
+      });
 
-    it(`Add Ix to Tx - MS: ${msPDA.toBase58()}`, async () => {
-      // create a transaction draft
-      let txState = await squads.createTransaction(msPDA, 1);
-      // check the transaction indexes match
-      expect(txState.instructionIndex).to.equal(0);
-      expect(txState.status).to.have.property("draft");
+      it(`Create Multisig`, async function(){
+        await squads.createMultisig(
+          threshold,
+          randomCreateKey,
+          memberList.map((m) => m.publicKey)
+        );
+        const vaultPDA = squads.getAuthorityPDA(msPDA, 1);
 
-      const testIx = await createTestTransferTransaction(
-        msPDA,
-        creator.publicKey
-      );
-      const ixState = await squads.addInstruction(txState.publicKey, testIx);
-      txState = await squads.getTransaction(txState.publicKey);
-      expect(ixState.instructionIndex).to.equal(1);
-      expect(txState.instructionIndex).to.equal(1);
-    });
+        const fundingTx = await createBlankTransaction(
+          squads.connection,
+          creator.publicKey
+        );
+        const fundingIx = await createTestTransferTransaction(
+          creator.publicKey,
+          vaultPDA,
+          0.001 * 1000000000
+        );
 
-    it(`Tx Activate - MS: ${msPDA.toBase58()}`, async () => {
-      // create a transaction draft
-      let txState = await squads.createTransaction(msPDA, 1);
-      const testIx = await createTestTransferTransaction(
-        msPDA,
-        creator.publicKey
-      );
-      let ixState = await squads.addInstruction(txState.publicKey, testIx);
-      await squads.activateTransaction(txState.publicKey);
+        fundingTx.add(fundingIx);
+        await provider.sendAndConfirm(fundingTx);
 
-      txState = await squads.getTransaction(txState.publicKey);
-      expect(txState.status).to.have.property("active");
-      ixState = await squads.getInstruction(ixState.publicKey);
-      expect(ixState.programId.toBase58()).to.equal(
-        testIx.programId.toBase58()
-      );
-    });
+        let msState = await squads.getMultisig(msPDA);
+        expect(msState.threshold).to.equal(1);
+        expect(msState.transactionIndex).to.equal(0);
+        expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal);
 
-    it(`Tx Sign - MS: ${msPDA.toBase58()}`, async () => {
-      // create a transaction draft
-      let txState = await squads.createTransaction(msPDA, 1);
-      const testIx = await createTestTransferTransaction(
-        msPDA,
-        creator.publicKey
-      );
-      await squads.addInstruction(txState.publicKey, testIx);
-      await squads.activateTransaction(txState.publicKey);
-      await squads.approveTransaction(txState.publicKey);
+        const vaultAccount = await squads.connection.getParsedAccountInfo(
+          vaultPDA
+        );
+        expect(vaultAccount.value.lamports).to.equal(0.001 * 1000000000);
+      });
 
-      txState = await squads.getTransaction(txState.publicKey);
-      expect(txState.approved.length).to.equal(1);
-      expect(txState.status).to.have.property("executeReady");
-    });
+      it(`Create Tx draft`,  async function(){
+        // create a transaction draft
+        const txState = await squads.createTransaction(msPDA, 1);
+        expect(txState.instructionIndex).to.equal(0);
+        expect(txState.creator.toBase58()).to.equal(creator.publicKey.toBase58());
 
-    it(`Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
-      // create authority to use (Vault, index 1)
-      const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
+        // check the transaction indexes match
+        const msState = await squads.getMultisig(msPDA);
+        expect(txState.transactionIndex).to.equal(msState.transactionIndex);
+      });
 
-      // the test transfer instruction
-      const testPayee = anchor.web3.Keypair.generate();
-      const testIx = await createTestTransferTransaction(
-        authorityPDA,
-        testPayee.publicKey
-      );
+      it(`Add Ix to Tx`,  async function(){
+        // create a transaction draft
+        let txState = await squads.createTransaction(msPDA, 1);
+        // check the transaction indexes match
+        expect(txState.instructionIndex).to.equal(0);
+        expect(txState.status).to.have.property("draft");
 
-      let txState = await squads.createTransaction(msPDA, 1);
-      await squads.addInstruction(txState.publicKey, testIx);
-      await squads.activateTransaction(txState.publicKey);
-      await squads.approveTransaction(txState.publicKey);
+        const testIx = await createTestTransferTransaction(
+          msPDA,
+          creator.publicKey
+        );
+        const ixState = await squads.addInstruction(txState.publicKey, testIx);
+        txState = await squads.getTransaction(txState.publicKey);
+        expect(ixState.instructionIndex).to.equal(1);
+        expect(txState.instructionIndex).to.equal(1);
+      });
 
-      txState = await squads.getTransaction(txState.publicKey);
-      expect(txState.status).to.have.property("executeReady");
+      it(`Tx Activate`,  async function(){
+        // create a transaction draft
+        let txState = await squads.createTransaction(msPDA, 1);
+        const testIx = await createTestTransferTransaction(
+          msPDA,
+          creator.publicKey
+        );
+        let ixState = await squads.addInstruction(txState.publicKey, testIx);
+        await squads.activateTransaction(txState.publicKey);
 
-      // move funds to auth/vault
-      const moveFundsToMsPDATx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      const moveFundsToMsPDAIx = await createTestTransferTransaction(
-        creator.publicKey,
-        authorityPDA
-      );
-      moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
-      await provider.sendAndConfirm(moveFundsToMsPDATx);
-      const authorityPDAFunded = await squads.connection.getAccountInfo(
-        authorityPDA
-      );
-      expect(authorityPDAFunded.lamports).to.equal(2000000);
+        txState = await squads.getTransaction(txState.publicKey);
+        expect(txState.status).to.have.property("active");
+        ixState = await squads.getInstruction(ixState.publicKey);
+        expect(ixState.programId.toBase58()).to.equal(
+          testIx.programId.toBase58()
+        );
+      });
 
-      await squads.executeTransaction(txState.publicKey);
+      it(`Tx Sign`,  async function(){
+        // create a transaction draft
+        let txState = await squads.createTransaction(msPDA, 1);
+        const testIx = await createTestTransferTransaction(
+          msPDA,
+          creator.publicKey
+        );
+        await squads.addInstruction(txState.publicKey, testIx);
+        await squads.activateTransaction(txState.publicKey);
+        await squads.approveTransaction(txState.publicKey);
 
-      txState = await squads.getTransaction(txState.publicKey);
+        txState = await squads.getTransaction(txState.publicKey);
+        expect(txState.approved.length).to.equal(1);
+        expect(txState.status).to.have.property("executeReady");
+      });
 
-      expect(txState.status).to.have.property("executed");
-      const testPayeeAccount = await squads.connection.getParsedAccountInfo(
-        testPayee.publicKey
-      );
-      expect(testPayeeAccount.value.lamports).to.equal(1000000);
-    });
+      it(`Transfer Tx Execute`,  async function(){
+        // create authority to use (Vault, index 1)
+        const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
 
-    it(`2X Transfer Tx Execute - MS: ${msPDA.toBase58()}`, async () => {
-      // create authority to use (Vault, index 1)
-      const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
+        // the test transfer instruction
+        const testPayee = anchor.web3.Keypair.generate();
+        const testIx = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey
+        );
 
-      // the test transfer instruction (2x)
-      const testPayee = anchor.web3.Keypair.generate();
-      const testIx = await createTestTransferTransaction(
-        authorityPDA,
-        testPayee.publicKey
-      );
-      const testIx2x = await createTestTransferTransaction(
-        authorityPDA,
-        testPayee.publicKey
-      );
+        let txState = await squads.createTransaction(msPDA, 1);
+        await squads.addInstruction(txState.publicKey, testIx);
+        await squads.activateTransaction(txState.publicKey);
+        await squads.approveTransaction(txState.publicKey);
 
-      let txState = await squads.createTransaction(msPDA, 1);
-      await squads.addInstruction(txState.publicKey, testIx);
-      await squads.addInstruction(txState.publicKey, testIx2x);
-      await squads.activateTransaction(txState.publicKey);
-      await squads.approveTransaction(txState.publicKey);
+        txState = await squads.getTransaction(txState.publicKey);
+        expect(txState.status).to.have.property("executeReady");
 
-      // move funds to auth/vault
-      const moveFundsToMsPDAIx = await createTestTransferTransaction(
-        creator.publicKey,
-        authorityPDA,
-        3000000
-      );
+        // move funds to auth/vault
+        const moveFundsToMsPDATx = await createBlankTransaction(
+          squads.connection,
+          creator.publicKey
+        );
+        const moveFundsToMsPDAIx = await createTestTransferTransaction(
+          creator.publicKey,
+          authorityPDA
+        );
+        moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
+        await provider.sendAndConfirm(moveFundsToMsPDATx);
+        const authorityPDAFunded = await squads.connection.getAccountInfo(
+          authorityPDA
+        );
+        expect(authorityPDAFunded.lamports).to.equal(2000000);
 
-      const moveFundsToMsPDATx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
-      await provider.sendAndConfirm(moveFundsToMsPDATx);
-      const msPDAFunded = await squads.connection.getAccountInfo(authorityPDA);
-      expect(msPDAFunded.lamports).to.equal(4000000);
-
-      await squads.executeTransaction(txState.publicKey);
-
-      txState = await squads.getTransaction(txState.publicKey);
-      expect(txState.status).to.have.property("executed");
-      let testPayeeAccount = await squads.connection.getParsedAccountInfo(
-        testPayee.publicKey
-      );
-      expect(testPayeeAccount.value.lamports).to.equal(2000000);
-    });
-
-    it(`2X Transfer Tx Sequential execute - MS: ${msPDA.toBase58()}`, async () => {
-      // create authority to use (Vault, index 1)
-      const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
-
-      let txState = await squads.createTransaction(msPDA, 1);
-
-      // person/entity who gets paid
-      const testPayee = anchor.web3.Keypair.generate();
-
-      ////////////////////////////////////////////////////////
-      // add the first transfer
-
-      // the test transfer instruction
-      const testIx = await createTestTransferTransaction(
-        authorityPDA,
-        testPayee.publicKey
-      );
-
-      let ixState = await squads.addInstruction(txState.publicKey, testIx);
-
-      //////////////////////////////////////////////////////////
-      // add the second transfer ix
-
-      const testIx2x = await createTestTransferTransaction(
-        authorityPDA,
-        testPayee.publicKey
-      );
-      let ix2State = await squads.addInstruction(txState.publicKey, testIx2x);
-      await squads.activateTransaction(txState.publicKey);
-      await squads.approveTransaction(txState.publicKey);
-
-      // move funds to auth/vault
-      const moveFundsToMsPDAIx = await createTestTransferTransaction(
-        creator.publicKey,
-        authorityPDA,
-        3000000
-      );
-      const moveFundsToMsPDATx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
-      await provider.sendAndConfirm(moveFundsToMsPDATx);
-      const msPDAFunded = await squads.connection.getAccountInfo(authorityPDA);
-      // expect the vault to be correct:
-      expect(msPDAFunded.lamports).to.equal(5000000);
-      // lead with the expected program account, follow with the other accounts for the ix
-      await squads.executeInstruction(txState.publicKey, ixState.publicKey);
-      ixState = await squads.getInstruction(ixState.publicKey);
-      txState = await squads.getTransaction(txState.publicKey);
-
-      expect(ixState.executed).to.be.true;
-      expect(txState.executedIndex).to.equal(1);
-
-      await squads.executeInstruction(txState.publicKey, ix2State.publicKey);
-
-      ix2State = await squads.getInstruction(ix2State.publicKey);
-      txState = await squads.getTransaction(txState.publicKey);
-
-      expect(ix2State.executed).to.be.true;
-      expect(txState.executedIndex).to.equal(2);
-      expect(txState.status).to.have.property("executed");
-    });
-
-    it(`Change ms size with realloc - MS: ${msPDA.toBase58()}`, async () => {
-      let msAccount = await squads.connection.getParsedAccountInfo(msPDA);
-      const startRentLamports = msAccount.value.lamports;
-
-      // 1 get the instruction to create a transction
-      // 2 get the instruction to add a member
-      // 3 get the instruction to 'activate' the tx
-      // 4 send over the transaction to the ms program with 1 - 3
-      // use 0 as authority index
-      const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
-      const [txInstructions, txPDA] = await (
-        await txBuilder.withAddMember(member2.publicKey)
-      ).getInstructions();
-      const activateIx = await squads.buildActivateTransaction(msPDA, txPDA);
-
-      let addMemberTx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      addMemberTx.add(...txInstructions);
-      addMemberTx.add(activateIx);
-
-      await provider.sendAndConfirm(addMemberTx);
-
-      await squads.approveTransaction(txPDA);
-
-      let txState = await squads.getTransaction(txPDA);
-      expect(txState.status).has.property("executeReady");
-
-      await squads.executeTransaction(txPDA);
-
-      const msState = await squads.getMultisig(msPDA);
-      msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
-      const endRentLamports = msAccount.value.lamports;
-      expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 1);
-      expect(endRentLamports).to.be.greaterThan(startRentLamports);
-    });
-
-    it(`Add a new member but creator is not executor - MS: ${msPDA.toBase58()}`, async () => {
-      // 1 get the instruction to create a transaction
-      // 2 get the instruction to add a member
-      // 3 get the instruction to 'activate' the tx
-      // 4 send over the transaction to the ms program with 1 - 3
-      // use 0 as authority index
-      const newMember = anchor.web3.Keypair.generate().publicKey;
-      const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
-      const [txInstructions, txPDA] = await (
-        await txBuilder.withAddMember(newMember)
-      ).getInstructions();
-      const activateIx = await squads.buildActivateTransaction(msPDA, txPDA);
-
-      let addMemberTx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      addMemberTx.add(...txInstructions);
-      addMemberTx.add(activateIx);
-
-      await provider.sendAndConfirm(addMemberTx);
-
-      await squads.approveTransaction(txPDA);
-
-      let txState = await squads.getTransaction(txPDA);
-      expect(txState.status).has.property("executeReady");
-
-      await squads.executeTransaction(txPDA, member2.publicKey, [member2]);
-
-      const msState = await squads.getMultisig(msPDA);
-      expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 2);
-    });
-
-    it(`Transaction instruction failure - MS: ${msPDA.toBase58()}`, async () => {
-      // create authority to use (Vault, index 1)
-      const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
-      let txState = await squads.createTransaction(msPDA, 1);
-
-      // the test transfer instruction
-      const testPayee = anchor.web3.Keypair.generate();
-      const testIx = await createTestTransferTransaction(
-        authorityPDA,
-        testPayee.publicKey,
-        anchor.web3.LAMPORTS_PER_SOL * 100
-      );
-
-      // add the instruction to the transaction
-      await squads.addInstruction(txState.publicKey, testIx);
-      await squads.activateTransaction(txState.publicKey);
-      await squads.approveTransaction(txState.publicKey);
-
-      try {
         await squads.executeTransaction(txState.publicKey);
-      } catch (e) {
-        // :(
-        expect(e.message).to.include("failed");
-      }
 
-      txState = await squads.getTransaction(txState.publicKey);
-      expect(txState.status).to.have.property("executeReady");
-    });
+        txState = await squads.getTransaction(txState.publicKey);
 
-    it(`Change threshold test - MS: ${msPDA.toBase58()}`, async () => {
-      const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
-      const [txInstructions, txPDA] = await (
-        await txBuilder.withChangeThreshold(2)
-      ).getInstructions();
-      const emptyTx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      emptyTx.add(...txInstructions);
-      await provider.sendAndConfirm(emptyTx);
+        expect(txState.status).to.have.property("executed");
+        const testPayeeAccount = await squads.connection.getParsedAccountInfo(
+          testPayee.publicKey
+        );
+        expect(testPayeeAccount.value.lamports).to.equal(1000000);
+      });
 
-      // get the ix
-      let ixState = await squads.getInstruction(
-        getIxPDA(txPDA, new BN(1, 10), squads.multisigProgramId)[0]
-      );
-      expect(ixState.instructionIndex).to.equal(1);
+      it(`2X Transfer Tx Execute`, async function() {
+        // create authority to use (Vault, index 1)
+        const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
 
-      // activate the tx
-      let txState = await squads.activateTransaction(txPDA);
-      expect(txState.status).to.have.property("active");
+        // the test transfer instruction (2x)
+        const testPayee = anchor.web3.Keypair.generate();
+        const testIx = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey
+        );
+        const testIx2x = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey
+        );
 
-      // approve the tx
-      await squads.approveTransaction(txPDA);
+        let txState = await squads.createTransaction(msPDA, 1);
+        await squads.addInstruction(txState.publicKey, testIx);
+        await squads.addInstruction(txState.publicKey, testIx2x);
+        await squads.activateTransaction(txState.publicKey);
+        await squads.approveTransaction(txState.publicKey);
 
-      // get the TX
-      txState = await squads.getTransaction(txPDA);
-      expect(txState.status).to.have.property("executeReady");
+        // move funds to auth/vault
+        const moveFundsToMsPDAIx = await createTestTransferTransaction(
+          creator.publicKey,
+          authorityPDA,
+          3000000
+        );
 
-      // execute the tx
-      txState = await squads.executeTransaction(txPDA);
-      const msState = await squads.getMultisig(msPDA);
+        const moveFundsToMsPDATx = await createBlankTransaction(
+          squads.connection,
+          creator.publicKey
+        );
+        moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
+        await provider.sendAndConfirm(moveFundsToMsPDATx);
+        const msPDAFunded = await squads.connection.getAccountInfo(authorityPDA);
+        expect(msPDAFunded.lamports).to.equal(4000000);
 
-      expect(msState.threshold).to.equal(2);
-      expect(txState.status).to.have.property("executed");
-      threshold = msState.threshold;
-    });
+        await squads.executeTransaction(txState.publicKey);
 
-    it(`Insufficient approval failure - MS: ${msPDA.toBase58()}`, async () => {
-      const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
-      const [txInstructions, txPDA] = await (
-        await txBuilder.withChangeThreshold(2)
-      ).executeInstructions();
+        txState = await squads.getTransaction(txState.publicKey);
+        expect(txState.status).to.have.property("executed");
+        let testPayeeAccount = await squads.connection.getParsedAccountInfo(
+          testPayee.publicKey
+        );
+        expect(testPayeeAccount.value.lamports).to.equal(2000000);
+      });
 
-      // get the ix
-      let ixState = await squads.getInstruction(
-        getIxPDA(txPDA, new BN(1, 10), squads.multisigProgramId)[0]
-      );
-      expect(ixState.instructionIndex).to.equal(1);
+      it(`2X Transfer Tx Sequential execute`, async function(){
+        // create authority to use (Vault, index 1)
+        const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
 
-      // activate the tx
-      let txState = await squads.activateTransaction(txPDA);
-      expect(txState.status).to.have.property("active");
+        let txState = await squads.createTransaction(msPDA, 1);
 
-      // approve the tx
-      await squads.approveTransaction(txPDA);
+        // person/entity who gets paid
+        const testPayee = anchor.web3.Keypair.generate();
 
-      // execute the tx
-      try {
+        ////////////////////////////////////////////////////////
+        // add the first transfer
+
+        // the test transfer instruction
+        const testIx = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey
+        );
+
+        let ixState = await squads.addInstruction(txState.publicKey, testIx);
+
+        //////////////////////////////////////////////////////////
+        // add the second transfer ix
+
+        const testIx2x = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey
+        );
+        let ix2State = await squads.addInstruction(txState.publicKey, testIx2x);
+        await squads.activateTransaction(txState.publicKey);
+        await squads.approveTransaction(txState.publicKey);
+
+        // move funds to auth/vault
+        const moveFundsToMsPDAIx = await createTestTransferTransaction(
+          creator.publicKey,
+          authorityPDA,
+          3000000
+        );
+        const moveFundsToMsPDATx = await createBlankTransaction(
+          squads.connection,
+          creator.publicKey
+        );
+        moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
+        await provider.sendAndConfirm(moveFundsToMsPDATx);
+        const msPDAFunded = await squads.connection.getAccountInfo(authorityPDA);
+        // expect the vault to be correct:
+        expect(msPDAFunded.lamports).to.equal(5000000);
+        // lead with the expected program account, follow with the other accounts for the ix
+        await squads.executeInstruction(txState.publicKey, ixState.publicKey);
+        ixState = await squads.getInstruction(ixState.publicKey);
+        txState = await squads.getTransaction(txState.publicKey);
+
+        expect(ixState.executed).to.be.true;
+        expect(txState.executedIndex).to.equal(1);
+
+        await squads.executeInstruction(txState.publicKey, ix2State.publicKey);
+
+        ix2State = await squads.getInstruction(ix2State.publicKey);
+        txState = await squads.getTransaction(txState.publicKey);
+
+        expect(ix2State.executed).to.be.true;
+        expect(txState.executedIndex).to.equal(2);
+        expect(txState.status).to.have.property("executed");
+      });
+
+      it(`Change ms size with realloc`, async function(){
+        let msAccount = await squads.connection.getParsedAccountInfo(msPDA);
+        const startRentLamports = msAccount.value.lamports;
+
+        // 1 get the instruction to create a transction
+        // 2 get the instruction to add a member
+        // 3 get the instruction to 'activate' the tx
+        // 4 send over the transaction to the ms program with 1 - 3
+        // use 0 as authority index
+        const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
+        const [txInstructions, txPDA] = await (
+          await txBuilder.withAddMember(member2.publicKey)
+        ).getInstructions();
+        const activateIx = await squads.buildActivateTransaction(msPDA, txPDA);
+
+        let addMemberTx = await createBlankTransaction(
+          squads.connection,
+          creator.publicKey
+        );
+        addMemberTx.add(...txInstructions);
+        addMemberTx.add(activateIx);
+
+        await provider.sendAndConfirm(addMemberTx);
+
+        await squads.approveTransaction(txPDA);
+
+        let txState = await squads.getTransaction(txPDA);
+        expect(txState.status).has.property("executeReady");
+
         await squads.executeTransaction(txPDA);
-      } catch (e) {
-        expect(e.message).to.contain("Error processing Instruction");
-      }
-    });
 
-    it(`Change vote from approved to rejected - MS: ${msPDA.toBase58()}`, async () => {
-      const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
-      const [txInstructions, txPDA] = await (
-        await txBuilder.withChangeThreshold(2)
-      ).executeInstructions();
+        const msState = await squads.getMultisig(msPDA);
+        msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
+        const endRentLamports = msAccount.value.lamports;
+        expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 1);
+        expect(endRentLamports).to.be.greaterThan(startRentLamports);
+      });
 
-      // get the ix
-      let ixState = await squads.getInstruction(
-        getIxPDA(txPDA, new BN(1, 10), squads.multisigProgramId)[0]
-      );
-      expect(ixState.instructionIndex).to.equal(1);
+      it(`Add a new member but creator is not executor`, async function(){
+        // 1 get the instruction to create a transaction
+        // 2 get the instruction to add a member
+        // 3 get the instruction to 'activate' the tx
+        // 4 send over the transaction to the ms program with 1 - 3
+        // use 0 as authority index
+        const newMember = anchor.web3.Keypair.generate().publicKey;
+        const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
+        const [txInstructions, txPDA] = await (
+          await txBuilder.withAddMember(newMember)
+        ).getInstructions();
+        const activateIx = await squads.buildActivateTransaction(msPDA, txPDA);
 
-      // activate the tx
-      let txState = await squads.activateTransaction(txPDA);
-      expect(txState.status).to.have.property("active");
-
-      // approve the tx
-      txState = await squads.approveTransaction(txPDA);
-
-      // check that state is "approved"
-      expect(txState.status).to.have.property("active");
-      expect(
-        txState.approved
-          .map((k) => k.toBase58())
-          .indexOf(creator.publicKey.toBase58())
-      ).is.greaterThanOrEqual(0);
-
-      // now reject
-      txState = await squads.rejectTransaction(txPDA);
-      expect(txState.status).to.have.property("active");
-      expect(
-        txState.rejected
-          .map((k) => k.toBase58())
-          .indexOf(creator.publicKey.toBase58())
-      ).is.greaterThanOrEqual(0);
-      expect(
-        txState.approved
-          .map((k) => k.toBase58())
-          .indexOf(creator.publicKey.toBase58())
-      ).is.lessThan(0);
-    });
-
-    it(`Add a new member & change threshold (conjoined) - MS: ${msPDA.toBase58()}`, async () => {
-      const newMember = anchor.web3.Keypair.generate().publicKey;
-      const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
-      const [txInstructions, txPDA] = await (
-        await txBuilder.withAddMemberAndChangeThreshold(newMember, 1)
-      ).getInstructions();
-      const activateIx = await squads.buildActivateTransaction(msPDA, txPDA);
-
-      let addMemberTx = await createBlankTransaction(
-        squads.connection,
-        creator.publicKey
-      );
-      addMemberTx.add(...txInstructions);
-      addMemberTx.add(activateIx);
-
-      await provider.sendAndConfirm(addMemberTx);
-      let msState = await squads.getMultisig(msPDA);
-      // get necessary signers
-      // if the threshold has changed, use the other members to approve as well
-      for (let i = 0; i < memberList.length; i++) {
-        // check to see if we need more signers
-        const approvalState = await squads.getTransaction(txPDA);
-        if (Object.keys(approvalState.status).indexOf("active") < 0) {
-          break;
-        }
-
-        const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
-          (k) => {
-            return k.toBase58() == memberList[i].publicKey.toBase58();
-          }
+        let addMemberTx = await createBlankTransaction(
+          squads.connection,
+          creator.publicKey
         );
-        if (inMultisig < 0) {
-          continue;
-        }
+        addMemberTx.add(...txInstructions);
+        addMemberTx.add(activateIx);
+
+        await provider.sendAndConfirm(addMemberTx);
+
+        await squads.approveTransaction(txPDA);
+
+        let txState = await squads.getTransaction(txPDA);
+        expect(txState.status).has.property("executeReady");
+
+        await squads.executeTransaction(txPDA, member2.publicKey, [member2]);
+
+        const msState = await squads.getMultisig(msPDA);
+        expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 2);
+      });
+
+      it(`Transaction instruction failure`, async function(){
+        // create authority to use (Vault, index 1)
+        const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
+        let txState = await squads.createTransaction(msPDA, 1);
+
+        // the test transfer instruction
+        const testPayee = anchor.web3.Keypair.generate();
+        const testIx = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey,
+          anchor.web3.LAMPORTS_PER_SOL * 100
+        );
+
+        // add the instruction to the transaction
+        await squads.addInstruction(txState.publicKey, testIx);
+        await squads.activateTransaction(txState.publicKey);
+        await squads.approveTransaction(txState.publicKey);
+
         try {
-          await provider.connection.requestAirdrop(
-            memberList[i].publicKey,
-            anchor.web3.LAMPORTS_PER_SOL
-          );
-          const approveTx = await program.methods
-            .approveTransaction()
-            .accounts({
-              multisig: msPDA,
-              transaction: txPDA,
-              member: memberList[i].publicKey,
-            })
-            .signers([memberList[i]])
-            .transaction();
-          try {
-            await provider.sendAndConfirm(approveTx, [memberList[i]]);
-          } catch (e) {
-            console.log(memberList[i].publicKey.toBase58(), " signing error");
-          }
+          await squads.executeTransaction(txState.publicKey);
         } catch (e) {
-          console.log(e);
+          // :(
+          expect(e.message).to.include("failed");
         }
-      }
 
-      let txState = await squads.getTransaction(txPDA);
-      expect(txState.status).has.property("executeReady");
+        txState = await squads.getTransaction(txState.publicKey);
+        expect(txState.status).to.have.property("executeReady");
+      });
 
-      const payer = memberList[4];
-      await provider.connection.requestAirdrop(
-        payer.publicKey,
-        anchor.web3.LAMPORTS_PER_SOL
-      );
-      await squads.executeTransaction(txPDA, payer.publicKey, [payer]);
-      txState = await squads.getTransaction(txPDA);
-      expect(txState.status).has.property("executed");
-      msState = await squads.getMultisig(msPDA);
-      threshold = msState.threshold;
-      expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 3);
-      expect(msState.threshold).to.equal(1);
+      it(`Change threshold test`, async function(){
+        const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
+        const [txInstructions, txPDA] = await (
+          await txBuilder.withChangeThreshold(2)
+        ).getInstructions();
+        const emptyTx = await createBlankTransaction(
+          squads.connection,
+          creator.publicKey
+        );
+        emptyTx.add(...txInstructions);
+        await provider.sendAndConfirm(emptyTx);
+
+        // get the ix
+        let ixState = await squads.getInstruction(
+          getIxPDA(txPDA, new BN(1, 10), squads.multisigProgramId)[0]
+        );
+        expect(ixState.instructionIndex).to.equal(1);
+
+        // activate the tx
+        let txState = await squads.activateTransaction(txPDA);
+        expect(txState.status).to.have.property("active");
+
+        // approve the tx
+        await squads.approveTransaction(txPDA);
+
+        // get the TX
+        txState = await squads.getTransaction(txPDA);
+        expect(txState.status).to.have.property("executeReady");
+
+        // execute the tx
+        txState = await squads.executeTransaction(txPDA);
+        const msState = await squads.getMultisig(msPDA);
+
+        expect(msState.threshold).to.equal(2);
+        expect(txState.status).to.have.property("executed");
+        threshold = msState.threshold;
+      });
+
+      it(`Insufficient approval failure`, async function(){
+        const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
+        const [txInstructions, txPDA] = await (
+          await txBuilder.withChangeThreshold(2)
+        ).executeInstructions();
+
+        // get the ix
+        let ixState = await squads.getInstruction(
+          getIxPDA(txPDA, new BN(1, 10), squads.multisigProgramId)[0]
+        );
+        expect(ixState.instructionIndex).to.equal(1);
+
+        // activate the tx
+        let txState = await squads.activateTransaction(txPDA);
+        expect(txState.status).to.have.property("active");
+
+        // approve the tx
+        await squads.approveTransaction(txPDA);
+
+        // execute the tx
+        try {
+          await squads.executeTransaction(txPDA);
+        } catch (e) {
+          expect(e.message).to.contain("Error processing Instruction");
+        }
+      });
+
+      it(`Change vote from approved to rejected`, async function(){
+        const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
+        const [txInstructions, txPDA] = await (
+          await txBuilder.withChangeThreshold(2)
+        ).executeInstructions();
+
+        // get the ix
+        let ixState = await squads.getInstruction(
+          getIxPDA(txPDA, new BN(1, 10), squads.multisigProgramId)[0]
+        );
+        expect(ixState.instructionIndex).to.equal(1);
+
+        // activate the tx
+        let txState = await squads.activateTransaction(txPDA);
+        expect(txState.status).to.have.property("active");
+
+        // approve the tx
+        txState = await squads.approveTransaction(txPDA);
+
+        // check that state is "approved"
+        expect(txState.status).to.have.property("active");
+        expect(
+          txState.approved
+            .map((k) => k.toBase58())
+            .indexOf(creator.publicKey.toBase58())
+        ).is.greaterThanOrEqual(0);
+
+        // now reject
+        txState = await squads.rejectTransaction(txPDA);
+        expect(txState.status).to.have.property("active");
+        expect(
+          txState.rejected
+            .map((k) => k.toBase58())
+            .indexOf(creator.publicKey.toBase58())
+        ).is.greaterThanOrEqual(0);
+        expect(
+          txState.approved
+            .map((k) => k.toBase58())
+            .indexOf(creator.publicKey.toBase58())
+        ).is.lessThan(0);
+      });
+
+      it(`Add a new member & change threshold (conjoined)`, async function(){
+        const newMember = anchor.web3.Keypair.generate().publicKey;
+        const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
+        const [txInstructions, txPDA] = await (
+          await txBuilder.withAddMemberAndChangeThreshold(newMember, 1)
+        ).getInstructions();
+        const activateIx = await squads.buildActivateTransaction(msPDA, txPDA);
+
+        let addMemberTx = await createBlankTransaction(
+          squads.connection,
+          creator.publicKey
+        );
+        addMemberTx.add(...txInstructions);
+        addMemberTx.add(activateIx);
+
+        await provider.sendAndConfirm(addMemberTx);
+        let msState = await squads.getMultisig(msPDA);
+        // get necessary signers
+        // if the threshold has changed, use the other members to approve as well
+        for (let i = 0; i < memberList.length; i++) {
+          // check to see if we need more signers
+          const approvalState = await squads.getTransaction(txPDA);
+          if (Object.keys(approvalState.status).indexOf("active") < 0) {
+            break;
+          }
+
+          const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
+            (k) => {
+              return k.toBase58() == memberList[i].publicKey.toBase58();
+            }
+          );
+          if (inMultisig < 0) {
+            continue;
+          }
+          try {
+            await provider.connection.requestAirdrop(
+              memberList[i].publicKey,
+              anchor.web3.LAMPORTS_PER_SOL
+            );
+            const approveTx = await program.methods
+              .approveTransaction()
+              .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                member: memberList[i].publicKey,
+              })
+              .signers([memberList[i]])
+              .transaction();
+            try {
+              await provider.sendAndConfirm(approveTx, [memberList[i]]);
+            } catch (e) {
+              console.log(memberList[i].publicKey.toBase58(), " signing error");
+            }
+          } catch (e) {
+            console.log(e);
+          }
+        }
+
+        let txState = await squads.getTransaction(txPDA);
+        expect(txState.status).has.property("executeReady");
+
+        const payer = memberList[4];
+        await provider.connection.requestAirdrop(
+          payer.publicKey,
+          anchor.web3.LAMPORTS_PER_SOL
+        );
+        await squads.executeTransaction(txPDA, payer.publicKey, [payer]);
+        txState = await squads.getTransaction(txPDA);
+        expect(txState.status).has.property("executed");
+        msState = await squads.getMultisig(msPDA);
+        threshold = msState.threshold;
+        expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 3);
+        expect(msState.threshold).to.equal(1);
+      });
     });
-  });
 
-  describe("Program upgrades", () => {
-    it(`Create a program manager - MS: ${msPDA.toBase58()}`, async () => {
-      const newProgramManager = await squads.createProgramManager(msPDA);
-      expect(newProgramManager.multisig.toBase58()).to.equal(msPDA.toBase58());
-    });
+    describe("Program upgrades", () => {
+      it(`Create a program manager`,  async function(){
+        const newProgramManager = await squads.createProgramManager(msPDA);
+        expect(newProgramManager.multisig.toBase58()).to.equal(msPDA.toBase58());
+      });
 
-    it(`Create a program to manage - MS ${msPDA.toBase58()}`, async () => {
-      const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
-      const nameString = "This is my test Program";
-      const mpState = await squads.createManagedProgram(
-        msPDA,
-        testProgramAddress,
-        nameString
-      );
-      expect(mpState.name).to.equal(nameString);
-      expect(mpState.managedProgramIndex).to.equal(1);
-    });
-    it(`Create a program to manage and create upgrade - MS ${msPDA.toBase58()}`, async () => {
-      const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
-      const nameString = "This is my test Program 2";
-      let mpState = await squads.createManagedProgram(
-        msPDA,
-        testProgramAddress,
-        nameString
-      );
-      expect(mpState.name).to.equal(nameString);
-      expect(mpState.managedProgramIndex).to.equal(2);
+      it(`Create a program to manage`, async function(){
+        const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
+        const nameString = "This is my test Program";
+        const mpState = await squads.createManagedProgram(
+          msPDA,
+          testProgramAddress,
+          nameString
+        );
+        expect(mpState.name).to.equal(nameString);
+        expect(mpState.managedProgramIndex).to.equal(1);
+      });
+      it(`Create a program to manage and create upgrade`, async function(){
+        const testProgramAddress = anchor.web3.Keypair.generate().publicKey;
+        const nameString = "This is my test Program 2";
+        let mpState = await squads.createManagedProgram(
+          msPDA,
+          testProgramAddress,
+          nameString
+        );
+        expect(mpState.name).to.equal(nameString);
+        expect(mpState.managedProgramIndex).to.equal(2);
 
-      const testBufferAddress = anchor.web3.Keypair.generate().publicKey;
-      const testSpillAddress = anchor.web3.Keypair.generate().publicKey;
-      const testAuthorityAddress = anchor.web3.Keypair.generate().publicKey;
-      const testUpgradeName = "Upgrade #1";
+        const testBufferAddress = anchor.web3.Keypair.generate().publicKey;
+        const testSpillAddress = anchor.web3.Keypair.generate().publicKey;
+        const testAuthorityAddress = anchor.web3.Keypair.generate().publicKey;
+        const testUpgradeName = "Upgrade #1";
 
-      const addedUpgrade = await squads.createProgramUpgrade(
-        msPDA,
-        mpState.publicKey,
-        testBufferAddress,
-        testSpillAddress,
-        testAuthorityAddress,
-        testUpgradeName
-      );
-      mpState = await squads.getManagedProgram(mpState.publicKey);
-      expect(addedUpgrade.upgradeIndex).to.equal(mpState.upgradeIndex);
-      expect(addedUpgrade.name).to.equal(testUpgradeName);
-      expect(addedUpgrade.upgradeIx.programId.toBase58()).to.equal(
-        BPF_UPGRADE_ID.toBase58()
-      );
-    });
-
-    it(`Create upgrade with buffer and deploy it - MS ${msPDA.toBase58()}`, async function () {
-      this.timeout(30000);
-      const nextProgramIndex = await squads.getNextProgramIndex(
-        getProgramManagerPDA(msPDA, squads.programManagerProgramId)[0]
-      );
-      const [vaultPDA] = await getAuthorityPDA(
-        msPDA,
-        new anchor.BN(1, 10),
-        squads.multisigProgramId
-      );
-
-      // create a temp keypair to use
-      const bufferKeypair = anchor.web3.Keypair.generate();
-
-      // write the temp buffer keypair to file
-      fs.writeFileSync(
-        "tests/tmp/buffer_test_keypair.json",
-        `[${bufferKeypair.secretKey.toString()}]`
-      );
-
-      // deploy/write the buffer
-      writeBuffer("tests/tmp/buffer_test_keypair.json");
-      // set the buffer authority to the vault
-      setBufferAuthority(bufferKeypair.publicKey, vaultPDA);
-
-      // check that the buffer has proper authority
-      const parsedBufferAccount = await squads.connection.getParsedAccountInfo(
-        bufferKeypair.publicKey
-      );
-      const parsedBufferData = (
-        parsedBufferAccount.value.data as ParsedAccountData
-      ).parsed;
-      expect(parsedBufferData.type).to.equal("buffer");
-      expect(parsedBufferData.info.authority).to.equal(vaultPDA.toBase58());
-
-      // set the program authority
-      setProgramAuthority(programManagerProgram.programId, vaultPDA);
-
-      // add the program
-      const nameString = "The program manager program, itself";
-      const mpState = await squads.createManagedProgram(
-        msPDA,
-        programManagerProgram.programId,
-        nameString
-      );
-      expect(mpState.name).to.equal(nameString);
-      expect(mpState.managedProgramIndex).to.equal(nextProgramIndex);
-
-      // create the upgrade
-
-      const testUpgradeName = "Upgrade #1";
-      const upgradeState = await squads.createProgramUpgrade(
-        msPDA,
-        mpState.publicKey,
-        bufferKeypair.publicKey,
-        squads.wallet.publicKey,
-        vaultPDA,
-        testUpgradeName
-      );
-
-      // verify the upgrade account was created, and that the buffers match as well in the ix
-      const managedProgramState = await squads.getManagedProgram(
-        mpState.publicKey
-      );
-      expect(upgradeState.upgradeIndex).to.equal(
-        managedProgramState.upgradeIndex
-      );
-      expect(upgradeState.name).to.equal(testUpgradeName);
-      // check the upgrade Ix accounts match
-      expect(upgradeState.upgradeIx.programId.toBase58()).to.equal(
-        BPF_UPGRADE_ID.toBase58()
-      );
-      expect(upgradeState.upgradeIx.accounts[1].pubkey.toBase58()).to.equal(
-        programManagerProgram.programId.toBase58()
-      );
-      expect(upgradeState.upgradeIx.accounts[2].pubkey.toBase58()).to.equal(
-        bufferKeypair.publicKey.toBase58()
-      );
-      expect(upgradeState.upgradeIx.accounts[3].pubkey.toBase58()).to.equal(
-        provider.wallet.publicKey.toBase58()
-      );
-      expect(upgradeState.upgradeIx.accounts[6].pubkey.toBase58()).to.equal(
-        vaultPDA.toBase58()
-      );
-
-      // create a new tx for the upgrade
-      let txBuilder = await squads.getTransactionBuilder(msPDA, 1);
-      // the upgrade instruction
-      const upgradeIx = {
-        programId: upgradeState.upgradeIx.programId,
-        data: upgradeState.upgradeIx.upgradeInstructionData as Buffer,
-        keys: upgradeState.upgradeIx.accounts as anchor.web3.AccountMeta[],
-      };
-      const [ixPDA] = getIxPDA(
-        txBuilder.transactionPDA(),
-        new BN(1, 10),
-        squads.multisigProgramId
-      );
-      const [ix2PDA] = getIxPDA(
-        txBuilder.transactionPDA(),
-        new BN(2, 10),
-        squads.multisigProgramId
-      );
-      txBuilder = await txBuilder
-        .withInstruction(upgradeIx)
-        .withSetAsExecuted(
-          pmPDA,
+        const addedUpgrade = await squads.createProgramUpgrade(
+          msPDA,
           mpState.publicKey,
-          upgradeState.publicKey,
+          testBufferAddress,
+          testSpillAddress,
+          testAuthorityAddress,
+          testUpgradeName
+        );
+        mpState = await squads.getManagedProgram(mpState.publicKey);
+        expect(addedUpgrade.upgradeIndex).to.equal(mpState.upgradeIndex);
+        expect(addedUpgrade.name).to.equal(testUpgradeName);
+        expect(addedUpgrade.upgradeIx.programId.toBase58()).to.equal(
+          BPF_UPGRADE_ID.toBase58()
+        );
+      });
+
+      it(`Create upgrade with buffer and deploy it`,  async function(){
+        this.timeout(30000);
+        const nextProgramIndex = await squads.getNextProgramIndex(
+          getProgramManagerPDA(msPDA, squads.programManagerProgramId)[0]
+        );
+        const [vaultPDA] = await getAuthorityPDA(
+          msPDA,
+          new anchor.BN(1, 10),
+          squads.multisigProgramId
+        );
+
+        // create a temp keypair to use
+        const bufferKeypair = anchor.web3.Keypair.generate();
+
+        // write the temp buffer keypair to file
+        fs.writeFileSync(
+          "tests/tmp/buffer_test_keypair.json",
+          `[${bufferKeypair.secretKey.toString()}]`
+        );
+
+        // deploy/write the buffer
+        writeBuffer("tests/tmp/buffer_test_keypair.json");
+        // set the buffer authority to the vault
+        setBufferAuthority(bufferKeypair.publicKey, vaultPDA);
+
+        // check that the buffer has proper authority
+        const parsedBufferAccount = await squads.connection.getParsedAccountInfo(
+          bufferKeypair.publicKey
+        );
+        const parsedBufferData = (
+          parsedBufferAccount.value.data as ParsedAccountData
+        ).parsed;
+        expect(parsedBufferData.type).to.equal("buffer");
+        expect(parsedBufferData.info.authority).to.equal(vaultPDA.toBase58());
+
+        // set the program authority
+        setProgramAuthority(programManagerProgram.programId, vaultPDA);
+
+        // add the program
+        const nameString = "The program manager program, itself";
+        const mpState = await squads.createManagedProgram(
+          msPDA,
+          programManagerProgram.programId,
+          nameString
+        );
+        expect(mpState.name).to.equal(nameString);
+        expect(mpState.managedProgramIndex).to.equal(nextProgramIndex);
+
+        // create the upgrade
+
+        const testUpgradeName = "Upgrade #1";
+        const upgradeState = await squads.createProgramUpgrade(
+          msPDA,
+          mpState.publicKey,
+          bufferKeypair.publicKey,
+          squads.wallet.publicKey,
+          vaultPDA,
+          testUpgradeName
+        );
+
+        // verify the upgrade account was created, and that the buffers match as well in the ix
+        const managedProgramState = await squads.getManagedProgram(
+          mpState.publicKey
+        );
+        expect(upgradeState.upgradeIndex).to.equal(
+          managedProgramState.upgradeIndex
+        );
+        expect(upgradeState.name).to.equal(testUpgradeName);
+        // check the upgrade Ix accounts match
+        expect(upgradeState.upgradeIx.programId.toBase58()).to.equal(
+          BPF_UPGRADE_ID.toBase58()
+        );
+        expect(upgradeState.upgradeIx.accounts[1].pubkey.toBase58()).to.equal(
+          programManagerProgram.programId.toBase58()
+        );
+        expect(upgradeState.upgradeIx.accounts[2].pubkey.toBase58()).to.equal(
+          bufferKeypair.publicKey.toBase58()
+        );
+        expect(upgradeState.upgradeIx.accounts[3].pubkey.toBase58()).to.equal(
+          provider.wallet.publicKey.toBase58()
+        );
+        expect(upgradeState.upgradeIx.accounts[6].pubkey.toBase58()).to.equal(
+          vaultPDA.toBase58()
+        );
+
+        // create a new tx for the upgrade
+        let txBuilder = await squads.getTransactionBuilder(msPDA, 1);
+        // the upgrade instruction
+        const upgradeIx = {
+          programId: upgradeState.upgradeIx.programId,
+          data: upgradeState.upgradeIx.upgradeInstructionData as Buffer,
+          keys: upgradeState.upgradeIx.accounts as anchor.web3.AccountMeta[],
+        };
+        const [ixPDA] = getIxPDA(
           txBuilder.transactionPDA(),
-          ixPDA,
-          1
+          new BN(1, 10),
+          squads.multisigProgramId
         );
-
-      const [, txPDA] = await txBuilder.executeInstructions();
-
-      // get the ix
-      let ixState = await squads.getInstruction(ixPDA);
-      expect(ixState.instructionIndex).to.equal(1);
-
-      // get the ix 2
-      let ix2State = await squads.getInstruction(ix2PDA);
-      expect(ix2State.instructionIndex).to.equal(2);
-
-      let txState = await squads.getTransaction(txPDA);
-      expect(txState.instructionIndex).to.equal(2);
-
-      // activate the tx
-      await squads.activateTransaction(txPDA);
-
-      txState = await squads.getTransaction(txPDA);
-      expect(txState.status).to.have.property("active");
-
-      const msState = await squads.getMultisig(msPDA);
-      // if the threshold has changed, use the other members to approve as well
-      for (let i = 0; i < memberList.length; i++) {
-        // check to see if we need more signers
-        const approvalState = await squads.getTransaction(txPDA);
-        if (Object.keys(approvalState.status).indexOf("active") < 0) {
-          break;
-        }
-
-        const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
-          (k) => {
-            return k.toBase58() == memberList[i].publicKey.toBase58();
-          }
+        const [ix2PDA] = getIxPDA(
+          txBuilder.transactionPDA(),
+          new BN(2, 10),
+          squads.multisigProgramId
         );
-        if (inMultisig < 0) {
-          continue;
-        }
-        try {
-          await provider.connection.requestAirdrop(
-            memberList[i].publicKey,
-            anchor.web3.LAMPORTS_PER_SOL
+        txBuilder = await txBuilder
+          .withInstruction(upgradeIx)
+          .withSetAsExecuted(
+            pmPDA,
+            mpState.publicKey,
+            upgradeState.publicKey,
+            txBuilder.transactionPDA(),
+            ixPDA,
+            1
           );
-          const approveTx = await program.methods
-            .approveTransaction()
-            .accounts({
-              multisig: msPDA,
-              transaction: txPDA,
-              member: memberList[i].publicKey,
-            })
-            .signers([memberList[i]])
-            .transaction();
-          try {
-            await provider.sendAndConfirm(approveTx, [memberList[i]]);
-          } catch (e) {
-            console.log(memberList[i].publicKey.toBase58(), " signing error");
+
+        const [, txPDA] = await txBuilder.executeInstructions();
+
+        // get the ix
+        let ixState = await squads.getInstruction(ixPDA);
+        expect(ixState.instructionIndex).to.equal(1);
+
+        // get the ix 2
+        let ix2State = await squads.getInstruction(ix2PDA);
+        expect(ix2State.instructionIndex).to.equal(2);
+
+        let txState = await squads.getTransaction(txPDA);
+        expect(txState.instructionIndex).to.equal(2);
+
+        // activate the tx
+        await squads.activateTransaction(txPDA);
+
+        txState = await squads.getTransaction(txPDA);
+        expect(txState.status).to.have.property("active");
+
+        const msState = await squads.getMultisig(msPDA);
+        // if the threshold has changed, use the other members to approve as well
+        for (let i = 0; i < memberList.length; i++) {
+          // check to see if we need more signers
+          const approvalState = await squads.getTransaction(txPDA);
+          if (Object.keys(approvalState.status).indexOf("active") < 0) {
+            break;
           }
-        } catch (e) {
-          console.log(e);
+
+          const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
+            (k) => {
+              return k.toBase58() == memberList[i].publicKey.toBase58();
+            }
+          );
+          if (inMultisig < 0) {
+            continue;
+          }
+          try {
+            await provider.connection.requestAirdrop(
+              memberList[i].publicKey,
+              anchor.web3.LAMPORTS_PER_SOL
+            );
+            const approveTx = await program.methods
+              .approveTransaction()
+              .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                member: memberList[i].publicKey,
+              })
+              .signers([memberList[i]])
+              .transaction();
+            try {
+              await provider.sendAndConfirm(approveTx, [memberList[i]]);
+            } catch (e) {
+              console.log(memberList[i].publicKey.toBase58(), " signing error");
+            }
+          } catch (e) {
+            console.log(e);
+          }
         }
-      }
 
-      txState = await squads.getTransaction(txPDA);
-      expect(txState.status).to.have.property("executeReady");
+        txState = await squads.getTransaction(txPDA);
+        expect(txState.status).to.have.property("executeReady");
 
-      await squads.executeTransaction(txPDA);
+        await squads.executeTransaction(txPDA);
 
-      txState = await squads.getTransaction(txPDA);
-      expect(txState.status).to.have.property("executed");
-      const puState = await squads.getProgramUpgrade(upgradeState.publicKey);
-      expect(puState.executed).to.be.true;
-      expect(puState.upgradedOn.toNumber()).to.be.greaterThan(0);
+        txState = await squads.getTransaction(txPDA);
+        expect(txState.status).to.have.property("executed");
+        const puState = await squads.getProgramUpgrade(upgradeState.publicKey);
+        expect(puState.executed).to.be.true;
+        expect(puState.upgradedOn.toNumber()).to.be.greaterThan(0);
+      });
     });
   });
+
+  // test suite for the mesh program
+  describe("Mesh Program", function(){
+    let meshProgram;
+    let ms;
+    let members = [
+      anchor.web3.Keypair.generate(),
+      anchor.web3.Keypair.generate(),
+      anchor.web3.Keypair.generate(),
+    ];
+    const createKey = anchor.web3.Keypair.generate().publicKey;
+
+    this.beforeAll(async function(){
+      deployMesh();
+      console.log("✔ Mesh Program deployed.");
+      meshProgram = anchor.workspace.Mesh as Program<Mesh>;
+      [ms] = await getMsPDA(createKey, meshProgram.programId);
+      await provider.connection.requestAirdrop(members[0].publicKey, anchor.web3.LAMPORTS_PER_SOL * 2);
+      await provider.connection.requestAirdrop(members[1].publicKey, anchor.web3.LAMPORTS_PER_SOL * 2);
+      await provider.connection.requestAirdrop(members[2].publicKey, anchor.web3.LAMPORTS_PER_SOL * 2);
+    });
+
+    it("Create a multisig", async function(){
+        let initMembers = [
+            members[0].publicKey,
+            members[1].publicKey,
+            members[2].publicKey
+        ];
+        try {
+            await meshProgram.methods.create(provider.wallet.publicKey, 1, createKey, initMembers)
+                .accounts({
+                    multisig: ms,
+                    creator: provider.wallet.publicKey
+                })
+                .rpc();
+        }catch(e) {
+            console.log(e);
+        }
+
+        const msState = await meshProgram.account.ms.fetch(ms);
+        expect(msState.externalAuthority.toBase58()).to.equal(provider.wallet.publicKey.toBase58());
+    });
+
+    it("External remove", async function(){
+        // get the state
+        let msState = await meshProgram.account.ms.fetch(ms);
+        const keyCount = (msState.keys as anchor.web3.PublicKey[]).length;
+        // find a key to remove
+        const removeKey = (msState.keys as anchor.web3.PublicKey[]).shift();
+        try {
+            await meshProgram.methods.removeMember(removeKey)
+                .accounts({
+                    multisig: ms,
+                })
+                .rpc();
+        }catch(e){
+            console.log(e);
+        }
+        msState = await meshProgram.account.ms.fetch(ms);
+        expect((msState.keys as anchor.web3.PublicKey[]).length).to.equal(keyCount-1);
+    });
+
+    it("Internal remove failure", async function(){
+        // get the state
+        let msState = await meshProgram.account.ms.fetch(ms);
+        const keyCount = (msState.keys as anchor.web3.PublicKey[]).length;
+        // find a key to remove
+        const removeKey = (msState.keys as anchor.web3.PublicKey[]).shift();
+        const signerIndex = members.findIndex((k)=>{
+            return k.publicKey.toBase58() === removeKey.toBase58();
+        });
+        const signer = members[signerIndex];
+
+        const removeIx = await meshProgram.methods.removeMember(removeKey)
+            .accounts({
+                multisig: ms,
+            })
+            .instruction();
+        try {
+            const removeTx = new anchor.web3.Transaction();
+            removeIx.keys.pop();
+            removeIx.keys.push({
+                pubkey: signer.publicKey,
+                isWritable: true,
+                isSigner: true,
+            });
+            removeTx.add(removeIx);
+            await provider.sendAndConfirm(removeTx,[signer]);
+        }catch(e){
+            // want failure here
+            // console.log(e);
+        }
+        msState = await meshProgram.account.ms.fetch(ms);
+        expect((msState.keys as anchor.web3.PublicKey[]).length).to.equal(keyCount);
+    });
+
+    it("Vault withdrawal test - default authority", async function() {
+        const msState = await meshProgram.account.ms.fetch(ms);
+        const [vault] = await getAuthorityPDA(ms, new anchor.BN(1), meshProgram.programId);
+        const withdrawIx = await createTestTransferTransaction(vault, provider.wallet.publicKey, anchor.web3.LAMPORTS_PER_SOL);
+        const [tx] = await getTxPDA(ms, new anchor.BN(msState.transactionIndex + 1), meshProgram.programId);
+        
+        // go through the current member keys and find a signer
+        const signerPubkey = (msState.keys as anchor.web3.PublicKey[])[0];
+        const signerIndex = members.findIndex((k)=>{
+            return k.publicKey.toBase58() === signerPubkey.toBase58();
+        });
+
+        const signer = members[signerIndex];
+
+        // create the tx with authority 1
+        try {
+            await meshProgram.methods.createTransaction(1)
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc();
+        }catch(e){
+            console.log(e);
+        }
+
+        const [ix] = await getIxPDA(tx, new anchor.BN(1), meshProgram.programId);
+        // add an instruction to use the default TX authority declared above
+        try {
+            await meshProgram.methods.addInstruction(withdrawIx, null, null, {default:{}})
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    instruction: ix,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc()
+        }catch(e) {
+            console.log(e);
+        }
+
+        // activate and approve
+        try {
+            await meshProgram.methods.activateTransaction()
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc();
+            
+            await meshProgram.methods.approveTransaction()
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    member: signer.publicKey
+                })
+                .signers([signer])
+                .rpc();
+        }catch(e) {
+            console.log(e);
+        }
+
+        let txState = await meshProgram.account.msTransaction.fetch(tx);
+        expect(txState.status).to.haveOwnProperty("executeReady");
+
+        // airdrop 2 SOL to the vault
+        try {
+            const ad = await provider.connection.requestAirdrop(vault, anchor.web3.LAMPORTS_PER_SOL);
+            await provider.connection.confirmTransaction(ad);
+        }catch(e){
+            console.log(e);
+        }
+        const vaultAccount = await provider.connection.getAccountInfo(vault);
+
+        // execute the transaction
+        try {
+            await executeTransaction(tx, signer as unknown as anchor.Wallet, provider, meshProgram, signer.publicKey, [signer])
+        }catch(e){
+            console.log(e);
+        }
+        
+        txState = await meshProgram.account.msTransaction.fetch(tx);
+        expect(txState.status).to.haveOwnProperty("executed");
+    });
+
+    it("Vault withdrawal test - 2 different authorities", async function() {
+        const msState = await meshProgram.account.ms.fetch(ms);
+        const [vault1] = await getAuthorityPDA(ms, new anchor.BN(1), meshProgram.programId);
+        const [vault2, vault2Bump] = await getAuthorityPDA(ms, new anchor.BN(2), meshProgram.programId);
+        const withdrawIx1 = await createTestTransferTransaction(vault1, provider.wallet.publicKey, anchor.web3.LAMPORTS_PER_SOL);
+        const withdrawIx2 = await createTestTransferTransaction(vault2, provider.wallet.publicKey, anchor.web3.LAMPORTS_PER_SOL);
+
+        const [tx] = await getTxPDA(ms, new anchor.BN(msState.transactionIndex + 1), meshProgram.programId);
+        
+        // go through the current member keys and find a signer
+        const signerPubkey = (msState.keys as anchor.web3.PublicKey[])[0];
+        const signerIndex = members.findIndex((k)=>{
+            return k.publicKey.toBase58() === signerPubkey.toBase58();
+        });
+
+        const signer = members[signerIndex];
+
+        // transfer 2 SOL to the vaults
+        const vault1TransferTx = new anchor.web3.Transaction();
+        const vault2TransferTx = new anchor.web3.Transaction();
+        const vault1TransferIx = await createTestTransferTransaction(provider.wallet.publicKey, vault1, anchor.web3.LAMPORTS_PER_SOL * 2);
+        const vault2Transferix = await createTestTransferTransaction(provider.wallet.publicKey, vault2, anchor.web3.LAMPORTS_PER_SOL * 2);
+        vault1TransferTx.add(vault1TransferIx);
+        vault2TransferTx.add(vault2Transferix);
+        
+        await meshProgram.provider.sendAll([{tx: vault1TransferTx}, {tx: vault2TransferTx}]);
+        
+        // create the tx with authority 1
+        try {
+            await meshProgram.methods.createTransaction(1)
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc();
+        }catch(e){
+            console.log(e);
+        }
+
+
+        // add an instruction to use the default TX authority declared above
+        const [ix1] = await getIxPDA(tx, new anchor.BN(1), meshProgram.programId);
+
+        try {
+            await meshProgram.methods.addInstruction(withdrawIx1, null, null, {default:{}})
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    instruction: ix1,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc()
+        }catch(e) {
+            console.log(e);
+        }
+
+        // add an instruction to use the default vault 2 TX authority declared above
+        const [ix2] = await getIxPDA(tx, new anchor.BN(2), meshProgram.programId);
+        try {
+            await meshProgram.methods.addInstruction(withdrawIx2, 2, vault2Bump, {default:{}})
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    instruction: ix2,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc()
+        }catch(e) {
+            console.log(e);
+        }
+
+        // activate and approve
+        try {
+            await meshProgram.methods.activateTransaction()
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc();
+            
+            await meshProgram.methods.approveTransaction()
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    member: signer.publicKey
+                })
+                .signers([signer])
+                .rpc();
+        }catch(e) {
+            console.log(e);
+        }
+
+        let txState = await meshProgram.account.msTransaction.fetch(tx);
+        expect(txState.status).to.haveOwnProperty("executeReady");
+
+        // make sure the vaults are funded
+        const vaultStartBalance1 = await provider.connection.getAccountInfo(vault1, "confirmed");
+        const vaultStartBalance2 = await provider.connection.getAccountInfo(vault2, "confirmed");
+        
+        expect(vaultStartBalance1.lamports).to.be.greaterThan(0);
+        expect(vaultStartBalance2.lamports).to.be.greaterThan(0);
+        // execute the transaction
+        try {
+            await executeTransaction(tx, signer as unknown as anchor.Wallet, provider, meshProgram, signer.publicKey, [signer])
+        }catch(e){
+            console.log(e);
+        }
+        
+        const vaultEndBalance1 = await provider.connection.getAccountInfo(vault1);
+        const vaultEndBalance2 =  await provider.connection.getAccountInfo(vault2);
+        txState = await meshProgram.account.msTransaction.fetch(tx);
+        expect(txState.status).to.haveOwnProperty("executed");
+
+        expect(vaultEndBalance1.lamports).to.equal(vaultStartBalance1.lamports - anchor.web3.LAMPORTS_PER_SOL);
+        expect(vaultEndBalance2.lamports).to.equal(vaultStartBalance2.lamports - anchor.web3.LAMPORTS_PER_SOL);
+    });
+
+    it("Transfer from vault to custom PDA, then transfer to vault 2", async function(){
+        const msState = await meshProgram.account.ms.fetch(ms);
+        // get next expected tx PDA
+        const [tx] = await getTxPDA(ms, new anchor.BN(msState.transactionIndex + 1), meshProgram.programId);
+        const [vault] = await getAuthorityPDA(ms, new anchor.BN(1), meshProgram.programId);
+        const [vault2] = await getAuthorityPDA(ms, new anchor.BN(2), meshProgram.programId);
+        // get the custom ix pda
+        const [customIxPda, customIxPdaBump] = await getIxAuthority(tx, new anchor.BN(1), meshProgram.programId);
+        // transfer from default vault to custom ix authority
+        const withdrawIx = await createTestTransferTransaction(vault, customIxPda, anchor.web3.LAMPORTS_PER_SOL);
+        // transfer from custom ix authority to vault 2
+        const transferFromCustomIx = await createTestTransferTransaction(customIxPda, vault2, anchor.web3.LAMPORTS_PER_SOL);
+        
+        // go through the current member keys and find a signer
+        const signerPubkey = (msState.keys as anchor.web3.PublicKey[])[0];
+        const signerIndex = members.findIndex((k)=>{
+            return k.publicKey.toBase58() === signerPubkey.toBase58();
+        });
+
+        const signer = members[signerIndex];
+
+        // transfer 2 SOL to the vault
+        const vaultTransferTx = new anchor.web3.Transaction();
+        const vaultTransferIx = await createTestTransferTransaction(provider.wallet.publicKey, vault, anchor.web3.LAMPORTS_PER_SOL * 2);
+        vaultTransferTx.add(vaultTransferIx);
+        
+        // vault 1 is funded
+        await meshProgram.provider.sendAll([{tx: vaultTransferTx}]);
+
+        // create the tx with authority 1 as default
+        try {
+            await meshProgram.methods.createTransaction(1)
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc();
+        }catch(e){
+            console.log(e);
+        }
+
+
+        // add an instruction to use the default TX authority declared above
+        const [ix1] = await getIxPDA(tx, new anchor.BN(1), meshProgram.programId);
+        // transfer from default vault to custom ix authority
+        try {
+            await meshProgram.methods.addInstruction(withdrawIx, null, null, {default:{}})
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    instruction: ix1,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc()
+        }catch(e) {
+            console.log(e);
+        }
+
+        // add instruction to transfer from the custom pda to vault 2
+        const [ix2] = await getIxPDA(tx, new anchor.BN(2), meshProgram.programId);
+        try {
+            await meshProgram.methods.addInstruction(transferFromCustomIx, 1, customIxPdaBump, {custom:{}})
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    instruction: ix2,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc()
+        }catch(e) {
+            console.log(e);
+        }
+
+        // activate and approve
+        try {
+            await meshProgram.methods.activateTransaction()
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    creator: signer.publicKey
+                })
+                .signers([signer])
+                .rpc();
+            
+            await meshProgram.methods.approveTransaction()
+                .accounts({
+                    multisig: ms,
+                    transaction: tx,
+                    member: signer.publicKey
+                })
+                .signers([signer])
+                .rpc();
+        }catch(e) {
+            console.log(e);
+        }
+
+        let txState = await meshProgram.account.msTransaction.fetch(tx);
+        expect(txState.status).to.haveOwnProperty("executeReady");
+
+        // make sure the vaults are funded
+        const vaultStartBalance1 = await provider.connection.getAccountInfo(vault, "confirmed");
+        const vaultStartBalance2 = await provider.connection.getAccountInfo(vault2, "confirmed");
+        expect(vaultStartBalance1.lamports).to.be.greaterThan(0);
+        // execute the transaction
+        try {
+            await executeTransaction(tx, signer as unknown as anchor.Wallet, provider, meshProgram, signer.publicKey, [signer])
+        }catch(e){
+            console.log(e);
+        }
+        
+        const vaultEndBalance1 = await provider.connection.getAccountInfo(vault);
+        const vaultEndBalance2 =  await provider.connection.getAccountInfo(vault2);
+        txState = await meshProgram.account.msTransaction.fetch(tx);
+        expect(txState.status).to.haveOwnProperty("executed");
+
+        expect(vaultEndBalance1.lamports).to.equal(vaultStartBalance1.lamports - anchor.web3.LAMPORTS_PER_SOL);
+        expect(vaultEndBalance2.lamports).to.equal(vaultStartBalance2.lamports + anchor.web3.LAMPORTS_PER_SOL);
+    });
+
+  })
 });
