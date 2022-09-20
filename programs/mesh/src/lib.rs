@@ -396,7 +396,7 @@ pub mod mesh {
                     )?
                 },
                 
-                // invoke based on the custom pda
+                // invoke based on the custom pda & vault authority
                 MsAuthorityType::Custom => {
                     invoke_signed(
                         &ix,
@@ -407,6 +407,13 @@ pub mod mesh {
                             authority_index,
                             b"ix_authority",
                             &[authority_bump],
+                        ],
+                        &[
+                            b"squad",
+                            ms_key.as_ref(),
+                            &ctx.accounts.transaction.authority_index.to_le_bytes(),
+                            b"authority",
+                            &[ctx.accounts.transaction.authority_bump]
                         ]]
                     )?
                 }
@@ -495,6 +502,13 @@ pub mod mesh {
                         authority_index,
                         b"ix_authority",
                         &[authority_bump],
+                    ],
+                    &[
+                        b"squad",
+                        ms_key.as_ref(),
+                        &tx.authority_index.to_le_bytes(),
+                        b"authority",
+                        &[tx.authority_bump]
                     ]]
                 )?
             }
