@@ -12,7 +12,7 @@ import {
   executeTransaction,
 } from "../helpers/transactions";
 import { execSync } from "child_process";
-import { ParsedAccountData } from "@solana/web3.js";
+import { ParsedAccountData, PublicKey } from "@solana/web3.js";
 import Squads, {
   getMsPDA,
   getIxPDA,
@@ -21,6 +21,7 @@ import Squads, {
   getTxPDA,
 } from "@sqds/sdk";
 import BN from "bn.js";
+import { ASSOCIATED_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
 
 const BPF_UPGRADE_ID = new anchor.web3.PublicKey(
   "BPFLoaderUpgradeab1e11111111111111111111111"
@@ -1340,5 +1341,241 @@ describe("Programs", function(){
         expect(vaultEndBalance2.lamports).to.equal(vaultStartBalance2.lamports + anchor.web3.LAMPORTS_PER_SOL);
     });
 
+    it("Create a token mint based off the custom ix PDA", async function(){
+      const tokenProgram = anchor.Spl.token(provider);
+      const ataProgram = anchor.Spl.associatedToken(provider);
+      const mintAmount = 100000;
+      const systemProgram = anchor.web3.SystemProgram;
+      const msState = await meshProgram.account.ms.fetch(ms);
+      // get next expected tx PDA
+      const [tx] = await getTxPDA(ms, new anchor.BN(msState.transactionIndex + 1), meshProgram.programId);
+      const [vault, vaultBump] = await getAuthorityPDA(ms, new anchor.BN(1), meshProgram.programId);
+      const [vault2, vault2Bump] = await getAuthorityPDA(ms, new anchor.BN(2), meshProgram.programId);
+
+      const [ix1] = await getIxPDA(tx, new anchor.BN(1), meshProgram.programId);
+      const [ix2] = await getIxPDA(tx, new anchor.BN(2), meshProgram.programId);
+
+      // go through the current member keys and find a signer
+      const signerPubkey = (msState.keys as anchor.web3.PublicKey[])[0];
+      const signerIndex = members.findIndex((k)=>{
+          return k.publicKey.toBase58() === signerPubkey.toBase58();
+      });
+
+      const signer = members[signerIndex];
+
+      // create the tx with authority 1 as default
+      try {
+        await meshProgram.methods.createTransaction(1)
+            .accounts({
+                multisig: ms,
+                transaction: tx,
+                creator: signer.publicKey
+            })
+            .signers([signer])
+            .rpc();
+      }catch(e){
+          console.log(e);
+      }
+
+      // use the tx custom authority to be the new mint account
+      const [newMintPda, newMintPdaBump] = await getIxAuthority(tx, new anchor.BN(1), meshProgram.programId);
+      const [vault1Ata] = await anchor.web3.PublicKey.findProgramAddress([
+          vault.toBuffer(),
+          TOKEN_PROGRAM_ID.toBuffer(),
+          newMintPda.toBuffer()
+        ], ataProgram.programId
+      );
+      const [vault2Ata] = await anchor.web3.PublicKey.findProgramAddress([
+        vault2.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        newMintPda.toBuffer()
+      ], ataProgram.programId
+    );
+
+      const createMintAccountIx = await systemProgram.createAccount({
+          fromPubkey: vault,
+          newAccountPubkey: newMintPda,
+          lamports: await provider.connection.getMinimumBalanceForRentExemption(82),
+          space: 82,
+          programId: tokenProgram.programId
+      });
+
+      const initializeMintIx = await tokenProgram.methods.initializeMint(
+          0,
+          vault,
+          null
+        )
+        .accounts({
+          mint: newMintPda,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        })
+        .instruction();
+
+      // add the two mint instructions
+        try {
+          await meshProgram.methods.addInstruction(createMintAccountIx, 1, newMintPdaBump, {custom:{}})
+              .accounts({
+                  multisig: ms,
+                  transaction: tx,
+                  instruction: ix1,
+                  creator: signer.publicKey
+              })
+              .signers([signer])
+              .rpc();
+        }catch(e){
+            console.log(e);
+        }
+
+        try {
+          await meshProgram.methods.addInstruction(initializeMintIx, 1, newMintPdaBump, {custom:{}})
+            .accounts({
+              multisig: ms,
+              transaction: tx,
+              instruction: ix2,
+              creator: signer.publicKey
+            })
+            .signers([signer])
+            .rpc();
+        }catch(e){
+            console.log(e);
+        }
+
+        // mint to vault 1 instruction - with ata creation
+        // mint to vault 2 instruction - with ata creation
+        const [ix3] = await getIxPDA(tx, new anchor.BN(3), meshProgram.programId);
+        const [ix4] = await getIxPDA(tx, new anchor.BN(4), meshProgram.programId);
+
+        const vault1AtaIx = await ataProgram.methods.create().accounts({
+          authority: vault,
+          mint: newMintPda,
+          associatedAccount: vault1Ata,
+          owner: vault
+          
+        }).instruction();
+
+        try {
+          await meshProgram.methods.addInstruction(vault1AtaIx, 1, vaultBump, {default:{}})
+            .accounts({
+              multisig: ms,
+              transaction: tx,
+              instruction: ix3,
+              creator: signer.publicKey
+            })
+            .signers([signer])
+            .rpc();
+        }catch(e){
+            console.log(e);
+        }
+
+        const vault2AtaIx = await ataProgram.methods.create().accounts({
+          authority: vault2,
+          mint: newMintPda,
+          associatedAccount: vault2Ata,
+          owner: vault2
+        }).instruction();
+
+        try {
+          await meshProgram.methods.addInstruction(vault2AtaIx, 2, vault2Bump, {default:{}})
+            .accounts({
+              multisig: ms,
+              transaction: tx,
+              instruction: ix4,
+              creator: signer.publicKey
+            })
+            .signers([signer])
+            .rpc();
+        }catch(e){
+            console.log(e);
+        }
+
+        // now add the mintTo to instructions for each ata
+        const [ix5] = await getIxPDA(tx, new anchor.BN(5), meshProgram.programId);
+        const [ix6] = await getIxPDA(tx, new anchor.BN(6), meshProgram.programId);
+        const mintToVault1Ix = await tokenProgram.methods.mintTo(new anchor.BN(mintAmount)).accounts({
+          mint: newMintPda,
+          to: vault1Ata,
+          authority: vault
+        }).instruction();
+
+        const mintToVault2Ix = await tokenProgram.methods.mintTo(new anchor.BN(mintAmount)).accounts({
+          mint: newMintPda,
+          to: vault2Ata,
+          authority: vault
+        }).instruction();
+
+        // since the default TX authority is the vault1, and holds authority over the mint, these 2 ixes can use the default authority
+        try {
+          await meshProgram.methods.addInstruction(mintToVault1Ix, null, null, {default:{}})
+            .accounts({
+              multisig: ms,
+              transaction: tx,
+              instruction: ix5,
+              creator: signer.publicKey
+            })
+            .signers([signer])
+            .rpc();
+        }catch(e){
+            console.log(e);
+        }
+        try {
+          await meshProgram.methods.addInstruction(mintToVault2Ix, null, null, {default:{}})
+            .accounts({
+              multisig: ms,
+              transaction: tx,
+              instruction: ix6,
+              creator: signer.publicKey
+            })
+            .signers([signer])
+            .rpc();
+        }catch(e){
+            console.log(e);
+        }        
+
+
+        // activate and approve
+        try {
+          await meshProgram.methods.activateTransaction()
+            .accounts({
+              multisig: ms,
+              transaction: tx,
+              creator: signer.publicKey
+            })
+            .signers([signer])
+            .rpc();
+        }catch(e){
+            console.log(e);
+        }
+
+        try {
+          await meshProgram.methods.approveTransaction()
+            .accounts({
+              multisig: ms,
+              transaction: tx,
+              member: signer.publicKey
+            })
+            .signers([signer])
+            .rpc();
+        }catch(e){
+            console.log(e);
+        }
+
+        let txState = await meshProgram.account.msTransaction.fetch(tx);
+        expect(txState.status).to.haveOwnProperty("executeReady");
+
+        // execute the transaction
+        try {
+          await executeTransaction(tx, signer as unknown as anchor.Wallet, provider, meshProgram, signer.publicKey, [signer])
+        }catch(e){
+          console.log(e);
+        }
+        txState = await meshProgram.account.msTransaction.fetch(tx);
+        expect(txState.status).to.haveOwnProperty("executed");
+
+        // check that the ATAs have the minted balances:
+        const vault1AtaState = await provider.connection.getParsedAccountInfo(vault1Ata);
+        const vault2AtaState = await provider.connection.getParsedAccountInfo(vault2Ata);
+        expect(vault1AtaState.value.data.parsed.info.tokenAmount.uiAmount).to.equal(mintAmount);
+        expect(vault2AtaState.value.data.parsed.info.tokenAmount.uiAmount).to.equal(mintAmount);
+    });
   })
 });
