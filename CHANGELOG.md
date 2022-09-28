@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/Squads-Protocol/squads-mpl/compare/v1.1.1...v1.2.0) (2022-09-28)
+
+
+### Features
+
+* **mesh:** added WIP for mesh program ([a4ddaae](https://github.com/Squads-Protocol/squads-mpl/commit/a4ddaae260955837e6555c8123c320de4eb358a3))
+
+
+### Bug Fixes
+
+* **authority:** check that type is Default or Custom ([6568df3](https://github.com/Squads-Protocol/squads-mpl/commit/6568df39c9c5ecf11ae477c3a96797c6f0b65c97))
+* **mesh:** 2 signers for execute ([cccc84f](https://github.com/Squads-Protocol/squads-mpl/commit/cccc84fbcf8f887d143be14d7077e4e0f28a23d0))
+* **sdk:** package updates and commitment change ([b571171](https://github.com/Squads-Protocol/squads-mpl/commit/b571171aa57f94169f20ced7f0d909ca0d781476))
+
 ## [1.1.1](https://github.com/Squads-Protocol/squads-mpl/compare/v1.1.0...v1.1.1) (2022-08-24)
 
 
