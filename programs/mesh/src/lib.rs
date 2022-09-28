@@ -220,13 +220,18 @@ pub mod mesh {
     // authority specified during the transaction creation
     pub fn add_instruction(ctx: Context<AddInstruction>, incoming_instruction: IncomingInstruction, authority_index: Option<u32>, authority_bump: Option<u8>, authority_type: MsAuthorityType) -> Result<()> {
         let tx = &mut ctx.accounts.transaction;
-
+        
         let mut ix_authority_index = authority_index;
         let mut ix_authority_bump = authority_bump;
         let mut ix_authority_type = authority_type;
 
+        // check the proper authority level option is set
+        if ix_authority_type != MsAuthorityType::Default && ix_authority_type != MsAuthorityType::Custom{
+            return err!(GraphsError::InvalidAuthorityType);
+        }
+
         // if no authority values are passed in, regardless of what the authority type is,
-        // we will use the authority specified in the transaction
+        // we will use the authority specified in the transaction and set the type to Default
         if authority_index.is_none() && authority_bump.is_none() {
             ix_authority_index = Some(tx.authority_index);
             ix_authority_bump = Some(tx.authority_bump);
@@ -236,10 +241,6 @@ pub mod mesh {
         // if one or the other is specified, throw an error
         if (authority_index.is_none() && authority_bump.is_some()) || (authority_index.is_some() && authority_bump.is_none()) {
             return err!(GraphsError::InvalidAuthorityIndex);
-        }
-
-        if ix_authority_type != MsAuthorityType::Default && ix_authority_type != MsAuthorityType::Custom{
-            return err!(GraphsError::InvalidAuthorityType);
         }
 
         tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
