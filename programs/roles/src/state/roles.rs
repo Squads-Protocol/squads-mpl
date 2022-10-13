@@ -22,13 +22,15 @@ impl User {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum Role {
     Initiate,
     Vote,
-    Execute
+    Execute,
+    InitiateAndExecute,
+    InitiateAndVote,
 }
 
 impl Role {
-    pub const MAXIMUM_SIZE: usize = 1 + 8;
+    pub const MAXIMUM_SIZE: usize = 1 + 18;
 }

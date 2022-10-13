@@ -43,6 +43,10 @@ pub mod roles {
         squads_mpl::cpi::activate_transaction(ctx.accounts.activate_transaction_ctx())
 
     }
+
+    pub fn execute_tx_proxy(ctx: Context<ExecuteTxProxy>, account_list: Vec<u8>) -> Result<()> {
+        squads_mpl::cpi::execute_transaction(ctx.accounts.execute_transaction_ctx(), account_list)
+    }
 }
 
 #[derive(Accounts)]
@@ -74,8 +78,22 @@ pub struct CreateProxy<'info> {
 
     #[account(mut)]
     pub transaction: Account<'info, MsTransaction>,
+    
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            creator.key().as_ref(),
+            b"user-role"
+        ], bump = user.bump,
+        constraint = user.role == Role::Initiate || user.role == Role::InitiateAndExecute || user.role == Role::InitiateAndVote
+    )]
+    pub user: Account<'info, User>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = user.origin_key == creator.key()
+    )]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub squads_program: Program<'info, SquadsMpl>,
@@ -87,7 +105,7 @@ impl<'info> CreateProxy<'info> {
         let cpi_accounts = CreateTransaction {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
-            creator: self.creator.to_account_info(),
+            creator: self.user.to_account_info(),
             system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
@@ -103,8 +121,22 @@ pub struct AddProxy<'info> {
 
     #[account(mut)]
     pub instruction: Account<'info, MsInstruction>,
-
-    #[account(mut)]
+    
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            creator.key().as_ref(),
+            b"user-role"
+        ], bump = user.bump,
+        constraint = user.role == Role::Initiate || user.role == Role::InitiateAndExecute || user.role == Role::InitiateAndVote
+    )]
+    pub user: Account<'info, User>,
+    
+    #[account(
+        mut,
+        constraint = user.origin_key == creator.key()
+    )]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub squads_program: Program<'info, SquadsMpl>,
@@ -117,7 +149,7 @@ impl<'info> AddProxy<'info> {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
             instruction: self.instruction.to_account_info(),
-            creator: self.creator.to_account_info(),
+            creator: self.user.to_account_info(),
             system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
@@ -131,7 +163,21 @@ pub struct ActivateProxy<'info> {
     #[account(mut)]
     pub transaction: Account<'info, MsTransaction>,
 
-    #[account(mut)]
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            creator.key().as_ref(),
+            b"user-role"
+        ], bump = user.bump,
+        constraint = user.role == Role::Initiate || user.role == Role::InitiateAndExecute || user.role == Role::InitiateAndVote
+    )]
+    pub user: Account<'info, User>,
+
+    #[account(
+        mut,
+        constraint = user.origin_key == creator.key()
+    )]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub squads_program: Program<'info, SquadsMpl>,
@@ -144,7 +190,7 @@ impl<'info> ActivateProxy<'info> {
         let cpi_accounts = ActivateTransaction {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
-            creator: self.creator.to_account_info(),
+            creator: self.user.to_account_info(),
             system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
@@ -158,7 +204,21 @@ pub struct VoteProxy<'info> {
     #[account(mut)]
     pub transaction: Account<'info, MsTransaction>,
 
-    #[account(mut)]
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            member.key().as_ref(),
+            b"user-role"
+        ], bump = user.bump,
+        constraint = user.role == Role::Vote || user.role == Role::InitiateAndVote
+    )]
+    pub user: Account<'info, User>,
+
+    #[account(
+        mut,
+        constraint = user.origin_key == member.key()
+    )]
     pub member: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub squads_program: Program<'info, SquadsMpl>,
@@ -171,7 +231,7 @@ impl<'info> VoteProxy<'info> {
         let cpi_accounts = VoteTransaction {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
-            member: self.member.to_account_info(),
+            member: self.user.to_account_info(),
             system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
@@ -179,26 +239,40 @@ impl<'info> VoteProxy<'info> {
 }
 
 #[derive(Accounts)]
-pub struct ExecuteProxy<'info> {
+pub struct ExecuteTxProxy<'info> {
     #[account(mut)]
     pub multisig: Box<Account<'info, Ms>>,
 
     #[account(mut)]
     pub transaction: Account<'info, MsTransaction>,
 
-    #[account(mut)]
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            member.key().as_ref(),
+            b"user-role"
+        ], bump = user.bump,
+        constraint = user.role == Role::Execute || user.role == Role::InitiateAndExecute,
+    )]
+    pub user: Account<'info, User>,
+
+    #[account(
+        mut,
+        constraint = user.origin_key == member.key()
+    )]
     pub member: Signer<'info>,
     pub squads_program: Program<'info, SquadsMpl>,
 
 }
 
-impl<'info> ExecuteProxy<'info> {
+impl<'info> ExecuteTxProxy<'info> {
     pub fn execute_transaction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ExecuteTransaction<'info>> {
         let cpi_program = self.squads_program.to_account_info();
         let cpi_accounts = ExecuteTransaction {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
-            member: self.member.to_account_info(),
+            member: self.user.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
     }
