@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 
-use squads_mpl::Create;
-use squads_mpl::state::{Ms, MsTransaction, MsInstruction};
+use squads_mpl::state::{Ms, MsTransaction, MsInstruction, IncomingInstruction};
 use squads_mpl::cpi::accounts::{
     CreateTransaction,
     AddInstruction,
@@ -14,10 +13,12 @@ use squads_mpl::program::SquadsMpl;
 use state::roles::{User,Role};
 pub mod state;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("8hG7uP3qM5NKSpNnNVsiRP2YoYLA91kcwZb8CZ4U7fV2");
 
 #[program]
 pub mod roles {
+    use squads_mpl::state::IncomingInstruction;
+
     use super::*;
 
     pub fn add_user(ctx: Context<NewUser>, origin_key: Pubkey, role: Role) -> Result<()> {
@@ -30,16 +31,17 @@ pub mod roles {
         Ok(())
     }
 
-    pub fn create_proxy(ctx: Context<CreateProxy>) -> Result<()> {
-        Ok(())
+    pub fn create_proxy(ctx: Context<CreateProxy>, authority_index: u32) -> Result<()> {
+        squads_mpl::cpi::create_transaction(ctx.accounts.create_transaction_ctx(), authority_index)
     }
 
-    pub fn add_proxy(ctx: Context<AddProxy>) -> Result<()> {
-        Ok(())
+    pub fn add_proxy(ctx: Context<AddProxy>, incoming_instruction: IncomingInstruction) -> Result<()> {
+        squads_mpl::cpi::add_instruction(ctx.accounts.add_instruction_ctx(), incoming_instruction)
     }
 
     pub fn activate_proxy(ctx: Context<ActivateProxy>) -> Result<()> {
-        Ok(())
+        squads_mpl::cpi::activate_transaction(ctx.accounts.activate_transaction_ctx())
+
     }
 }
 
@@ -109,7 +111,7 @@ pub struct AddProxy<'info> {
 }
 
 impl<'info> AddProxy<'info> {
-    pub fn create_transaction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, AddInstruction<'info>> {
+    pub fn add_instruction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, AddInstruction<'info>> {
         let cpi_program = self.squads_program.to_account_info();
         let cpi_accounts = AddInstruction {
             multisig: self.multisig.to_account_info(),
@@ -137,7 +139,7 @@ pub struct ActivateProxy<'info> {
 }
 
 impl<'info> ActivateProxy<'info> {
-    pub fn create_transaction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ActivateTransaction<'info>> {
+    pub fn activate_transaction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ActivateTransaction<'info>> {
         let cpi_program = self.squads_program.to_account_info();
         let cpi_accounts = ActivateTransaction {
             multisig: self.multisig.to_account_info(),
@@ -164,7 +166,7 @@ pub struct VoteProxy<'info> {
 }
 
 impl<'info> VoteProxy<'info> {
-    pub fn create_transaction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, VoteTransaction<'info>> {
+    pub fn vote_transaction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, VoteTransaction<'info>> {
         let cpi_program = self.squads_program.to_account_info();
         let cpi_accounts = VoteTransaction {
             multisig: self.multisig.to_account_info(),
@@ -191,7 +193,7 @@ pub struct ExecuteProxy<'info> {
 }
 
 impl<'info> ExecuteProxy<'info> {
-    pub fn create_transaction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ExecuteTransaction<'info>> {
+    pub fn execute_transaction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, ExecuteTransaction<'info>> {
         let cpi_program = self.squads_program.to_account_info();
         let cpi_accounts = ExecuteTransaction {
             multisig: self.multisig.to_account_info(),
