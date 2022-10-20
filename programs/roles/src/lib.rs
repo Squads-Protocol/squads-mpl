@@ -1,24 +1,23 @@
 use anchor_lang::prelude::*;
-
-use squads_mpl::state::{Ms, MsTransaction, MsInstruction, IncomingInstruction};
-use squads_mpl::cpi::accounts::{
-    CreateTransaction,
-    AddInstruction,
-    ActivateTransaction,
-    VoteTransaction,
-    ExecuteTransaction
-};
+use squads_mpl::errors::MsError;
 use squads_mpl::program::SquadsMpl;
-
-use state::roles::{User,Role};
+use squads_mpl::cpi::{
+    accounts::{
+        CreateTransaction,
+        AddInstruction,
+        ActivateTransaction,
+        VoteTransaction,
+        ExecuteTransaction,
+    }
+};
+use state::roles::*;
+pub use squads_mpl::state::ms::{Ms, MsInstruction, MsTransaction};
 pub mod state;
 
 declare_id!("8hG7uP3qM5NKSpNnNVsiRP2YoYLA91kcwZb8CZ4U7fV2");
 
 #[program]
 pub mod roles {
-    use squads_mpl::state::IncomingInstruction;
-
     use super::*;
 
     pub fn add_user(ctx: Context<NewUser>, origin_key: Pubkey, role: Role) -> Result<()> {
@@ -36,7 +35,7 @@ pub mod roles {
     }
 
     pub fn add_proxy(ctx: Context<AddProxy>, incoming_instruction: IncomingInstruction) -> Result<()> {
-        squads_mpl::cpi::add_instruction(ctx.accounts.add_instruction_ctx(), incoming_instruction)
+        squads_mpl::cpi::add_instruction(ctx.accounts.add_instruction_ctx(), incoming_instruction.into())
     }
 
     pub fn activate_proxy(ctx: Context<ActivateProxy>) -> Result<()> {
@@ -64,19 +63,35 @@ pub struct NewUser<'info>{
         ], bump
     )]
     pub user:  Box<Account<'info, User>>,
+
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
+    )]
     pub multisig: Box<Account<'info, Ms>>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = matches!(multisig.is_member(payer.key()), Some(..)) @MsError::KeyNotInMultisig,
+    )]
     pub payer: Signer<'info>,
+    pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct CreateProxy<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        owner = squads_mpl::ID,  
+    )]
     pub multisig: Account<'info, Ms>,
 
-    #[account(mut)]
     pub transaction: Account<'info, MsTransaction>,
     
     #[account(
@@ -92,7 +107,7 @@ pub struct CreateProxy<'info> {
 
     #[account(
         mut,
-        constraint = user.origin_key == creator.key()
+        constraint = user.origin_key == creator.key() @MsError::InvalidInstructionAccount
     )]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -114,12 +129,43 @@ impl<'info> CreateProxy<'info> {
 
 #[derive(Accounts)]
 pub struct AddProxy<'info> {
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
+    )]
     pub multisig: Account<'info, Ms>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ],
+        bump = transaction.bump,
+        seeds::program = squads_mpl::ID,
+    )]
     pub transaction: Account<'info, MsTransaction>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            transaction.key().as_ref(),
+            &instruction.instruction_index.to_le_bytes(),
+            b"instruction"
+        ],
+        bump = instruction.bump,
+        seeds::program = squads_mpl::ID,
+    )]
     pub instruction: Account<'info, MsInstruction>,
     
     #[account(
@@ -158,9 +204,29 @@ impl<'info> AddProxy<'info> {
 
 #[derive(Accounts)]
 pub struct ActivateProxy<'info> {
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
+    )]
     pub multisig: Account<'info, Ms>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ],
+        bump = transaction.bump,
+        seeds::program = squads_mpl::ID,
+    )]
     pub transaction: Account<'info, MsTransaction>,
 
     #[account(
@@ -199,9 +265,29 @@ impl<'info> ActivateProxy<'info> {
 
 #[derive(Accounts)]
 pub struct VoteProxy<'info> {
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
+    )]
     pub multisig: Account<'info, Ms>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ],
+        bump = transaction.bump,
+        seeds::program = squads_mpl::ID,
+    )]
     pub transaction: Account<'info, MsTransaction>,
 
     #[account(
@@ -240,7 +326,16 @@ impl<'info> VoteProxy<'info> {
 
 #[derive(Accounts)]
 pub struct ExecuteTxProxy<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
+    )]
     pub multisig: Box<Account<'info, Ms>>,
 
     #[account(mut)]

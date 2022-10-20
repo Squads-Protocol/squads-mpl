@@ -1,7 +1,5 @@
-use std::convert::TryInto;
-
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
-use anchor_lang::solana_program::borsh::get_instance_packed_len;
+use anchor_lang::{prelude::*};
+// use squads_mpl::state::IncomingInstruction;
 
 #[account]
 pub struct User {
@@ -33,4 +31,37 @@ pub enum Role {
 
 impl Role {
     pub const MAXIMUM_SIZE: usize = 1 + 18;
+}
+
+#[derive(AnchorSerialize,AnchorDeserialize, Copy, Clone)]
+pub struct MsAccountMeta {
+    pub pubkey: Pubkey,
+    pub is_signer: bool,
+    pub is_writable: bool
+}
+
+// serialization schema for incoming instructions to be attached to transaction
+#[derive(AnchorSerialize,AnchorDeserialize, Clone)]
+pub struct IncomingInstruction {
+    pub program_id: Pubkey,
+    pub keys: Vec<MsAccountMeta>,
+    pub data: Vec<u8>
+}
+
+impl From<IncomingInstruction> for squads_mpl::state::IncomingInstruction{
+    fn from(incoming_instruction: IncomingInstruction) -> Self {
+        let mut keys = vec![];
+        for key in incoming_instruction.keys {
+            keys.push(squads_mpl::state::MsAccountMeta{
+                pubkey: key.pubkey,
+                is_signer: key.is_signer,
+                is_writable: key.is_writable
+            })
+        }
+        squads_mpl::state::IncomingInstruction{
+            program_id: incoming_instruction.program_id,
+            keys,
+            data: incoming_instruction.data
+        }
+    }
 }

@@ -2,9 +2,10 @@ import { expect } from "chai";
 import fs from "fs";
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
-import { SquadsMpl } from "../target/types/squads_mpl";
-import { ProgramManager } from "../target/types/program_manager";
-import { Mesh } from "../target/types/mesh";
+import { SquadsMpl } from "../idl/squads_mpl";
+import { ProgramManager } from "../idl/program_manager";
+import { Roles } from "../idl/roles";
+import { Mesh } from "../idl/mesh";
 
 import {
   createBlankTransaction,
@@ -39,6 +40,11 @@ const deployPm = () => {
 
 const deployMesh = () => {
   const deployCmd = `solana program deploy --url localhost -v --program-id $(pwd)/target/deploy/mesh-keypair.json $(pwd)/target/deploy/mesh.so`;
+  execSync(deployCmd);
+};
+
+const deployRoles = () => {
+  const deployCmd = `solana program deploy --url localhost -v --program-id $(pwd)/target/deploy/roles-keypair.json $(pwd)/target/deploy/roles.so`;
   execSync(deployCmd);
 };
 
@@ -91,7 +97,7 @@ describe("Programs", function(){
     anchor.setProvider(provider);
   });
 
-  describe("SPML & Program Manager", function(){
+  describe("SMPL, Program Manager, & Roles", function(){
 
     let program;
     let squads;
@@ -101,6 +107,8 @@ describe("Programs", function(){
     let msPDA;
     let pmPDA;
     let member2;
+    let rolesProgram;
+
     const numberOfMembersTotal = 10;
     const memberList = [...new Array(numberOfMembersTotal - 1)].map(() => {
       return anchor.web3.Keypair.generate();
@@ -109,22 +117,23 @@ describe("Programs", function(){
     let threshold = 1;
 
     // test suite
-    describe("SMPL Basic functionality", function(){
-      this.beforeAll(function(){
+    describe("SMPL Basic functionality", async function(){
+      this.beforeAll(async function(){
         console.log("Deploying programs...");
         deploySmpl();
         console.log("✔ SMPL Program deployed.");
         deployPm();
         console.log("✔ Program Manager Program deployed.");
+        deployRoles();
+        console.log("✔ Roles Program deployed.");
         console.log("Finished deploying programs.");
-  
+
         program = anchor.workspace.SquadsMpl as Program<SquadsMpl>;
         squads = Squads.localnet(provider.wallet, {
           commitmentOrConfig: provider.connection.commitment,
           multisigProgramId: anchor.workspace.SquadsMpl.programId,
           programManagerProgramId: anchor.workspace.ProgramManager.programId,
         });
-      
         // the program-manager program / provider
         programManagerProgram = anchor.workspace
           .ProgramManager as Program<ProgramManager>;
@@ -673,7 +682,7 @@ describe("Programs", function(){
       });
     });
 
-    describe("Program upgrades", () => {
+    describe.skip("Program upgrades", () => {
       it(`Create a program manager`,  async function(){
         const newProgramManager = await squads.createProgramManager(msPDA);
         expect(newProgramManager.multisig.toBase58()).to.equal(msPDA.toBase58());
@@ -908,10 +917,213 @@ describe("Programs", function(){
         expect(puState.upgradedOn.toNumber()).to.be.greaterThan(0);
       });
     });
+  
+    // test suite for the roles program
+    describe("Roles Program", async function(){
+      const userWithRole = anchor.web3.Keypair.generate();
+
+      this.beforeAll(function(){
+        rolesProgram = anchor.workspace.Roles as Program<Roles>;
+      });
+
+      it("Add new member role and add them to the MS", async function(){
+        const [userPDA] = await anchor.web3.PublicKey.findProgramAddress([
+            anchor.utils.bytes.utf8.encode("squad"),
+            msPDA.toBuffer(),
+            userWithRole.publicKey.toBuffer(),
+            anchor.utils.bytes.utf8.encode("user-role")
+          ],rolesProgram.programId
+        );
+
+        let msState = await program.account.ms.fetch(msPDA);
+        const nextTxIndex = msState.transactionIndex + 1;
+        // generate the txPDA
+        const [txPDA] = await getTxPDA(
+          msPDA,
+          new BN(nextTxIndex, 10),
+          program.programId
+        );
+
+        // the actual transaction
+        try {
+          await program.methods.createTransaction(0)
+            .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              creator: provider.wallet.publicKey,
+            })
+            .rpc();
+        } catch (e) {
+          console.log("failed to create the authority 0 tx", e);
+        }
+        // generate the 2 ixPDAs
+        const [ixPDA] = await getIxPDA(
+          txPDA,
+          new BN(1, 10),
+          program.programId
+        );
+
+        try {
+          // the ix that will create the user role
+          await rolesProgram.methods.addUser(userWithRole.publicKey, {initiate:{}})
+            .accounts({
+              user: userPDA,
+              multisig: msPDA,
+              payer: provider.wallet.publicKey
+            }).rpc();
+        }catch(e){
+          console.log("failed to add the user role", e);
+        }
+
+        try {
+          // the ix that will add the user to the MS
+          const addMemberIx = await program.methods.addMember(userPDA)
+            .accounts({
+              multisig: msPDA,
+              multisigAuth: msPDA,
+              member: provider.wallet.publicKey,
+            })
+            .instruction();
+
+          await program.methods.addInstruction(addMemberIx)
+            .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              instruction: ixPDA,
+              creator: provider.wallet.publicKey
+            })
+            .rpc();
+        }catch(e){
+          console.log("failed to add the add member ix", e);
+        }
+
+        try {
+          // the activation ix
+          await program.methods.activateTransaction()
+          .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              creator: provider.wallet.publicKey
+            })
+            .rpc();
+        }catch(e){
+          console.log("failed to activate the tx", e);
+        }
+
+        try {
+          // the approve ix
+          await program.methods.approveTransaction()
+            .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              member: provider.wallet.publicKey,
+            })
+            .rpc();
+        }catch(e){
+          console.log("failed to approve the tx", e);
+        }
+
+        // sign to approve with the other members
+        msState = await squads.getMultisig(msPDA);
+        // get necessary signers
+        // if the threshold has changed, use the other members to approve as well
+        for (let i = 0; i < memberList.length; i++) {
+          // check to see if we need more signers
+          const approvalState = await squads.getTransaction(txPDA);
+          if (Object.keys(approvalState.status).indexOf("active") < 0) {
+            break;
+          }
+
+          const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
+            (k) => {
+              return k.toBase58() == memberList[i].publicKey.toBase58();
+            }
+          );
+          if (inMultisig < 0) {
+            continue;
+          }
+          try {
+            await provider.connection.requestAirdrop(
+              memberList[i].publicKey,
+              anchor.web3.LAMPORTS_PER_SOL
+            );
+            const approveTx = await program.methods
+              .approveTransaction()
+              .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                member: memberList[i].publicKey,
+              })
+              .signers([memberList[i]])
+              .transaction();
+            try {
+              await provider.sendAndConfirm(approveTx, [memberList[i]]);
+            } catch (e) {
+              console.log(memberList[i].publicKey.toBase58(), " signing error");
+            }
+          } catch (e) {
+            console.log(e);
+          }
+        }
+        let txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("executeReady");
+
+        try {
+          await squads.executeTransaction(txPDA);
+        }catch(e){
+          console.log("failed to execute the tx", e);
+        }
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("executed");
+        const roleState = await rolesProgram.account.user.fetch(userPDA);
+        expect(roleState.originKey.toBase58()).to.equal(userWithRole.publicKey.toBase58());
+        expect(roleState.role).to.have.property("initiate");
+      });
+
+      it("New user role initiate withdrawal", async function(){
+        await provider.connection.requestAirdrop(
+          userWithRole.publicKey,
+          anchor.web3.LAMPORTS_PER_SOL
+        );
+        const [userPDA] = await anchor.web3.PublicKey.findProgramAddress([
+            anchor.utils.bytes.utf8.encode("squad"),
+            msPDA.toBuffer(),
+            userWithRole.publicKey.toBuffer(),
+            anchor.utils.bytes.utf8.encode("user-role")
+          ],rolesProgram.programId
+        );
+
+        let msState = await program.account.ms.fetch(msPDA);
+        const nextTxIndex = msState.transactionIndex + 1;
+        // generate the txPDA
+        const [txPDA] = await getTxPDA(
+          msPDA,
+          new BN(nextTxIndex, 10),
+          program.programId
+        );
+        try {
+          const createProxyTx = await rolesProgram.methods.createProxy(1)
+            .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              user: userPDA,
+              creator: userWithRole.publicKey,
+              squadsProgram: program.programId
+            })
+            .signers([userWithRole.publicKey])
+            .transaction();
+          
+            await provider.sendAndConfirm(createProxyTx, [userWithRole]);
+        }catch(e){
+          console.log("failed to create the user 1 tx", e);
+        }
+      });
+    });
+
   });
 
   // test suite for the mesh program
-  describe("Mesh Program", function(){
+  describe.skip("Mesh Program", function(){
     let meshProgram;
     let ms;
     let members = [
@@ -1577,5 +1789,6 @@ describe("Programs", function(){
         expect(vault1AtaState.value.data.parsed.info.tokenAmount.uiAmount).to.equal(mintAmount);
         expect(vault2AtaState.value.data.parsed.info.tokenAmount.uiAmount).to.equal(mintAmount);
     });
-  })
+  });
+
 });
