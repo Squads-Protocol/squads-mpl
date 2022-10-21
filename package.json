@@ -2,8 +2,8 @@
   "private": true,
   "dependencies": {
     "@project-serum/anchor": "^0.25.0",
-    "bn.js": "^5.2.1",
-    "@sqds/sdk": "1.0.2"
+    "@sqds/sdk": "^1.0.4",
+    "bn.js": "^5.2.1"
   },
   "devDependencies": {
     "@types/chai": "^4.3.1",

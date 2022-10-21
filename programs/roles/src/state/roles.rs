@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*};
+use anchor_lang::{prelude::*, solana_program::borsh::get_instance_packed_len};
 // use squads_mpl::state::IncomingInstruction;
 
 #[account]
@@ -46,6 +46,15 @@ pub struct IncomingInstruction {
     pub program_id: Pubkey,
     pub keys: Vec<MsAccountMeta>,
     pub data: Vec<u8>
+}
+impl IncomingInstruction {
+    pub fn get_max_size(&self) -> usize {
+        // add three the size to correlate with the saved instruction account
+        // there are 3 extra bytes in a saved instruction account: index, bump, executed
+        // this is used to determine how much space the incoming instruction
+        // will used when saved
+        return get_instance_packed_len(&self).unwrap_or_default().checked_add(3).unwrap_or_default();
+    }
 }
 
 impl From<IncomingInstruction> for squads_mpl::state::IncomingInstruction{

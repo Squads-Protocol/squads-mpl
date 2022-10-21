@@ -13,7 +13,7 @@ import {
   executeTransaction,
 } from "../helpers/transactions";
 import { execSync } from "child_process";
-import { ParsedAccountData, PublicKey } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, ParsedAccountData, PublicKey, SystemProgram } from "@solana/web3.js";
 import Squads, {
   getMsPDA,
   getIxPDA,
@@ -935,6 +935,13 @@ describe("Programs", function(){
           ],rolesProgram.programId
         );
 
+        const [userPayerPDA] = await anchor.web3.PublicKey.findProgramAddress([
+          anchor.utils.bytes.utf8.encode("squad"),
+          msPDA.toBuffer(),
+          userPDA.toBuffer(),
+          anchor.utils.bytes.utf8.encode("role-payer")
+        ], rolesProgram.programId)
+
         let msState = await program.account.ms.fetch(msPDA);
         const nextTxIndex = msState.transactionIndex + 1;
         // generate the txPDA
@@ -977,7 +984,7 @@ describe("Programs", function(){
 
         try {
           // the ix that will add the user to the MS
-          const addMemberIx = await program.methods.addMember(userPDA)
+          const addMemberIx = await program.methods.addMember(userPayerPDA)
             .accounts({
               multisig: msPDA,
               multisigAuth: msPDA,
@@ -1081,8 +1088,14 @@ describe("Programs", function(){
       });
 
       it("New user role initiate withdrawal", async function(){
+        const [vault] = await getAuthorityPDA(msPDA, new anchor.BN(1), program.programId);
+
         await provider.connection.requestAirdrop(
           userWithRole.publicKey,
+          anchor.web3.LAMPORTS_PER_SOL
+        );
+        await provider.connection.requestAirdrop(
+          vault,
           anchor.web3.LAMPORTS_PER_SOL
         );
         const [userPDA] = await anchor.web3.PublicKey.findProgramAddress([
@@ -1092,7 +1105,16 @@ describe("Programs", function(){
             anchor.utils.bytes.utf8.encode("user-role")
           ],rolesProgram.programId
         );
-
+        const [userPayerPDA] = await anchor.web3.PublicKey.findProgramAddress([
+          anchor.utils.bytes.utf8.encode("squad"),
+          msPDA.toBuffer(),
+          userPDA.toBuffer(),
+          anchor.utils.bytes.utf8.encode("role-payer")
+        ], rolesProgram.programId)
+        await provider.connection.requestAirdrop(
+          userPayerPDA,
+          anchor.web3.LAMPORTS_PER_SOL
+        );
         let msState = await program.account.ms.fetch(msPDA);
         const nextTxIndex = msState.transactionIndex + 1;
         // generate the txPDA
@@ -1101,22 +1123,86 @@ describe("Programs", function(){
           new BN(nextTxIndex, 10),
           program.programId
         );
+        // create/initiate a squads transaction
         try {
           const createProxyTx = await rolesProgram.methods.createProxy(1)
             .accounts({
               multisig: msPDA,
               transaction: txPDA,
               user: userPDA,
+              rolePayer: userPayerPDA,
               creator: userWithRole.publicKey,
               squadsProgram: program.programId
             })
             .signers([userWithRole.publicKey])
             .transaction();
           
-            await provider.sendAndConfirm(createProxyTx, [userWithRole]);
+            await provider.sendAndConfirm(createProxyTx, [userWithRole], {skipPreflight: true});
         }catch(e){
           console.log("failed to create the user 1 tx", e);
         }
+        let txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("draft");
+        
+        // attach an instruction
+        const [ixPDA] = await getIxPDA(txPDA, new anchor.BN(1), program.programId);
+        const withdrawIx = await SystemProgram.transfer({fromPubkey: vault, toPubkey: provider.wallet.publicKey, lamports: LAMPORTS_PER_SOL/2});
+        const addWithdrawIxTx = await rolesProgram.methods.addProxy(withdrawIx)
+          .accounts({
+            multisig: msPDA,
+            transaction: txPDA,
+            instruction: ixPDA,
+            user: userPDA,
+            rolePayer: userPayerPDA,
+            creator: userWithRole.publicKey,
+            squadsProgram: program.programId
+          })
+          .transaction();
+          
+          try {
+            await provider.sendAndConfirm(addWithdrawIxTx, [userWithRole], {skipPreflight: true});
+          }catch(e){
+            console.log(e);
+          }
+          txState = await program.account.msTransaction.fetch(txPDA);
+          expect(txState.instructionIndex).to.equal(1);
+
+        // activate the instruction
+        const activateIxTx = await rolesProgram.methods.activateProxy()
+          .accounts({
+            multisig: msPDA,
+            transaction: txPDA,
+            user: userPDA,
+            rolePayer: userPayerPDA,
+            creator: userWithRole.publicKey,
+            squadsProgram: program.programId
+          }).transaction();
+        try {
+          await provider.sendAndConfirm(activateIxTx, [userWithRole], {skipPreflight: true});
+        }catch(e){
+          console.log(e);
+        }
+
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("active");
+
+        // // now fail when voting
+        const approveIxTx = await rolesProgram.methods.approveProxy()
+          .accounts({
+            multisig: msPDA,
+            transaction: txPDA,
+            user: userPDA,
+            rolePayer: userPayerPDA,
+            member: userWithRole.publicKey,
+            squadsProgram: program.programId
+          }).transaction();
+
+        try {
+          await provider.sendAndConfirm(approveIxTx, [userWithRole], {skipPreflight: true});
+        }catch(e){
+          console.log(e);
+        }
+
       });
     });
 

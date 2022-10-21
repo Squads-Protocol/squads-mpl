@@ -54,12 +54,17 @@ export type Roles = {
         },
         {
           "name": "transaction",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
           "name": "user",
           "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rolePayer",
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -74,6 +79,11 @@ export type Roles = {
         },
         {
           "name": "squadsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -109,6 +119,11 @@ export type Roles = {
           "isSigner": false
         },
         {
+          "name": "rolePayer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "creator",
           "isMut": true,
           "isSigner": true
@@ -120,6 +135,11 @@ export type Roles = {
         },
         {
           "name": "squadsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -155,6 +175,93 @@ export type Roles = {
           "name": "creator",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "rolePayer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "squadsProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "approveProxy",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "transaction",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "user",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "member",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "rolePayer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "squadsProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "rejectProxy",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "transaction",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "user",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "member",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "rolePayer",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "systemProgram",
@@ -297,6 +404,12 @@ export type Roles = {
           }
         ]
       }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidRole"
     }
   ]
 };
@@ -357,12 +470,17 @@ export const IDL: Roles = {
         },
         {
           "name": "transaction",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
           "name": "user",
           "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rolePayer",
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -377,6 +495,11 @@ export const IDL: Roles = {
         },
         {
           "name": "squadsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -412,6 +535,11 @@ export const IDL: Roles = {
           "isSigner": false
         },
         {
+          "name": "rolePayer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "creator",
           "isMut": true,
           "isSigner": true
@@ -423,6 +551,11 @@ export const IDL: Roles = {
         },
         {
           "name": "squadsProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
           "isMut": false,
           "isSigner": false
         }
@@ -458,6 +591,93 @@ export const IDL: Roles = {
           "name": "creator",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "rolePayer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "squadsProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "approveProxy",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "transaction",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "user",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "member",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "rolePayer",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "squadsProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "rejectProxy",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "transaction",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "user",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "member",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "rolePayer",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "systemProgram",
@@ -600,6 +820,12 @@ export const IDL: Roles = {
           }
         ]
       }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidRole"
     }
   ]
 };
