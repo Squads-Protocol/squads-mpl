@@ -6,7 +6,7 @@ pub mod state;
 use errors::*;
 pub mod errors;
 
-declare_id!("5mt41y2huXBXb8HSkMiNexABuk8GVEmrgZqEgauGtV4y");
+declare_id!("SMPLVC8MxZ5Bf5EfF7PaMiTCxoBAcmkbM2vkrvMK8ho");
 
 #[program]
 pub mod mesh {

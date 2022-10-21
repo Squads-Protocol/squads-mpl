@@ -7,7 +7,7 @@ pub mod state;
 use errors::*;
 pub mod errors;
 
-declare_id!("84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW");
+declare_id!("SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu");
 
 #[program]
 pub mod squads_mpl {
@@ -185,7 +185,6 @@ pub mod squads_mpl {
     // instructions, whereas authorities 1 or greater refer to a vault,
     // upgrade authority, or other.
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
-        msg!("Creating transaction from payer {:?}", ctx.accounts.creator.key());
         let ms = &mut ctx.accounts.multisig;
         let authority_bump = match authority_index  {
            1.. => {
