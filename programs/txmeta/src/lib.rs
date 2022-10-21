@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-declare_id!("SMPL5bz5ERMdweouWrXtk3jmb6FnjZkWf7pHDsE6Zwz");
+declare_id!("5o4wQhxotU8rVz6iK1VowzyX53z3HuznvhvYYCMZn875");
 
 #[program]
 pub mod txmeta {

@@ -586,6 +586,30 @@ export declare type SquadsMpl = {
                     }
                 ];
             };
+        },
+        {
+            "name": "incomingInstruction";
+            "type": {
+                "kind": "struct";
+                "fields": [
+                    {
+                        "name": "programId";
+                        "type": "publicKey";
+                    },
+                    {
+                        "name": "keys";
+                        "type": {
+                            "vec": {
+                                "defined": "MsAccountMeta";
+                            };
+                        };
+                    },
+                    {
+                        "name": "data";
+                        "type": "bytes";
+                    }
+                ];
+            };
         }
     ];
     "types": [
@@ -605,30 +629,6 @@ export declare type SquadsMpl = {
                     {
                         "name": "isWritable";
                         "type": "bool";
-                    }
-                ];
-            };
-        },
-        {
-            "name": "IncomingInstruction";
-            "type": {
-                "kind": "struct";
-                "fields": [
-                    {
-                        "name": "programId";
-                        "type": "publicKey";
-                    },
-                    {
-                        "name": "keys";
-                        "type": {
-                            "vec": {
-                                "defined": "MsAccountMeta";
-                            };
-                        };
-                    },
-                    {
-                        "name": "data";
-                        "type": "bytes";
                     }
                 ];
             };

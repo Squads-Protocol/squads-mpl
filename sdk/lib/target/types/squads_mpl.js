@@ -589,6 +589,30 @@ exports.IDL = {
                     }
                 ]
             }
+        },
+        {
+            "name": "incomingInstruction",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "programId",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "keys",
+                        "type": {
+                            "vec": {
+                                "defined": "MsAccountMeta"
+                            }
+                        }
+                    },
+                    {
+                        "name": "data",
+                        "type": "bytes"
+                    }
+                ]
+            }
         }
     ],
     "types": [
@@ -608,30 +632,6 @@ exports.IDL = {
                     {
                         "name": "isWritable",
                         "type": "bool"
-                    }
-                ]
-            }
-        },
-        {
-            "name": "IncomingInstruction",
-            "type": {
-                "kind": "struct",
-                "fields": [
-                    {
-                        "name": "programId",
-                        "type": "publicKey"
-                    },
-                    {
-                        "name": "keys",
-                        "type": {
-                            "vec": {
-                                "defined": "MsAccountMeta"
-                            }
-                        }
-                    },
-                    {
-                        "name": "data",
-                        "type": "bytes"
                     }
                 ]
             }
