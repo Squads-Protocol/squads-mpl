@@ -63,7 +63,7 @@ export type Roles = {
           "isSigner": false
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -119,7 +119,7 @@ export type Roles = {
           "isSigner": false
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -177,7 +177,7 @@ export type Roles = {
           "isSigner": true
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -218,7 +218,7 @@ export type Roles = {
           "isSigner": true
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -259,7 +259,7 @@ export type Roles = {
           "isSigner": true
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -298,6 +298,11 @@ export type Roles = {
           "name": "member",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "delegate",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "squadsProgram",
@@ -479,7 +484,7 @@ export const IDL: Roles = {
           "isSigner": false
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -535,7 +540,7 @@ export const IDL: Roles = {
           "isSigner": false
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -593,7 +598,7 @@ export const IDL: Roles = {
           "isSigner": true
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -634,7 +639,7 @@ export const IDL: Roles = {
           "isSigner": true
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -675,7 +680,7 @@ export const IDL: Roles = {
           "isSigner": true
         },
         {
-          "name": "rolePayer",
+          "name": "delegate",
           "isMut": true,
           "isSigner": false
         },
@@ -714,6 +719,11 @@ export const IDL: Roles = {
           "name": "member",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "delegate",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "squadsProgram",

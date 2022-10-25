@@ -35,46 +35,46 @@ pub mod roles {
     }
 
     pub fn create_proxy(ctx: Context<CreateProxy>, authority_index: u32) -> Result<()> {
-        // calculate rent for new account, and transfer funds to the role-payer
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
-        let members_len = ctx.accounts.multisig.keys.len();
-        let rent_needed = ctx.accounts.rent.minimum_balance(MsTransaction::initial_size_with_members(members_len)).max(1);
-        let user_payer_seeds = &[
+
+        // need to check and derive delegate
+        let delegate_seeds = &[
             b"squad",
             multisig.as_ref(),
             user.as_ref(),
-            b"role-payer"
+            b"delegate"
         ];
-        let (user_payer_pda, user_payer_bump) = Pubkey::find_program_address(user_payer_seeds, ctx.program_id);
-
+        // get the delegate key
+        let (delegate_pda, delegate_bump) = Pubkey::find_program_address(delegate_seeds, ctx.program_id);
+        // if the supplied delegate key does not match, throw error
+        if delegate_pda != ctx.accounts.delegate.key() {
+            return err!(MsError::InvalidInstructionAccount);
+        }
+        // calculate rent for new account, and transfer funds to the role-payer
+        let members_len = ctx.accounts.multisig.keys.len();
+        let rent_needed = ctx.accounts.rent.minimum_balance(MsTransaction::initial_size_with_members(members_len) + 8).max(1);
+        msg!("Pre fund balance {:?}", ctx.accounts.delegate.lamports());
         invoke(
             &system_instruction::transfer(
                 &ctx.accounts.creator.key(),
-                &user_payer_pda,
+                &delegate_pda,
                 rent_needed,
             ),
             &[
                 ctx.accounts.creator.to_account_info().clone(),
-                ctx.accounts.role_payer.to_account_info().clone(),
+                ctx.accounts.delegate.to_account_info().clone(),
                 ctx.accounts.system_program.to_account_info().clone(),
             ],
         )?;
-        msg!("Transferred rent to role-payer {:?}", user_payer_pda);
-        // let seeds = &[&[
-            // b"squad",
-            // multisig.as_ref(),
-            // user.as_ref(),
-            // b"role-payer",
-        //     &[user_payer_bump]][..]
-        // ];
+        msg!("Post fund balance {:?}", ctx.accounts.delegate.lamports());
         squads_mpl::cpi::create_transaction(ctx.accounts.create_transaction_ctx().with_signer(&[
             &[
                 b"squad",
                 multisig.as_ref(),
                 user.as_ref(),
-                b"role-payer",
-                &[user_payer_bump],
+                b"delegate",
+                &[delegate_bump],
             ],
         ]), authority_index)
     }
@@ -82,35 +82,42 @@ pub mod roles {
     pub fn add_proxy(ctx: Context<AddProxy>, incoming_instruction: IncomingInstruction) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
-        let rent_needed = ctx.accounts.rent.minimum_balance( 8 + incoming_instruction.get_max_size()).max(1);
-        let user_payer_seeds = &[
+
+        // need to check and derive delegate
+        let delegate_seeds = &[
             b"squad",
             multisig.as_ref(),
             user.as_ref(),
-            b"role-payer"
+            b"delegate"
         ];
-        let (user_payer_pda, user_payer_bump) = Pubkey::find_program_address(user_payer_seeds, ctx.program_id);
+        // get the delegate key
+        let (delegate_pda, delegate_bump) = Pubkey::find_program_address(delegate_seeds, ctx.program_id);
+        // if the supplied delegate key does not match, throw error
+        if delegate_pda != ctx.accounts.delegate.key() {
+            return err!(MsError::InvalidInstructionAccount);
+        }
+
+        let rent_needed = ctx.accounts.rent.minimum_balance( 8 + incoming_instruction.get_max_size()).max(1);
 
         invoke(
             &system_instruction::transfer(
                 &ctx.accounts.creator.key(),
-                &user_payer_pda,
+                &delegate_pda,
                 rent_needed,
             ),
             &[
                 ctx.accounts.creator.to_account_info().clone(),
-                ctx.accounts.role_payer.to_account_info().clone(),
+                ctx.accounts.delegate.to_account_info().clone(),
                 ctx.accounts.system_program.to_account_info().clone(),
             ],
         )?;
-        msg!("Transferred rent to role-payer {:?}", user_payer_pda);
         squads_mpl::cpi::add_instruction(ctx.accounts.add_instruction_ctx().with_signer(&[
             &[
                 b"squad",
                 multisig.as_ref(),
                 user.as_ref(),
-                b"role-payer",
-                &[user_payer_bump],
+                b"delegate",
+                &[delegate_bump],
             ],
         ]), incoming_instruction.into())
     }
@@ -118,20 +125,26 @@ pub mod roles {
     pub fn activate_proxy(ctx: Context<ActivateProxy>) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
-        let user_payer_seeds = &[
+        // need to check and derive delegate
+        let delegate_seeds = &[
             b"squad",
             multisig.as_ref(),
             user.as_ref(),
-            b"role-payer"
+            b"delegate"
         ];
-        let (_user_payer_pda, user_payer_bump) = Pubkey::find_program_address(user_payer_seeds, ctx.program_id);
+        // get the delegate key
+        let (delegate_pda, delegate_bump) = Pubkey::find_program_address(delegate_seeds, ctx.program_id);
+        // if the supplied delegate key does not match, throw error
+        if delegate_pda != ctx.accounts.delegate.key() {
+            return err!(MsError::InvalidInstructionAccount);
+        }
         squads_mpl::cpi::activate_transaction(ctx.accounts.activate_transaction_ctx().with_signer(&[
             &[
                 b"squad",
                 multisig.as_ref(),
                 user.as_ref(),
-                b"role-payer",
-                &[user_payer_bump],
+                b"delegate",
+                &[delegate_bump],
             ],
         ]))
     }
@@ -139,20 +152,26 @@ pub mod roles {
     pub fn approve_proxy(ctx: Context<VoteProxy>) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
-        let user_payer_seeds = &[
+        // need to check and derive delegate
+        let delegate_seeds = &[
             b"squad",
             multisig.as_ref(),
             user.as_ref(),
-            b"role-payer"
+            b"delegate"
         ];
-        let (_user_payer_pda, user_payer_bump) = Pubkey::find_program_address(user_payer_seeds, ctx.program_id);
+        // get the delegate key
+        let (delegate_pda, delegate_bump) = Pubkey::find_program_address(delegate_seeds, ctx.program_id);
+        // if the supplied delegate key does not match, throw error
+        if delegate_pda != ctx.accounts.delegate.key() {
+            return err!(MsError::InvalidInstructionAccount);
+        }
         squads_mpl::cpi::approve_transaction(ctx.accounts.vote_transaction_ctx().with_signer(&[
             &[
                 b"squad",
                 multisig.as_ref(),
                 user.as_ref(),
-                b"role-payer",
-                &[user_payer_bump],
+                b"delegate",
+                &[delegate_bump],
             ],
         ]))
     }
@@ -160,26 +179,56 @@ pub mod roles {
     pub fn reject_proxy(ctx: Context<VoteProxy>) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
-        let user_payer_seeds = &[
+        let delegate_seeds = &[
             b"squad",
             multisig.as_ref(),
             user.as_ref(),
-            b"role-payer"
+            b"delegate"
         ];
-        let (_user_payer_pda, user_payer_bump) = Pubkey::find_program_address(user_payer_seeds, ctx.program_id);
+        // get the delegate key
+        let (delegate_pda, delegate_bump) = Pubkey::find_program_address(delegate_seeds, ctx.program_id);
+        // if the supplied delegate key does not match, throw error
+        if delegate_pda != ctx.accounts.delegate.key() {
+            return err!(MsError::InvalidInstructionAccount);
+        }
         squads_mpl::cpi::reject_transaction(ctx.accounts.vote_transaction_ctx().with_signer(&[
             &[
                 b"squad",
                 multisig.as_ref(),
                 user.as_ref(),
-                b"role-payer",
-                &[user_payer_bump],
+                b"delegate",
+                &[delegate_bump],
             ],
         ]))
     }
 
-    pub fn execute_tx_proxy(ctx: Context<ExecuteTxProxy>, account_list: Vec<u8>) -> Result<()> {
-        squads_mpl::cpi::execute_transaction(ctx.accounts.execute_transaction_ctx(), account_list)
+    pub fn execute_tx_proxy<'info>(ctx: Context<'_,'_,'_,'info, ExecuteTxProxy<'info>>, account_list: Vec<u8>) -> Result<()> {
+        let multisig = ctx.accounts.multisig.key();
+        let user = ctx.accounts.user.key();
+        let delegate_seeds = &[
+            b"squad",
+            multisig.as_ref(),
+            user.as_ref(),
+            b"delegate"
+        ];
+        // get the delegate key
+        let (delegate_pda, delegate_bump) = Pubkey::find_program_address(delegate_seeds, ctx.program_id);
+        // if the supplied delegate key does not match, throw error
+        if delegate_pda != ctx.accounts.delegate.key() {
+            return err!(MsError::InvalidInstructionAccount);
+        }
+        let remaining_accounts = ctx.remaining_accounts.clone().to_vec();
+        squads_mpl::cpi::execute_transaction(ctx.accounts.execute_transaction_ctx()
+            .with_remaining_accounts(remaining_accounts)
+            .with_signer(&[
+                &[
+                    b"squad",
+                    multisig.as_ref(),
+                    user.as_ref(),
+                    b"delegate",
+                    &[delegate_bump],
+                ],
+            ]), account_list)
     }
 }
 
@@ -223,11 +272,18 @@ pub struct NewUser<'info>{
 pub struct CreateProxy<'info> {
     #[account(
         mut,
-        owner = squads_mpl::ID,  
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
     )]
     pub multisig: Account<'info, Ms>,
 
-    /// CHECK: this account gets passed through via context
+    /// CHECK: this account gets passed through via context and the Squads MPL program will proceed with relevant checks
     #[account(mut)]
     pub transaction: AccountInfo<'info>,
     
@@ -242,17 +298,9 @@ pub struct CreateProxy<'info> {
     )]
     pub user: Account<'info, User>,
 
-    // #[account(
-    //     seeds = [
-    //         b"squad",
-    //         multisig.key().as_ref(),
-    //         user.key().as_ref(),
-    //         b"role-payer"
-    //     ], bump
-    // )]
-    /// CHECK: Manually checking this derivation in the method
+    /// CHECK: Manually checking this derivation in the create_proxy function above
     #[account(mut)]
-    pub role_payer:  AccountInfo<'info>,
+    pub delegate:  AccountInfo<'info>,
 
     #[account(
         mut,
@@ -267,12 +315,10 @@ pub struct CreateProxy<'info> {
 impl<'info> CreateProxy<'info> {
     pub fn create_transaction_ctx(&self) -> CpiContext<'_, '_, '_, 'info, CreateTransaction<'info>> {
         let cpi_program = self.squads_program.to_account_info();
-        msg!("TX {:?}", self.transaction.key());
-        msg!("MS {:?}", self.multisig.key());
         let cpi_accounts = CreateTransaction {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
-            creator: self.role_payer.to_account_info(),
+            creator: self.delegate.to_account_info(),
             system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
@@ -282,6 +328,7 @@ impl<'info> CreateProxy<'info> {
 #[derive(Accounts)]
 pub struct AddProxy<'info> {
     #[account(
+        owner = squads_mpl::ID,
         seeds = [
             b"squad",
             multisig.create_key.as_ref(),
@@ -306,7 +353,7 @@ pub struct AddProxy<'info> {
     )]
     pub transaction: Account<'info, MsTransaction>,
 
-    /// CHECK: Manually checking this derivation in the method
+    /// CHECK: instruction account is passed through and verified via the SMPL program
     #[account(mut)]
     pub instruction: AccountInfo<'info>,
     
@@ -323,7 +370,7 @@ pub struct AddProxy<'info> {
 
     /// CHECK: Manually checking this derivation in the method
     #[account(mut)]
-    pub role_payer:  AccountInfo<'info>,
+    pub delegate:  AccountInfo<'info>,
 
     #[account(
         mut,
@@ -342,7 +389,7 @@ impl<'info> AddProxy<'info> {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
             instruction: self.instruction.to_account_info(),
-            creator: self.role_payer.to_account_info(),
+            creator: self.delegate.to_account_info(),
             system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
@@ -352,6 +399,7 @@ impl<'info> AddProxy<'info> {
 #[derive(Accounts)]
 pub struct ActivateProxy<'info> {
     #[account(
+        owner = squads_mpl::ID,
         seeds = [
             b"squad",
             multisig.create_key.as_ref(),
@@ -394,7 +442,7 @@ pub struct ActivateProxy<'info> {
     pub creator: Signer<'info>,
     /// CHECK: Manually checking this derivation in the method
     #[account(mut)]
-    pub role_payer:  AccountInfo<'info>,
+    pub delegate:  AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub squads_program: Program<'info, SquadsMpl>,
 
@@ -406,7 +454,7 @@ impl<'info> ActivateProxy<'info> {
         let cpi_accounts = ActivateTransaction {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
-            creator: self.role_payer.to_account_info(),
+            creator: self.delegate.to_account_info(),
             system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
@@ -416,6 +464,7 @@ impl<'info> ActivateProxy<'info> {
 #[derive(Accounts)]
 pub struct VoteProxy<'info> {
     #[account(
+        owner = squads_mpl::ID,
         seeds = [
             b"squad",
             multisig.create_key.as_ref(),
@@ -458,7 +507,7 @@ pub struct VoteProxy<'info> {
     pub member: Signer<'info>,
     /// CHECK: Manually checking this derivation in the method
     #[account(mut)]
-    pub role_payer:  AccountInfo<'info>,
+    pub delegate:  AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub squads_program: Program<'info, SquadsMpl>,
 
@@ -470,7 +519,7 @@ impl<'info> VoteProxy<'info> {
         let cpi_accounts = VoteTransaction {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
-            member: self.role_payer.to_account_info(),
+            member: self.delegate.to_account_info(),
             system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
@@ -510,6 +559,9 @@ pub struct ExecuteTxProxy<'info> {
         constraint = user.origin_key == member.key()
     )]
     pub member: Signer<'info>,
+    /// CHECK: Manually checking this derivation in the method
+    #[account(mut)]
+    pub delegate:  AccountInfo<'info>,
     pub squads_program: Program<'info, SquadsMpl>,
 
 }
