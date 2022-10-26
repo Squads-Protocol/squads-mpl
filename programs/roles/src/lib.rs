@@ -16,7 +16,7 @@ pub mod errors;
 pub use squads_mpl::state::ms::{Ms, MsInstruction, MsTransaction};
 pub mod state;
 
-declare_id!("8hG7uP3qM5NKSpNnNVsiRP2YoYLA91kcwZb8CZ4U7fV2");
+declare_id!("SMPLvKJwsyNGD6xf7Ph6VRpDGPa3DXV4uPHcTAnXe6r");
 
 #[program]
 pub mod roles {
