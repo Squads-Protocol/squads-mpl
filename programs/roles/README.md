@@ -21,9 +21,9 @@ To accomplish this, there are 2 PDA derivations based off this origin key: the U
 The User Role account simply holds the origin key and the role in which to enforce restrictions. The Delegate is a PDA that is added to the multisig (appears as a normal owner/member), and acts as proxy for Signing and funding any invocations that occur from the origin key.
 
 The User Role PDA is derived from the origin key & the Multisig PDA, and the Delegate PDA is derived from the User Role PDA and the Multisig PDA.\
-The User PDA\
+The User Roles PDA (for the account)\
 `["squad", multisig_pda, origin_key, "user-role"]`\
-The Delegate PDA\
+The Delegate PDA (which is added as a member of the Squads multisig)\
 `["squad", multisig_pda, user_pda, "delegate"]`
 
 User Role accounts can only be added and created by pre-existing Multisig Member Keys. Invoking the Roles Program requires the origin key, the user role key, and the delegate key.
