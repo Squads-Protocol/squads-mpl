@@ -24,6 +24,7 @@ pub mod roles {
 
     use super::*;
 
+    // creates a roles account for a user, derived from the origin key
     pub fn add_user(ctx: Context<NewUser>, origin_key: Pubkey, role: Role) -> Result<()> {
         let user = &mut ctx.accounts.user;
         user.init(
@@ -34,6 +35,7 @@ pub mod roles {
         Ok(())
     }
 
+    // creates a new transaction to be passed off to squads mpl program
     pub fn create_proxy(ctx: Context<CreateProxy>, authority_index: u32) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
@@ -79,6 +81,7 @@ pub mod roles {
         ]), authority_index)
     }
 
+    // passes the instruction to be added to the squads mpl program
     pub fn add_proxy(ctx: Context<AddProxy>, incoming_instruction: IncomingInstruction) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
@@ -122,6 +125,7 @@ pub mod roles {
         ]), incoming_instruction.into())
     }
 
+    // activates a transaction on behalf of the user
     pub fn activate_proxy(ctx: Context<ActivateProxy>) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
@@ -149,6 +153,7 @@ pub mod roles {
         ]))
     }
 
+    // approves a transaction (votes) on behalf of the user
     pub fn approve_proxy(ctx: Context<VoteProxy>) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
@@ -176,6 +181,7 @@ pub mod roles {
         ]))
     }
 
+    // rejects a transaction (votes) on behalf of the user
     pub fn reject_proxy(ctx: Context<VoteProxy>) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
@@ -202,6 +208,7 @@ pub mod roles {
         ]))
     }
 
+    // executes a transaction on behalf of the user
     pub fn execute_tx_proxy<'info>(ctx: Context<'_,'_,'_,'info, ExecuteTxProxy<'info>>, account_list: Vec<u8>) -> Result<()> {
         let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
