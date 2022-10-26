@@ -572,7 +572,7 @@ impl<'info> ExecuteTxProxy<'info> {
         let cpi_accounts = ExecuteTransaction {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
-            member: self.user.to_account_info(),
+            member: self.delegate.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
     }

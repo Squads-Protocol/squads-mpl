@@ -23,6 +23,7 @@ import Squads, {
 } from "@sqds/sdk";
 import BN from "bn.js";
 import { ASSOCIATED_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
+import { getExecuteProxyInstruction } from "../helpers/roles";
 
 const BPF_UPGRADE_ID = new anchor.web3.PublicKey(
   "BPFLoaderUpgradeab1e11111111111111111111111"
@@ -682,7 +683,7 @@ describe("Programs", function(){
       });
     });
 
-    describe.skip("Program upgrades", () => {
+    describe("Program upgrades", () => {
       it(`Create a program manager`,  async function(){
         const newProgramManager = await squads.createProgramManager(msPDA);
         expect(newProgramManager.multisig.toBase58()).to.equal(msPDA.toBase58());
@@ -1250,6 +1251,167 @@ describe("Programs", function(){
         expect(roleState.role).to.have.property("vote");
         console.log("        ------ Successfully added vote role to user     ------");
 
+
+        // add the execute-only role to the MS
+        const [userWithExecuteRolePDA] = await anchor.web3.PublicKey.findProgramAddress([
+          anchor.utils.bytes.utf8.encode("squad"),
+          msPDA.toBuffer(),
+          userWithExecuteRole.publicKey.toBuffer(),
+          anchor.utils.bytes.utf8.encode("user-role")
+          ],rolesProgram.programId
+        );
+
+        const [userWithExecuteRoleDelegatePDA] = await anchor.web3.PublicKey.findProgramAddress([
+          anchor.utils.bytes.utf8.encode("squad"),
+          msPDA.toBuffer(),
+          userWithExecuteRolePDA.toBuffer(),
+          anchor.utils.bytes.utf8.encode("delegate")
+        ], rolesProgram.programId)
+
+        msState = await program.account.ms.fetch(msPDA);
+        nextTxIndex = msState.transactionIndex + 1;
+        // generate the txPDA
+        [txPDA] = await getTxPDA(
+          msPDA,
+          new BN(nextTxIndex, 10),
+          program.programId
+        );
+
+        // the actual transaction
+        try {
+          await program.methods.createTransaction(0)
+            .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              creator: provider.wallet.publicKey,
+            })
+            .rpc();
+        } catch (e) {
+          console.log("failed to create the authority 0 tx", e);
+        }
+        // generate the ixPDA
+        [ixPDA] = await getIxPDA(
+          txPDA,
+          new BN(1, 10),
+          program.programId
+        );
+
+        try {
+          // the ix that will create the user role
+          await rolesProgram.methods.addUser(userWithExecuteRole.publicKey, {execute:{}})
+            .accounts({
+              user: userWithExecuteRolePDA,
+              multisig: msPDA,
+              payer: provider.wallet.publicKey
+            }).rpc();
+        }catch(e){
+          console.log("failed to add the user role", e);
+        }
+
+        try {
+          // the ix that will add the user to the MS
+          const addMemberIx = await program.methods.addMember(userWithExecuteRoleDelegatePDA)
+            .accounts({
+              multisig: msPDA,
+              multisigAuth: msPDA,
+              member: provider.wallet.publicKey,
+            })
+            .instruction();
+
+          await program.methods.addInstruction(addMemberIx)
+            .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              instruction: ixPDA,
+              creator: provider.wallet.publicKey
+            })
+            .rpc();
+        }catch(e){
+          console.log("failed to add the add member ix", e);
+        }
+
+        try {
+          // the activation ix
+          await program.methods.activateTransaction()
+          .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              creator: provider.wallet.publicKey
+            })
+            .rpc();
+        }catch(e){
+          console.log("failed to activate the tx", e);
+        }
+
+        try {
+          // the approve ix
+          await program.methods.approveTransaction()
+            .accounts({
+              multisig: msPDA,
+              transaction: txPDA,
+              member: provider.wallet.publicKey,
+            })
+            .rpc();
+        }catch(e){
+          console.log("failed to approve the tx", e);
+        }
+
+        // sign to approve with the other members
+        msState = await squads.getMultisig(msPDA);
+        // get necessary signers
+        // if the threshold has changed, use the other members to approve as well
+        for (let i = 0; i < memberList.length; i++) {
+          // check to see if we need more signers
+          const approvalState = await squads.getTransaction(txPDA);
+          if (Object.keys(approvalState.status).indexOf("active") < 0) {
+            break;
+          }
+
+          const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
+            (k) => {
+              return k.toBase58() == memberList[i].publicKey.toBase58();
+            }
+          );
+          if (inMultisig < 0) {
+            continue;
+          }
+          try {
+            await provider.connection.requestAirdrop(
+              memberList[i].publicKey,
+              anchor.web3.LAMPORTS_PER_SOL
+            );
+            const approveTx = await program.methods
+              .approveTransaction()
+              .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                member: memberList[i].publicKey,
+              })
+              .signers([memberList[i]])
+              .transaction();
+            try {
+              await provider.sendAndConfirm(approveTx, [memberList[i]]);
+            } catch (e) {
+              console.log(memberList[i].publicKey.toBase58(), " signing error");
+            }
+          } catch (e) {
+            console.log(e);
+          }
+        }
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("executeReady");
+
+        try {
+          await squads.executeTransaction(txPDA);
+        }catch(e){
+          console.log("failed to execute the tx", e);
+        }
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("executed");
+        roleState = await rolesProgram.account.user.fetch(userWithExecuteRolePDA);
+        expect(roleState.originKey.toBase58()).to.equal(userWithExecuteRole.publicKey.toBase58());
+        expect(roleState.role).to.have.property("execute");
+        console.log("        ------ Successfully added execute role to user     ------");
       });
 
       it("New user role initiate withdrawal & vote role", async function(){
@@ -1257,6 +1419,14 @@ describe("Programs", function(){
 
         await provider.connection.requestAirdrop(
           userWithRole.publicKey,
+          anchor.web3.LAMPORTS_PER_SOL
+        );
+        await provider.connection.requestAirdrop(
+          userWithVoteRole.publicKey,
+          anchor.web3.LAMPORTS_PER_SOL
+        );
+        await provider.connection.requestAirdrop(
+          userWithExecuteRole.publicKey,
           anchor.web3.LAMPORTS_PER_SOL
         );
         await provider.connection.requestAirdrop(
@@ -1400,13 +1570,95 @@ describe("Programs", function(){
         txState = await program.account.msTransaction.fetch(txPDA);
         expect(txState.approved.length).to.equal(1);
         expect(txState.approved[0].toBase58()).to.equal(userWithVoteRoleDelegatePDA.toBase58());
+
+        // sign to approve with the other members
+        msState = await squads.getMultisig(msPDA);
+        // get necessary signers
+        // if the threshold has changed, use the other members to approve as well
+        for (let i = 0; i < memberList.length; i++) {
+          // check to see if we need more signers
+          const approvalState = await squads.getTransaction(txPDA);
+          if (Object.keys(approvalState.status).indexOf("active") < 0) {
+            break;
+          }
+
+          const inMultisig = (msState.keys as anchor.web3.PublicKey[]).findIndex(
+            (k) => {
+              return k.toBase58() == memberList[i].publicKey.toBase58();
+            }
+          );
+          if (inMultisig < 0) {
+            continue;
+          }
+          try {
+            await provider.connection.requestAirdrop(
+              memberList[i].publicKey,
+              anchor.web3.LAMPORTS_PER_SOL
+            );
+            const approveTx = await program.methods
+              .approveTransaction()
+              .accounts({
+                multisig: msPDA,
+                transaction: txPDA,
+                member: memberList[i].publicKey,
+              })
+              .signers([memberList[i]])
+              .transaction();
+            try {
+              await provider.sendAndConfirm(approveTx, [memberList[i]]);
+            } catch (e) {
+              console.log(memberList[i].publicKey.toBase58(), " signing error");
+            }
+          } catch (e) {
+            console.log(e);
+          }
+        }
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("executeReady");
+
+        // test execute role
+        const [userWithExecutePDA] = await anchor.web3.PublicKey.findProgramAddress([
+            anchor.utils.bytes.utf8.encode("squad"),
+            msPDA.toBuffer(),
+            userWithExecuteRole.publicKey.toBuffer(),
+            anchor.utils.bytes.utf8.encode("user-role")
+          ],rolesProgram.programId
+        );
+
+        const [userWithExecuteDelegatePDA] = await anchor.web3.PublicKey.findProgramAddress([
+          anchor.utils.bytes.utf8.encode("squad"),
+          msPDA.toBuffer(),
+          userWithExecutePDA.toBuffer(),
+          anchor.utils.bytes.utf8.encode("delegate")
+        ], rolesProgram.programId)
+
+        // get the proxied execute ix
+        const executeIx = await getExecuteProxyInstruction(
+          txPDA,
+          userWithExecuteRole.publicKey,
+          userWithExecutePDA,
+          userWithExecuteDelegatePDA,
+          program,
+          rolesProgram
+        );
+
+        const executeTx = new anchor.web3.Transaction();
+        executeTx.add(executeIx);
+        try {
+          await provider.sendAndConfirm(executeTx, [userWithExecuteRole]);
+        }catch(e){
+          console.log(e);
+          expect(true).to.equal(false);
+        }
+        txState = await program.account.msTransaction.fetch(txPDA);
+        expect(txState.status).to.have.property("executed");
       });
     });
 
   });
 
   // test suite for the mesh program
-  describe.skip("Mesh Program", function(){
+  describe("Mesh Program", function(){
     let meshProgram;
     let ms;
     let members = [
