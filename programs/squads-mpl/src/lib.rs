@@ -7,6 +7,18 @@ pub mod state;
 use errors::*;
 pub mod errors;
 
+use solana_security_txt::security_txt;
+
+security_txt! {
+    name: "Squads MPL",
+    project_url: "https://squads.so",
+    contacts: "email:security@sqds.io,email:contact@osec.io",
+    policy: "https://github.com/Squads-Protocol/squads-mpl/blob/main/SECURITY.md",
+    preferred_languages: "en",
+    source_code: "https://github.com/squads-protocol/squads-mpl",
+    auditors: "OtterSec"
+}
+
 declare_id!("SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu");
 
 #[program]

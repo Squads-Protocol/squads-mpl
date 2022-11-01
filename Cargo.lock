@@ -1221,11 +1221,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-security-txt"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f14189df19df7f3977a7ea236ccae6cdc40855ab5baf1ab2796a091ef5c490d1"
+
+[[package]]
 name = "squads-mpl"
 version = "0.1.1"
 dependencies = [
  "anchor-lang",
  "hex",
+ "solana-security-txt",
 ]
 
 [[package]]
