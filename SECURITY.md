@@ -10,7 +10,7 @@ We suggest that you ensure that multi-factor authentication is enabled on your a
 ### Incident response process
 In case an incident is discovered or reported, the following process will be followed to contain, respond and remediate:
 1. Establish a new draft security advisory
-In response to an email to security@squads.so, a member of the Squads team will: 
+In response to an email to security@sqds.so, a member of the Squads team will: 
 * create a new draft security advisory for the incident at  
 * add the reporter's github user and the squads-protocol/security-incident-response-team group to the draft security advisory 
 * create a private fork of the repository (grey button towards the bottom of the page) 
