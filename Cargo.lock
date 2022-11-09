@@ -1286,6 +1286,7 @@ name = "txmeta"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "squads-mpl",
 ]
 
 [[package]]
