@@ -1,0 +1,22 @@
+[package]
+name = "schedule"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "schedule"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.25.0"
+squads-mpl = { path = "../squads-mpl", features =["cpi"] } 
+clockwork-thread-program = { version = "1.3.6", features = ["cpi"] }
+hex = "0.3.1"
