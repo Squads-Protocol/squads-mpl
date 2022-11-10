@@ -16,7 +16,9 @@ Technical information about SMPL [can be found in the program README.md](https:/
 ### Mainnet, Testnet, & Devnet
   * Squads V3 on-chain program: [SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu](https://explorer.solana.com/address/SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu)
   * Program manager: [SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK](https://explorer.solana.com/address/SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK)
-  
+
+The immutable (non-upgradeable program is located at) [BASEDWVF6xeXTJSrk99cbMCwGFtaUvFLihpg6ki9UWX3](https://explorer.solana.com/address/BASEDWVF6xeXTJSrk99cbMCwGFtaUvFLihpg6ki9UWX3)
+
 Both programs are [Anchor verified](https://www.apr.dev/).
 * [Squads-MPL](https://www.apr.dev/program/SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu)
 * [Program Manager](https://www.apr.dev/program/SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK)
