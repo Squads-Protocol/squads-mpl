@@ -4,11 +4,10 @@ use squads_mpl::state::*;
 use squads_mpl::errors::*;
 pub mod state;
 
-declare_id!("");
+declare_id!("FnVHo2S6NxqaGT8buKCzxs8njaZEUkA9aRQNU87ASFyv");
 
 #[program]
 pub mod validator {
-    use anchor_lang::solana_program::{bpf_loader_upgradeable::upgrade};
 
     use super::*;
 

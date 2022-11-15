@@ -1,5 +1,4 @@
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
-use anchor_lang::solana_program::borsh::get_instance_packed_len;
+use anchor_lang::prelude::*;
 
 #[account]
 pub struct ValidatorManager {
