@@ -1,5 +1,4 @@
 use anchor_lang::{prelude::*, solana_program::borsh::get_instance_packed_len};
-// use squads_mpl::state::IncomingInstruction;
 
 #[account]
 pub struct User {
@@ -7,6 +6,7 @@ pub struct User {
     pub origin_key: Pubkey,
     pub bump: u8,
 }
+
 
 impl User {
     pub const MAXIMUM_SIZE: usize =  Role::MAXIMUM_SIZE +
@@ -74,3 +74,4 @@ impl From<IncomingInstruction> for squads_mpl::state::IncomingInstruction{
         }
     }
 }
+
