@@ -3,10 +3,10 @@ export type Roles = {
   "name": "roles",
   "instructions": [
     {
-      "name": "addUser",
+      "name": "createManager",
       "accounts": [
         {
-          "name": "user",
+          "name": "rolesManager",
           "isMut": true,
           "isSigner": false
         },
@@ -19,6 +19,47 @@ export type Roles = {
           "name": "payer",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "addUser",
+      "accounts": [
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rolesManager",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "transaction",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "rent",
@@ -36,6 +77,58 @@ export type Roles = {
           "name": "originKey",
           "type": "publicKey"
         },
+        {
+          "name": "role",
+          "type": {
+            "defined": "Role"
+          }
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "changeRole",
+      "accounts": [
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "transaction",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
         {
           "name": "role",
           "type": {
@@ -320,10 +413,34 @@ export type Roles = {
   ],
   "accounts": [
     {
+      "name": "rolesManager",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ms",
+            "type": "publicKey"
+          },
+          {
+            "name": "roleIndex",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "user",
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
           {
             "name": "role",
             "type": {
@@ -337,6 +454,14 @@ export type Roles = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "ms",
+            "type": "publicKey"
+          },
+          {
+            "name": "roleIndex",
+            "type": "u32"
           }
         ]
       }
@@ -406,6 +531,9 @@ export type Roles = {
           },
           {
             "name": "InitiateAndVote"
+          },
+          {
+            "name": "VoteAndExecute"
           }
         ]
       }
@@ -424,10 +552,10 @@ export const IDL: Roles = {
   "name": "roles",
   "instructions": [
     {
-      "name": "addUser",
+      "name": "createManager",
       "accounts": [
         {
-          "name": "user",
+          "name": "rolesManager",
           "isMut": true,
           "isSigner": false
         },
@@ -440,6 +568,47 @@ export const IDL: Roles = {
           "name": "payer",
           "isMut": true,
           "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "addUser",
+      "accounts": [
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rolesManager",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "transaction",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "rent",
@@ -457,6 +626,58 @@ export const IDL: Roles = {
           "name": "originKey",
           "type": "publicKey"
         },
+        {
+          "name": "role",
+          "type": {
+            "defined": "Role"
+          }
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "changeRole",
+      "accounts": [
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "transaction",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
         {
           "name": "role",
           "type": {
@@ -741,10 +962,34 @@ export const IDL: Roles = {
   ],
   "accounts": [
     {
+      "name": "rolesManager",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ms",
+            "type": "publicKey"
+          },
+          {
+            "name": "roleIndex",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "user",
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
           {
             "name": "role",
             "type": {
@@ -758,6 +1003,14 @@ export const IDL: Roles = {
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "ms",
+            "type": "publicKey"
+          },
+          {
+            "name": "roleIndex",
+            "type": "u32"
           }
         ]
       }
@@ -827,6 +1080,9 @@ export const IDL: Roles = {
           },
           {
             "name": "InitiateAndVote"
+          },
+          {
+            "name": "VoteAndExecute"
           }
         ]
       }

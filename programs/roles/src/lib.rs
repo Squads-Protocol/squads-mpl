@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use squads_mpl::errors::MsError;
 
 use state::roles::*;
-use errors::*;
 pub mod errors;
 pub use squads_mpl::state::ms::{Ms, MsInstruction, MsTransaction};
 use account::*;
@@ -17,25 +16,29 @@ pub mod roles {
 
     use super::*;
 
+    pub fn create_manager(ctx: Context<NewManager>) -> Result<()> {
+        let roles_manager = &mut ctx.accounts.roles_manager;
+        roles_manager.init(ctx.accounts.multisig.key(), *ctx.bumps.get("roles_manager").unwrap())
+    }
+
     // creates a roles account for a user, derived from the origin key
-    pub fn add_user(ctx: Context<NewUser>, origin_key: Pubkey, role: Role) -> Result<()> {
-        if !valid_role(&role){
-            return err!(RolesError::InvalidRole);
-        }
+    pub fn add_user(ctx: Context<NewUser>, origin_key: Pubkey, role: Role, name: String) -> Result<()> {
         let user = &mut ctx.accounts.user;
+        let roles_manager = &mut ctx.accounts.roles_manager;
         user.init(
             origin_key,
             *ctx.bumps.get("user").unwrap(),
-            role
+            role,
+            ctx.accounts.multisig.key(),
+            roles_manager.role_index.checked_add(1).unwrap(),
+            name,
         );
+        roles_manager.role_index = roles_manager.role_index.checked_add(1).unwrap();
         Ok(())
     }
 
     // changes the role
     pub fn change_role(ctx: Context<UserModify>, role: Role) -> Result<()> {
-        if !valid_role(&role){
-            return err!(RolesError::InvalidRole);
-        }
         let user = &mut ctx.accounts.user;
         user.role = role;
         Ok(())
@@ -43,14 +46,13 @@ pub mod roles {
 
     // creates a new transaction to be passed off to squads mpl program
     pub fn create_proxy(ctx: Context<CreateProxy>, authority_index: u32) -> Result<()> {
-        let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
-
+        let creator = ctx.accounts.creator.key();
         // need to check and derive delegate
         let delegate_seeds = &[
             b"squad",
-            multisig.as_ref(),
             user.as_ref(),
+            creator.as_ref(),
             b"delegate"
         ];
         // get the delegate key
@@ -62,7 +64,6 @@ pub mod roles {
         // calculate rent for new account, and transfer funds to the role-payer
         let members_len = ctx.accounts.multisig.keys.len();
         let rent_needed = ctx.accounts.rent.minimum_balance(MsTransaction::initial_size_with_members(members_len) + 8).max(1);
-        msg!("Pre fund balance {:?}", ctx.accounts.delegate.lamports());
         invoke(
             &system_instruction::transfer(
                 &ctx.accounts.creator.key(),
@@ -79,8 +80,8 @@ pub mod roles {
         squads_mpl::cpi::create_transaction(ctx.accounts.create_transaction_ctx().with_signer(&[
             &[
                 b"squad",
-                multisig.as_ref(),
                 user.as_ref(),
+                creator.as_ref(),
                 b"delegate",
                 &[delegate_bump],
             ],
@@ -89,14 +90,14 @@ pub mod roles {
 
     // passes the instruction to be added to the squads mpl program
     pub fn add_proxy(ctx: Context<AddProxy>, incoming_instruction: IncomingInstruction) -> Result<()> {
-        let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
+        let creator = ctx.accounts.creator.key();    
 
         // need to check and derive delegate
         let delegate_seeds = &[
             b"squad",
-            multisig.as_ref(),
             user.as_ref(),
+            creator.as_ref(),
             b"delegate"
         ];
         // get the delegate key
@@ -123,8 +124,8 @@ pub mod roles {
         squads_mpl::cpi::add_instruction(ctx.accounts.add_instruction_ctx().with_signer(&[
             &[
                 b"squad",
-                multisig.as_ref(),
                 user.as_ref(),
+                creator.as_ref(),
                 b"delegate",
                 &[delegate_bump],
             ],
@@ -133,13 +134,14 @@ pub mod roles {
 
     // activates a transaction on behalf of the user
     pub fn activate_proxy(ctx: Context<ActivateProxy>) -> Result<()> {
-        let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
+        let creator = ctx.accounts.creator.key();
+
         // need to check and derive delegate
         let delegate_seeds = &[
             b"squad",
-            multisig.as_ref(),
             user.as_ref(),
+            creator.as_ref(),
             b"delegate"
         ];
         // get the delegate key
@@ -151,8 +153,8 @@ pub mod roles {
         squads_mpl::cpi::activate_transaction(ctx.accounts.activate_transaction_ctx().with_signer(&[
             &[
                 b"squad",
-                multisig.as_ref(),
                 user.as_ref(),
+                creator.as_ref(),
                 b"delegate",
                 &[delegate_bump],
             ],
@@ -161,13 +163,14 @@ pub mod roles {
 
     // approves a transaction (votes) on behalf of the user
     pub fn approve_proxy(ctx: Context<VoteProxy>) -> Result<()> {
-        let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
+        let member = ctx.accounts.member.key();
+
         // need to check and derive delegate
         let delegate_seeds = &[
             b"squad",
-            multisig.as_ref(),
             user.as_ref(),
+            member.as_ref(),
             b"delegate"
         ];
         // get the delegate key
@@ -179,8 +182,8 @@ pub mod roles {
         squads_mpl::cpi::approve_transaction(ctx.accounts.vote_transaction_ctx().with_signer(&[
             &[
                 b"squad",
-                multisig.as_ref(),
                 user.as_ref(),
+                member.as_ref(),
                 b"delegate",
                 &[delegate_bump],
             ],
@@ -189,12 +192,12 @@ pub mod roles {
 
     // rejects a transaction (votes) on behalf of the user
     pub fn reject_proxy(ctx: Context<VoteProxy>) -> Result<()> {
-        let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
+        let member = ctx.accounts.member.key();
         let delegate_seeds = &[
             b"squad",
-            multisig.as_ref(),
             user.as_ref(),
+            member.as_ref(),
             b"delegate"
         ];
         // get the delegate key
@@ -206,8 +209,8 @@ pub mod roles {
         squads_mpl::cpi::reject_transaction(ctx.accounts.vote_transaction_ctx().with_signer(&[
             &[
                 b"squad",
-                multisig.as_ref(),
                 user.as_ref(),
+                member.as_ref(),
                 b"delegate",
                 &[delegate_bump],
             ],
@@ -216,12 +219,12 @@ pub mod roles {
 
     // executes a transaction on behalf of the user
     pub fn execute_tx_proxy<'info>(ctx: Context<'_,'_,'_,'info, ExecuteTxProxy<'info>>, account_list: Vec<u8>) -> Result<()> {
-        let multisig = ctx.accounts.multisig.key();
         let user = ctx.accounts.user.key();
+        let member = ctx.accounts.member.key();
         let delegate_seeds = &[
             b"squad",
-            multisig.as_ref(),
             user.as_ref(),
+            member.as_ref(),
             b"delegate"
         ];
         // get the delegate key
@@ -236,21 +239,11 @@ pub mod roles {
             .with_signer(&[
                 &[
                     b"squad",
-                    multisig.as_ref(),
                     user.as_ref(),
+                    member.as_ref(),
                     b"delegate",
                     &[delegate_bump],
                 ],
             ]), account_list)
-    }
-}
-
-pub fn valid_role(role: &Role) -> bool {
-    match role {
-        Role::Vote => true,
-        Role::Execute => true,
-        Role::InitiateAndExecute => true,
-        Role::InitiateAndVote => true,
-        _ => false
     }
 }

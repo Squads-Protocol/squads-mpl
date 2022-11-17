@@ -14,21 +14,62 @@ use crate::errors::RolesError;
 use crate::state::roles::*;
 
 #[derive(Accounts)]
-#[instruction(origin_key: Pubkey, role: Role)]
+pub struct NewManager<'info>{
+    #[account(
+        init,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            b"roles-manager"
+        ],
+        bump,
+        payer = payer,
+        space = 8 + RolesManager::MAXIMUM_SIZE,
+    )]
+    pub roles_manager: Account<'info, RolesManager>,
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub multisig: Box<Account<'info, Ms>>,
+    #[account(
+        mut,
+        constraint = matches!(multisig.is_member(payer.key()), Some(..)) @MsError::KeyNotInMultisig,
+    )]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(origin_key: Pubkey, role: Role, name: String)]
 pub struct NewUser<'info>{
     #[account(
         init,
         payer = payer,
-        space = 8 + User::MAXIMUM_SIZE,
+        space = 8 + User::MINIMUM_SIZE + name.try_to_vec().unwrap().len(),
         seeds = [
             b"squad",
             multisig.key().as_ref(),
-            origin_key.as_ref(),
+            &roles_manager.role_index.checked_add(1).unwrap().to_le_bytes(),
             b"user-role"
         ], bump
     )]
     pub user:  Box<Account<'info, User>>,
-
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            b"roles-manager"
+        ],
+        bump = roles_manager.bump,
+    )]
+    pub roles_manager: Account<'info, RolesManager>,
     #[account(
         seeds = [
             b"squad",
@@ -87,7 +128,7 @@ pub struct UserModify<'info>{
         seeds = [
             b"squad",
             multisig.key().as_ref(),
-            user.origin_key.as_ref(),
+            &user.role_index.to_le_bytes(),
             b"user-role"
         ], bump = user.bump,
     )]
@@ -166,7 +207,7 @@ pub struct CreateProxy<'info> {
         seeds = [
             b"squad",
             multisig.key().as_ref(),
-            creator.key().as_ref(),
+            &user.role_index.to_le_bytes(),
             b"user-role"
         ], bump = user.bump,
         constraint = user.role == Role::Initiate || user.role == Role::InitiateAndExecute || user.role == Role::InitiateAndVote @RolesError::InvalidRole
@@ -236,7 +277,7 @@ pub struct AddProxy<'info> {
         seeds = [
             b"squad",
             multisig.key().as_ref(),
-            creator.key().as_ref(),
+            &user.role_index.to_le_bytes(),
             b"user-role"
         ], bump = user.bump,
         constraint = user.role == Role::Initiate || user.role == Role::InitiateAndExecute || user.role == Role::InitiateAndVote @RolesError::InvalidRole
@@ -303,7 +344,7 @@ pub struct ActivateProxy<'info> {
         seeds = [
             b"squad",
             multisig.key().as_ref(),
-            creator.key().as_ref(),
+            &user.role_index.to_le_bytes(),
             b"user-role"
         ], bump = user.bump,
         constraint = user.role == Role::Initiate || user.role == Role::InitiateAndExecute || user.role == Role::InitiateAndVote @RolesError::InvalidRole
@@ -368,7 +409,7 @@ pub struct VoteProxy<'info> {
         seeds = [
             b"squad",
             multisig.key().as_ref(),
-            member.key().as_ref(),
+            &user.role_index.to_le_bytes(),
             b"user-role"
         ], bump = user.bump,
         constraint = user.role == Role::Vote || user.role == Role::InitiateAndVote @RolesError::InvalidRole
@@ -422,7 +463,7 @@ pub struct ExecuteTxProxy<'info> {
         seeds = [
             b"squad",
             multisig.key().as_ref(),
-            member.key().as_ref(),
+            &user.role_index.to_le_bytes(),
             b"user-role"
         ], bump = user.bump,
         constraint = user.role == Role::Execute || user.role == Role::InitiateAndExecute,

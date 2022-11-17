@@ -109,3 +109,33 @@ export async function getExecuteProxyInstruction(
     executeIx.keys = executeIx.keys.concat(keysUnique);
     return executeIx;
   }
+
+
+
+export const getUserRolePDA = async (msPDA: anchor.web3.PublicKey, roleIndex: anchor.BN, programId: anchor.web3.PublicKey) => {
+  return  anchor.web3.PublicKey.findProgramAddress([
+    anchor.utils.bytes.utf8.encode("squad"),
+    msPDA.toBuffer(),
+    roleIndex.toArrayLike(Buffer, "le", 4),
+    anchor.utils.bytes.utf8.encode("user-role")
+    ],programId
+  );
+}
+
+
+export const getUserDelegatePDA = async (rolePDA: anchor.web3.PublicKey, userKey: anchor.web3.PublicKey, programId: anchor.web3.PublicKey) => {
+  return anchor.web3.PublicKey.findProgramAddress([
+    anchor.utils.bytes.utf8.encode("squad"),
+    rolePDA.toBuffer(),
+    userKey.toBuffer(),
+    anchor.utils.bytes.utf8.encode("delegate")
+  ], programId);
+};
+
+export const getRolesManager = async(msPDA, programId) => {
+  return anchor.web3.PublicKey.findProgramAddress([
+    anchor.utils.bytes.utf8.encode("squad"),
+    msPDA.toBuffer(),
+    anchor.utils.bytes.utf8.encode("roles-manager")
+  ], programId);
+};
