@@ -5,24 +5,28 @@ squads_mpl = "84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW"
 program_manager = "8Y5Qbdb67Ka4LcPCziyhLrGbYN2ftZ1BG11Q5PiHenLP"
 mesh = "5mt41y2huXBXb8HSkMiNexABuk8GVEmrgZqEgauGtV4y"
 txmeta = "5o4wQhxotU8rVz6iK1VowzyX53z3HuznvhvYYCMZn875"
+roles = "8hG7uP3qM5NKSpNnNVsiRP2YoYLA91kcwZb8CZ4U7fV2"
 
 [programs.devnet]
 squads_mpl = "SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu"
 program_manager = "SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK"
 mesh = "SMPLVC8MxZ5Bf5EfF7PaMiTCxoBAcmkbM2vkrvMK8ho"
 txmeta = "SMPL5bz5ERMdweouWrXtk3jmb6FnjZkWf7pHDsE6Zwz"
+roles = "SMPLvKJwsyNGD6xf7Ph6VRpDGPa3DXV4uPHcTAnXe6r"
 
 [programs.testnet]
 squads_mpl = "SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu"
 program_manager = "SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK"
 mesh = "SMPLVC8MxZ5Bf5EfF7PaMiTCxoBAcmkbM2vkrvMK8ho"
 txmeta = "SMPL5bz5ERMdweouWrXtk3jmb6FnjZkWf7pHDsE6Zwz"
+roles = "SMPLvKJwsyNGD6xf7Ph6VRpDGPa3DXV4uPHcTAnXe6r"
 
 [programs.mainnet]
 squads_mpl = "SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu"
 program_manager = "SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK"
 mesh = "SMPLVC8MxZ5Bf5EfF7PaMiTCxoBAcmkbM2vkrvMK8ho"
 txmeta = "SMPL5bz5ERMdweouWrXtk3jmb6FnjZkWf7pHDsE6Zwz"
+roles = "SMPLvKJwsyNGD6xf7Ph6VRpDGPa3DXV4uPHcTAnXe6r"
 
 [registry]
 url = "https://anchor.projectserum.com"
