@@ -248,6 +248,11 @@ pub mod squads_mpl {
         )
     }
 
+    pub fn add_instruction_v2(ctx: Context<AddInstructionV2>, ix_schema: IncomingIxSchema) -> Result<()>{
+        let ix_count = ix_schema.number_of_ixes;
+        Ok(())
+    }
+
     // instruction to approve a transaction on behalf of a member
     // the transaction must have an "active" status
     pub fn approve_transaction(ctx: Context<VoteTransaction>) -> Result<()> {
@@ -598,6 +603,54 @@ pub struct AddInstruction<'info> {
         constraint = 8 + instruction_data.get_max_size() <= MsInstruction::MAXIMUM_SIZE @MsError::InvalidTransactionState,
     )]
     pub instruction: Account<'info, MsInstruction>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+    pub system_program: Program<'info, System>
+}
+
+#[derive(Accounts)]
+#[instruction(instruction_data: IncomingInstruction)]
+pub struct AddInstructionV2<'info> {
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
+    pub multisig: Account<'info, Ms>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ], bump = transaction.bump,
+        constraint = creator.key() == transaction.creator,
+        constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
+    )]
+    pub transaction: Account<'info, MsTransaction>,
+
+    // #[account(
+    //     init,
+    //     payer = creator,
+    //     space = 8 + instruction_data.get_max_size(),
+    //     seeds = [
+    //         b"squad",
+    //         transaction.key().as_ref(),
+    //         &transaction.instruction_index.checked_add(1).unwrap().to_le_bytes(),
+    //         b"instruction"
+    //     ], bump,
+    //     constraint = 8 + instruction_data.get_max_size() <= MsInstruction::MAXIMUM_SIZE @MsError::InvalidTransactionState,
+    // )]
+    
+    // pub instruction: Account<'info, MsInstruction>,
 
     #[account(mut)]
     pub creator: Signer<'info>,

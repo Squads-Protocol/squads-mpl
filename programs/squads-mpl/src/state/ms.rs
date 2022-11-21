@@ -300,3 +300,14 @@ pub struct IncomingInstruction {
     pub keys: Vec<MsAccountMeta>,
     pub data: Vec<u8>
 }
+
+
+#[derive(AnchorSerialize,AnchorDeserialize,Clone)]
+pub struct IncomingIxSchema{
+    pub account_list: Vec<Pubkey>, //unique 
+    pub account_indexes: Vec<Vec<u8>>,
+    pub number_of_ixes: u8,
+    pub data: Vec<Vec<u8>>
+}
+
+// [ix1, pg1, acc1, acc2, acc3... ix2, pg2, acc1_2, account2_2...]
