@@ -1316,6 +1316,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e8820f5d777f6224dc4be3632222971ac30164d4a258d595640799554ebfd99"
 
 [[package]]
+name = "validator"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "squads-mpl",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
