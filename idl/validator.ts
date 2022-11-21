@@ -1,0 +1,245 @@
+export type Validator = {
+  "version": "0.1.0",
+  "name": "validator",
+  "instructions": [
+    {
+      "name": "createValidatorManager",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "validatorManager",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "creator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "createManagedValidator",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "validatorManager",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "managedValidator",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "creator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "validatorAddress",
+          "type": "publicKey"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "validatorManager",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "multisig",
+            "type": "publicKey"
+          },
+          {
+            "name": "managedValidatorIndex",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "managedValidator",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "managedValidatorIndex",
+            "type": "u32"
+          },
+          {
+            "name": "validatorAddress",
+            "type": "publicKey"
+          },
+          {
+            "name": "multisig",
+            "type": "publicKey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+};
+
+export const IDL: Validator = {
+  "version": "0.1.0",
+  "name": "validator",
+  "instructions": [
+    {
+      "name": "createValidatorManager",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "validatorManager",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "creator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "createManagedValidator",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "validatorManager",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "managedValidator",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "creator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "validatorAddress",
+          "type": "publicKey"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "validatorManager",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "multisig",
+            "type": "publicKey"
+          },
+          {
+            "name": "managedValidatorIndex",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "managedValidator",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "managedValidatorIndex",
+            "type": "u32"
+          },
+          {
+            "name": "validatorAddress",
+            "type": "publicKey"
+          },
+          {
+            "name": "multisig",
+            "type": "publicKey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+};
