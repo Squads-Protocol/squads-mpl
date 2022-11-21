@@ -483,10 +483,6 @@ pub mod squads_mpl {
             if ix_account_info.key != &ms_ix.keys[account_index].pubkey {
                 return err!(MsError::InvalidInstructionAccount);
             }
-            // check that the ix account writable match the submitted account writable
-            if ix_account_info.is_writable != ms_ix.keys[account_index].is_writable {
-                return err!(MsError::InvalidInstructionAccount);
-            }
             ix_account_infos.push(ix_account_info.clone());
         }
 
