@@ -102,7 +102,7 @@ describe("Programs", function(){
 
   describe("SMPL, Program Manager, & Roles", function(){
 
-    let program;
+    let program: Program<SquadsMpl>;
     let squads;
     let creator;
     let programManagerProgram;
@@ -211,7 +211,7 @@ describe("Programs", function(){
         expect(txState.instructionIndex).to.equal(1);
       });
 
-      it(`Tx Activate`,  async function(){
+      it.skip(`Tx Activate`,  async function(){
         // create a transaction draft
         let txState = await squads.createTransaction(msPDA, 1);
         const testIx = await createTestTransferTransaction(
@@ -229,7 +229,7 @@ describe("Programs", function(){
         );
       });
 
-      it(`Tx Sign`,  async function(){
+      it.skip(`Tx Sign`,  async function(){
         // create a transaction draft
         let txState = await squads.createTransaction(msPDA, 1);
         const testIx = await createTestTransferTransaction(
@@ -245,7 +245,7 @@ describe("Programs", function(){
         expect(txState.status).to.have.property("executeReady");
       });
 
-      it(`Transfer Tx Execute`,  async function(){
+      it.skip(`Transfer Tx Execute`,  async function(){
         // create authority to use (Vault, index 1)
         const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
 
@@ -291,7 +291,146 @@ describe("Programs", function(){
         expect(testPayeeAccount.value.lamports).to.equal(1000000);
       });
 
-      it(`2X Transfer Tx Execute`, async function() {
+      it(`Add 2 ixes with args`, async function() {
+        // create authority to use (Vault, index 1)
+        const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
+
+        // the test transfer instruction (2x)
+        const testPayee = anchor.web3.Keypair.generate();
+        const testIx = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey
+        );
+        // console.log("test ix 1", testIx);
+        // console.log("test ix 2", testIx);
+        const testIx2x = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey
+        );
+
+        const getUniqueAccountKeys = (ixes: anchor.web3.TransactionInstruction[]) => {
+          const aK: anchor.web3.PublicKey[] = [];
+          for (let ix of ixes) {
+            // attempted to make compressed instruction and set account_keys
+            const pIndex = aK.findIndex((k)=>{
+              return k.equals(ix.programId);
+            });
+            if (pIndex === -1) {
+              aK.push(ix.programId);
+            }
+
+            for (let k of ix.keys) {
+              const kIndex = aK.findIndex((key)=>{
+                return key.equals(k.pubkey);
+              });
+              if (kIndex === -1) {
+                aK.push(k.pubkey);
+              }
+            }
+          }
+          return aK;
+        };
+
+        const getCompressedIxes = (accountKeys: anchor.web3.PublicKey[], ixes: anchor.web3.TransactionInstruction[]) => {
+          return ixes.map(ix => {
+            return {
+              programIdIndex: accountKeys.findIndex((k)=>{
+                return k.equals(ix.programId);
+              }),
+              accountIndexes: Buffer.from(ix.keys.map(k => {
+                return accountKeys.findIndex((key)=>{
+                  return key.equals(k.pubkey);
+                });
+              })),
+              signerIndexes: Buffer.from(ix.keys.filter(k => k.isSigner).map(k => {
+                return accountKeys.findIndex((key)=>{
+                  return key.equals(k.pubkey);
+                }
+              )})),
+              writableIndexes: Buffer.from(ix.keys.filter(k => k.isWritable).map(k => {
+                return accountKeys.findIndex((key)=>{
+                  return key.equals(k.pubkey);
+                }
+              )})),
+              data: ix.data,
+            };
+          });
+        };
+
+        /*
+          accountKeys 
+          instructions
+        */
+
+        let txState = await squads.createTransaction(msPDA, 1);
+        const accountKeys =  getUniqueAccountKeys([testIx, testIx2x]);
+        const compressedIxes = getCompressedIxes(accountKeys, [testIx, testIx2x]);
+        // console.log(compressedIxes);
+        // console.log(" ");
+        const [ix_1_pda] = await getIxPDA(txState.publicKey, new BN(1), program.programId);
+        const [ix_2_pda] = await getIxPDA(txState.publicKey, new BN(2), program.programId);
+        console.log("ix 1pda:", ix_1_pda.toBase58());
+        console.log("ix_2Pda", ix_2_pda.toBase58());
+        const ixArgs = {
+          accountKeys,
+          instructions: compressedIxes,
+        };
+
+        try{
+          await program.methods.addInstructions(ixArgs)
+          .accounts({
+            multisig: msPDA,
+            transaction: txState.publicKey,
+            creator: provider.wallet.publicKey
+          })
+          .remainingAccounts([
+            {pubkey: ix_1_pda, isWritable: true, isSigner: false},
+            {pubkey: ix_2_pda, isWritable: true, isSigner: false},
+          ])
+          .rpc({skipPreflight: true});
+        }catch(e){
+          console.log("ERRRRR",e);
+        }
+        console.log("SUCCESS IN ADDING!");
+        /*
+        await squads.addInstruction(txState.publicKey, testIx);
+        await squads.addInstruction(txState.publicKey, testIx2x);
+        */
+        await squads.activateTransaction(txState.publicKey);
+        await squads.approveTransaction(txState.publicKey);
+        let newTxState = await squads.getTransaction(txState.publicKey);
+        expect(newTxState.status).to.have.property("executeReady");
+        console.log("EXECUTE READY");
+        // move funds to auth/vault
+        const moveFundsToMsPDAIx = await createTestTransferTransaction(
+          creator.publicKey,
+          authorityPDA,
+          3000000
+        );
+
+        const moveFundsToMsPDATx = await createBlankTransaction(
+          squads.connection,
+          creator.publicKey
+        );
+        moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
+        await provider.sendAndConfirm(moveFundsToMsPDATx);
+        const msPDAFunded = await squads.connection.getAccountInfo(authorityPDA);
+        expect(msPDAFunded.lamports).to.equal(4000000);
+        
+        try {
+          await squads.executeTransaction(txState.publicKey);
+        }catch(e){
+          console.log("EXECUTION ERROR", e);
+        }
+        txState = await squads.getTransaction(txState.publicKey);
+        expect(txState.status).to.have.property("executed");
+        let testPayeeAccount = await squads.connection.getParsedAccountInfo(
+          testPayee.publicKey
+        );
+        expect(testPayeeAccount.value.lamports).to.equal(2000000);
+      });
+
+      it.skip(`2X Transfer Tx Execute`, async function() {
         // create authority to use (Vault, index 1)
         const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
 
@@ -338,7 +477,7 @@ describe("Programs", function(){
         expect(testPayeeAccount.value.lamports).to.equal(2000000);
       });
 
-      it(`2X Transfer Tx Sequential execute`, async function(){
+      it.skip(`2X Transfer Tx Sequential execute`, async function(){
         // create authority to use (Vault, index 1)
         const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
 
@@ -402,7 +541,7 @@ describe("Programs", function(){
         expect(txState.status).to.have.property("executed");
       });
 
-      it(`Change ms size with realloc`, async function(){
+      it.skip(`Change ms size with realloc`, async function(){
         let msAccount = await squads.connection.getParsedAccountInfo(msPDA);
         const startRentLamports = msAccount.value.lamports;
 
@@ -431,8 +570,12 @@ describe("Programs", function(){
         let txState = await squads.getTransaction(txPDA);
         expect(txState.status).has.property("executeReady");
 
-        await squads.executeTransaction(txPDA);
-
+        try {
+          await squads.executeTransaction(txPDA);
+        } catch (e) {
+          console.log("EXECUTE ERROR");
+          console.log(e);
+        }
         const msState = await squads.getMultisig(msPDA);
         msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
         const endRentLamports = msAccount.value.lamports;
@@ -440,7 +583,7 @@ describe("Programs", function(){
         expect(endRentLamports).to.be.greaterThan(startRentLamports);
       });
 
-      it(`Add a new member but creator is not executor`, async function(){
+      it.skip(`Add a new member but creator is not executor`, async function(){
         // 1 get the instruction to create a transaction
         // 2 get the instruction to add a member
         // 3 get the instruction to 'activate' the tx
@@ -473,7 +616,7 @@ describe("Programs", function(){
         expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 2);
       });
 
-      it(`Transaction instruction failure`, async function(){
+      it.skip(`Transaction instruction failure`, async function(){
         // create authority to use (Vault, index 1)
         const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
         let txState = await squads.createTransaction(msPDA, 1);
@@ -502,7 +645,7 @@ describe("Programs", function(){
         expect(txState.status).to.have.property("executeReady");
       });
 
-      it(`Change threshold test`, async function(){
+      it.skip(`Change threshold test`, async function(){
         const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
         const [txInstructions, txPDA] = await (
           await txBuilder.withChangeThreshold(2)
@@ -540,7 +683,7 @@ describe("Programs", function(){
         threshold = msState.threshold;
       });
 
-      it(`Insufficient approval failure`, async function(){
+      it.skip(`Insufficient approval failure`, async function(){
         const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
         const [txInstructions, txPDA] = await (
           await txBuilder.withChangeThreshold(2)
@@ -567,7 +710,7 @@ describe("Programs", function(){
         }
       });
 
-      it(`Change vote from approved to rejected`, async function(){
+      it.skip(`Change vote from approved to rejected`, async function(){
         const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
         const [txInstructions, txPDA] = await (
           await txBuilder.withChangeThreshold(2)
@@ -609,7 +752,7 @@ describe("Programs", function(){
         ).is.lessThan(0);
       });
 
-      it(`Add a new member & change threshold (conjoined)`, async function(){
+      it.skip(`Add a new member & change threshold (conjoined)`, async function(){
         const newMember = anchor.web3.Keypair.generate().publicKey;
         const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
         const [txInstructions, txPDA] = await (
