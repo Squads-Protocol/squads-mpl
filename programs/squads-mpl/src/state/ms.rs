@@ -303,11 +303,17 @@ pub struct IncomingInstruction {
 
 
 #[derive(AnchorSerialize,AnchorDeserialize,Clone)]
-pub struct IncomingIxSchema{
-    pub account_list: Vec<Pubkey>, //unique 
-    pub account_indexes: Vec<Vec<u8>>,
-    pub number_of_ixes: u8,
-    pub data: Vec<Vec<u8>>
+pub struct AddInstructionsArgs {
+    /// The list of unique account public keys (including program IDs) that will be used in the provided instructions.
+    pub account_keys: Vec<Pubkey>,
+    pub instructions: Vec<CompressedInstruction>,
 }
 
-// [ix1, pg1, acc1, acc2, acc3... ix2, pg2, acc1_2, account2_2...]
+#[derive(AnchorSerialize,AnchorDeserialize,Clone)]
+pub struct CompressedInstruction {
+    pub program_id_index: u8,
+    pub account_indexes: Vec<u8>,
+    pub signer_indexes: Vec<u8>,
+    pub writable_indexes: Vec<u8>,
+    pub data: Vec<u8>
+}

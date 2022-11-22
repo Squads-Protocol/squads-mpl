@@ -7,6 +7,8 @@ pub mod state;
 use errors::*;
 pub mod errors;
 
+mod util;
+
 use solana_security_txt::security_txt;
 
 security_txt! {
@@ -29,7 +31,7 @@ pub mod squads_mpl {
     use anchor_lang::solana_program::{program::{invoke_signed, invoke}, system_instruction::transfer};
 
     use super::*;
-    
+
     // instruction to create a multisig
     pub fn create(ctx: Context<Create>, threshold:u16, create_key: Pubkey, members: Vec<Pubkey>) -> Result<()> {
         // sort the members and remove duplicates
@@ -232,7 +234,7 @@ pub mod squads_mpl {
 
     // instruction to attach an instruction to a transaction
     // transactions must be in the "draft" status, and any
-    // signer (aside from execution payer) must math the
+    // signer (aside from execution payer) must match the
     // authority specified during the transaction creation
     pub fn add_instruction(ctx: Context<AddInstruction>, incoming_instruction: IncomingInstruction) -> Result<()> {
         let tx = &mut ctx.accounts.transaction;
@@ -248,8 +250,43 @@ pub mod squads_mpl {
         )
     }
 
-    pub fn add_instruction_v2(ctx: Context<AddInstructionV2>, ix_schema: IncomingIxSchema) -> Result<()>{
-        let ix_count = ix_schema.number_of_ixes;
+    /// Batch add instructions to a transaction.
+    pub fn add_instructions(ctx: Context<AddInstructions>, args: AddInstructionsArgs) -> Result<()>{
+        let tx = &mut ctx.accounts.transaction;
+
+        for ms_instruction_account_info in ctx.remaining_accounts {
+            util::init_pda(todo!())?;
+        }
+
+        let AddInstructionsArgs { account_keys, instructions } = args;
+
+        for compressed_ix in instructions {
+            let incoming_instruction = IncomingInstruction {
+                program_id: account_keys.get(compressed_ix.program_id_index as usize).unwrap().clone(),
+                keys: compressed_ix.account_indexes.iter().map(|index| {
+                    MsAccountMeta {
+                        pubkey: account_keys.get(*index as usize).unwrap().clone(),
+                        is_signer: compressed_ix.signer_indexes.contains(index),
+                        is_writable: compressed_ix.writable_indexes.contains(index),
+                    }
+                }).collect(),
+                data: compressed_ix.data,
+            };
+
+            // TODO: extract into an assert function.
+            // make sure internal transactions have a matching program id for attached instructions
+            if tx.authority_index == 0 && &incoming_instruction.program_id != ctx.program_id {
+                return err!(MsError::InvalidAuthorityIndex);
+            }
+
+            tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
+            // ctx.accounts.instruction.init(
+            //     tx.instruction_index,
+            //     incoming_instruction,
+            //     *ctx.bumps.get("instruction").unwrap()
+            // )
+        }
+
         Ok(())
     }
 
@@ -385,9 +422,9 @@ pub mod squads_mpl {
                 let ix_account_info = next_account_info(ix_iter)?.clone();
 
                 // check if this data has length of 8 or greater, and is our discriminator
-                if ctx.program_id == ix_program_info.key && 
+                if ctx.program_id == ix_program_info.key &&
                     (
-                        Some(add_member_discriminator.as_slice()) == ix.data.get(0..8) || 
+                        Some(add_member_discriminator.as_slice()) == ix.data.get(0..8) ||
                         Some(add_member_and_change_threshold_discriminator.as_slice()) == ix.data.get(0..8)
                     ) && account_index == 2 {
                     // check that the ix account keys match the submitted account keys
@@ -448,7 +485,7 @@ pub mod squads_mpl {
         let ms_key = &ctx.accounts.multisig.key();
         let ms_ix = &mut ctx.accounts.instruction;
         let tx = &mut ctx.accounts.transaction;
-        
+
         // setup the authority seeds
         let authority_seeds = [
             b"squad",
@@ -493,7 +530,7 @@ pub mod squads_mpl {
 
         if tx.authority_index < 1 && &ix.program_id != ctx.program_id {
             return err!(MsError::InvalidAuthorityIndex);
-        } 
+        }
 
         invoke_signed(
             &ix,
@@ -611,7 +648,7 @@ pub struct AddInstruction<'info> {
 
 #[derive(Accounts)]
 #[instruction(instruction_data: IncomingInstruction)]
-pub struct AddInstructionV2<'info> {
+pub struct AddInstructions<'info> {
     #[account(
         seeds = [
             b"squad",
@@ -637,6 +674,12 @@ pub struct AddInstructionV2<'info> {
     )]
     pub transaction: Account<'info, MsTransaction>,
 
+    #[account(mut)]
+    pub creator: Signer<'info>,
+    pub system_program: Program<'info, System>
+
+    // `remaining_accounts` are MsInstruction accounts.
+
     // #[account(
     //     init,
     //     payer = creator,
@@ -649,12 +692,7 @@ pub struct AddInstructionV2<'info> {
     //     ], bump,
     //     constraint = 8 + instruction_data.get_max_size() <= MsInstruction::MAXIMUM_SIZE @MsError::InvalidTransactionState,
     // )]
-    
     // pub instruction: Account<'info, MsInstruction>,
-
-    #[account(mut)]
-    pub creator: Signer<'info>,
-    pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]
@@ -815,7 +853,7 @@ pub struct ExecuteInstruction<'info> {
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
     )]
     pub transaction: Account<'info, MsTransaction>,
-    
+
     #[account(
         mut,
         seeds = [
