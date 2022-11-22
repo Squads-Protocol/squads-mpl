@@ -312,8 +312,11 @@ pub struct AddInstructionsArgs {
 #[derive(AnchorSerialize,AnchorDeserialize,Clone)]
 pub struct CompressedInstruction {
     pub program_id_index: u8,
+    /// Indices into the account_keys list indicating which accounts to pass to the instruction.
     pub account_indexes: Vec<u8>,
+    /// Indices into the account_keys list indicating which accounts are signers.
     pub signer_indexes: Vec<u8>,
+    /// Indices into the account_keys list indicating which accounts are writable.
     pub writable_indexes: Vec<u8>,
     pub data: Vec<u8>
 }

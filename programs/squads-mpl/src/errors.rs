@@ -2,12 +2,12 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum MsError {
-    #[msg("The account has lamports.")]
-    AccountHasLamports,
     KeyNotInMultisig,
     InvalidTransactionState,
     InvalidNumberOfAccounts,
     InvalidInstructionAccount,
+    #[msg("Number of instruction arguments does not match number of instruction accounts.")]
+    InvalidInstructionCount,
     InvalidAuthorityIndex,
     TransactionAlreadyExecuted,
     CannotRemoveSoloMember,
