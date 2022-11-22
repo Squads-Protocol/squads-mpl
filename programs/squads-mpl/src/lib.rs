@@ -300,20 +300,34 @@ pub mod squads_mpl {
 
             require_keys_eq!(ix_pda, ms_instruction_info.key(), MsError::InvalidInstructionAccount);
 
+
+            let seeds_with_bump = [
+                b"squad" as &[u8],
+                &tx_key.as_ref(),
+                &tx.instruction_index.to_le_bytes(),
+                b"instruction",
+                &[ix_pda_bump]
+            ];
+
             util::init_pda(InitPdaArgs {
                 account_info: ms_instruction_info.to_account_info(),
                 payer: ctx.accounts.creator.to_account_info(),
                 space: 8 + incoming_instruction.get_max_size(),
-                seeds: &seeds,
-                bump: ix_pda_bump,
+                // seeds: &seeds,
+                // bump: ix_pda_bump,
+                seeds_with_bump: &seeds_with_bump,
                 owner: &ctx.program_id,
                 system_program: ctx.accounts.system_program.to_account_info(),
             })?;
+            msg!("instruction account initialized");
+            
 
-            let mut ms_instruction = Account::<MsInstruction>::try_from(
+            let mut ms_instruction = Account::<MsInstruction>::try_from_unchecked(
                 &ms_instruction_info.to_account_info()
             )?;
-
+            // Account::<MsInstruction>::new()
+            msg!("Post TRY_FROM");
+            ms_instruction.reload()?;
             ms_instruction.init(
                 tx.instruction_index,
                 incoming_instruction,
@@ -685,7 +699,7 @@ pub struct AddInstruction<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(instruction_data: IncomingInstruction)]
+#[instruction(args: AddInstructionsArgs)]
 pub struct AddInstructions<'info> {
     #[account(
         seeds = [
