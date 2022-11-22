@@ -29,6 +29,7 @@ pub mod squads_mpl {
     use std::{convert::{TryInto}};
 
     use anchor_lang::solana_program::{program::{invoke_signed, invoke}, system_instruction::transfer};
+    use crate::util::InitPdaArgs;
 
     use super::*;
 
@@ -251,16 +252,21 @@ pub mod squads_mpl {
     }
 
     /// Batch add instructions to a transaction.
-    pub fn add_instructions(ctx: Context<AddInstructions>, args: AddInstructionsArgs) -> Result<()>{
+    pub fn add_instructions<'a, 'info>(
+        ctx: Context<'a, '_, '_, 'info, AddInstructions<'info>>,
+        args: AddInstructionsArgs
+    ) -> Result<()> {
         let tx = &mut ctx.accounts.transaction;
 
-        for ms_instruction_account_info in ctx.remaining_accounts {
-            util::init_pda(todo!())?;
-        }
+        // make sure the number of instructions passed in `args` matches
+        // the number of instruction accounts passed as `remaining_accounts`.
+        require_eq!(args.instructions.len(), ctx.remaining_accounts.len(), MsError::InvalidInstructionCount);
 
         let AddInstructionsArgs { account_keys, instructions } = args;
 
-        for compressed_ix in instructions {
+        for (ix_index, compressed_ix) in instructions.into_iter().enumerate() {
+            let ms_instruction_info = ctx.remaining_accounts.get(ix_index).unwrap();
+
             let incoming_instruction = IncomingInstruction {
                 program_id: account_keys.get(compressed_ix.program_id_index as usize).unwrap().clone(),
                 keys: compressed_ix.account_indexes.iter().map(|index| {
@@ -280,11 +286,39 @@ pub mod squads_mpl {
             }
 
             tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
-            // ctx.accounts.instruction.init(
-            //     tx.instruction_index,
-            //     incoming_instruction,
-            //     *ctx.bumps.get("instruction").unwrap()
-            // )
+
+            let tx_key = tx.key();
+
+            let seeds = [
+                b"squad" as &[u8],
+                &tx_key.as_ref(),
+                &tx.instruction_index.to_le_bytes(),
+                b"instruction"
+            ];
+
+            let (ix_pda, ix_pda_bump) = Pubkey::find_program_address(&seeds, ctx.program_id);
+
+            require_keys_eq!(ix_pda, ms_instruction_info.key(), MsError::InvalidInstructionAccount);
+
+            util::init_pda(InitPdaArgs {
+                account_info: ms_instruction_info.to_account_info(),
+                payer: ctx.accounts.creator.to_account_info(),
+                space: 8 + incoming_instruction.get_max_size(),
+                seeds: &seeds,
+                bump: ix_pda_bump,
+                owner: &ctx.program_id,
+                system_program: ctx.accounts.system_program.to_account_info(),
+            })?;
+
+            let mut ms_instruction = Account::<MsInstruction>::try_from(
+                &ms_instruction_info.to_account_info()
+            )?;
+
+            ms_instruction.init(
+                tx.instruction_index,
+                incoming_instruction,
+                ix_pda_bump
+            )?;
         }
 
         Ok(())
