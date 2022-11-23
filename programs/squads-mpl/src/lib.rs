@@ -9,6 +9,7 @@ pub mod errors;
 
 use solana_security_txt::security_txt;
 
+#[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
     name: "Squads MPL",
     project_url: "https://squads.so",
