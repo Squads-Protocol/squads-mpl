@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction, Discriminator};
 use hex::FromHex;
 
 use state::ms::*;
@@ -21,7 +21,7 @@ security_txt! {
     auditors: "OtterSec"
 }
 
-declare_id!("SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu");
+declare_id!("J7j1uANJkX5BALTfhRmX2HDJ1D9cHg5hHY5uujJdRBcS");
 
 #[program]
 pub mod squads_mpl {
@@ -268,10 +268,10 @@ pub mod squads_mpl {
             let ms_instruction_info = ctx.remaining_accounts.get(ix_index).unwrap();
 
             let incoming_instruction = IncomingInstruction {
-                program_id: account_keys.get(compressed_ix.program_id_index as usize).unwrap().clone(),
+                program_id: *account_keys.get(compressed_ix.program_id_index as usize).unwrap(),
                 keys: compressed_ix.account_indexes.iter().map(|index| {
                     MsAccountMeta {
-                        pubkey: account_keys.get(*index as usize).unwrap().clone(),
+                        pubkey: *account_keys.get(*index as usize).unwrap(),
                         is_signer: compressed_ix.signer_indexes.contains(index),
                         is_writable: compressed_ix.writable_indexes.contains(index),
                     }
@@ -291,7 +291,7 @@ pub mod squads_mpl {
 
             let seeds = [
                 b"squad" as &[u8],
-                &tx_key.as_ref(),
+                tx_key.as_ref(),
                 &tx.instruction_index.to_le_bytes(),
                 b"instruction"
             ];
@@ -300,10 +300,9 @@ pub mod squads_mpl {
 
             require_keys_eq!(ix_pda, ms_instruction_info.key(), MsError::InvalidInstructionAccount);
 
-
             let seeds_with_bump = [
                 b"squad" as &[u8],
-                &tx_key.as_ref(),
+                tx_key.as_ref(),
                 &tx.instruction_index.to_le_bytes(),
                 b"instruction",
                 &[ix_pda_bump]
@@ -313,26 +312,25 @@ pub mod squads_mpl {
                 account_info: ms_instruction_info.to_account_info(),
                 payer: ctx.accounts.creator.to_account_info(),
                 space: 8 + incoming_instruction.get_max_size(),
-                // seeds: &seeds,
-                // bump: ix_pda_bump,
                 seeds_with_bump: &seeds_with_bump,
-                owner: &ctx.program_id,
+                owner: ctx.program_id,
                 system_program: ctx.accounts.system_program.to_account_info(),
             })?;
-            msg!("instruction account initialized");
-            
 
-            let mut ms_instruction = Account::<MsInstruction>::try_from_unchecked(
-                &ms_instruction_info.to_account_info()
+            let discriminator = MsInstruction::discriminator();
+            ms_instruction_info.try_borrow_mut_data()?[..discriminator.len()].copy_from_slice(discriminator[..].as_ref());
+
+            let mut ms_instruction = Account::<MsInstruction>::try_from(
+                ms_instruction_info
             )?;
-            // Account::<MsInstruction>::new()
-            msg!("Post TRY_FROM");
-            ms_instruction.reload()?;
+
             ms_instruction.init(
                 tx.instruction_index,
                 incoming_instruction,
                 ix_pda_bump
             )?;
+
+            ms_instruction.serialize(&mut &mut ms_instruction_info.try_borrow_mut_data()?[8..])?;
         }
 
         Ok(())

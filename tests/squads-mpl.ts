@@ -364,26 +364,18 @@ describe("Programs", function(){
           instructions: compressedIxes,
         };
 
-        try{
-          await program.methods.addInstructions(ixArgs)
-          .accounts({
-            multisig: msPDA,
-            transaction: txState.publicKey,
-            creator: provider.wallet.publicKey
-          })
-          .remainingAccounts([
-            {pubkey: ix_1_pda, isWritable: true, isSigner: false},
-            {pubkey: ix_2_pda, isWritable: true, isSigner: false},
-          ])
-          .rpc({skipPreflight: true});
-        }catch(e){
-          console.log("ERRRRR",e);
-        }
-        console.log("SUCCESS IN ADDING!");
-        /*
-        await squads.addInstruction(txState.publicKey, testIx);
-        await squads.addInstruction(txState.publicKey, testIx2x);
-        */
+        await program.methods.addInstructions(ixArgs)
+        .accounts({
+          multisig: msPDA,
+          transaction: txState.publicKey,
+          creator: provider.wallet.publicKey
+        })
+        .remainingAccounts([
+          {pubkey: ix_1_pda, isWritable: true, isSigner: false},
+          {pubkey: ix_2_pda, isWritable: true, isSigner: false},
+        ])
+        .rpc({skipPreflight: true});
+
         await squads.activateTransaction(txState.publicKey);
         await squads.approveTransaction(txState.publicKey);
         let newTxState = await squads.getTransaction(txState.publicKey);

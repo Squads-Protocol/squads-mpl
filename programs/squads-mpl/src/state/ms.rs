@@ -228,6 +228,7 @@ impl MsTransaction {
 
 // the internal instruction schema, similar to Instruction but with extra metadata
 #[account]
+#[derive(Debug)]
 pub struct MsInstruction {
     pub program_id: Pubkey,
     pub keys: Vec<MsAccountMeta>,
@@ -286,7 +287,7 @@ impl From<MsInstruction> for Instruction {
 }
 
 // internal AccountMeta serialization schema
-#[derive(AnchorSerialize,AnchorDeserialize, Copy, Clone)]
+#[derive(AnchorSerialize,AnchorDeserialize, Copy, Clone, Debug)]
 pub struct MsAccountMeta {
     pub pubkey: Pubkey,
     pub is_signer: bool,
@@ -294,7 +295,7 @@ pub struct MsAccountMeta {
 }
 
 // serialization schema for incoming instructions to be attached to transaction
-#[derive(AnchorSerialize,AnchorDeserialize, Clone)]
+#[derive(AnchorSerialize,AnchorDeserialize, Clone, Debug)]
 pub struct IncomingInstruction {
     pub program_id: Pubkey,
     pub keys: Vec<MsAccountMeta>,
