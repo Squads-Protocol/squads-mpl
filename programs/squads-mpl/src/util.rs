@@ -1,6 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::program::invoke_signed;
-use anchor_lang::solana_program::system_instruction;
 use anchor_lang::system_program;
 
 pub struct InitPdaArgs<'a, 'b, 'info> {
@@ -24,50 +22,21 @@ pub struct InitPdaArgs<'a, 'b, 'info> {
 pub fn init_pda(args: InitPdaArgs) -> Result<()> {
     let rent = Rent::get()?;
     let rent_exemption_lamports = rent.minimum_balance(args.space);
-    // let seeds_with_bump = [&args.seeds[..], &[&[args.bump]]];
-
-    // let seeds_with_bump [
-    //     b"squad" as &[u8],
-    //     &tx_key.as_ref(),
-    //     &tx.instruction_index.to_le_bytes(),
-    //     b"instruction"
-    // ];
 
     let current_lamports = args.account_info.lamports();
-    msg!("Initializing the account data for {:?}", args.account_info);
-    msg!("PAYER {:?}", args.payer);
-    let payer = args.payer.clone();
-    let new_account = args.account_info.clone();
     if current_lamports == 0 {
         // Create the token account with right amount of lamports and space, and the correct owner.
-        // let cpi_accounts = system_program::CreateAccount {
-        //     from: args.payer,
-        //     to: args.account_info,
-        // };
+        let cpi_accounts = system_program::CreateAccount {
+            from: args.payer,
+            to: args.account_info,
+        };
 
-        // let cpi_context = CpiContext::new(args.system_program.to_account_info(), cpi_accounts);
-        // msg!("CPI CONTEXT {:?}", cpi_context);
-        // system_program::create_account(
-        //     cpi_context.with_signer(&seeds_with_bump),
-        //     rent_exemption_lamports,
-        //     args.space as u64,
-        //     args.owner
-        // )?;
-
-        invoke_signed(
-            &system_instruction::create_account(
-                payer.key,
-                new_account.key,
-                rent_exemption_lamports,
-                args.space as u64,
-                args.owner,
-            ),
-            &[
-                payer,
-                new_account,
-                args.system_program
-            ],
-            &[args.seeds_with_bump]
+        let cpi_context = CpiContext::new(args.system_program.to_account_info(), cpi_accounts);
+        system_program::create_account(
+            cpi_context.with_signer(&[args.seeds_with_bump]),
+            rent_exemption_lamports,
+            args.space as u64,
+            args.owner
         )?;
     } else {
         // Fund the account for rent exemption.
