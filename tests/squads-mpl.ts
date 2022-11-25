@@ -345,23 +345,15 @@ describe("Programs", function(){
           });
         };
 
-        /*
-          accountKeys 
-          instructions
-        */
-
         let txState = await squads.createTransaction(msPDA, 1);
         const accountKeys =  getUniqueAccountKeys([testIx, testIx2x]);
         const compressedIxes = getCompressedIxes(accountKeys, [testIx, testIx2x]);
-        // console.log(compressedIxes);
-        // console.log(" ");
         const [ix_1_pda] = await getIxPDA(txState.publicKey, new BN(1), program.programId);
         const [ix_2_pda] = await getIxPDA(txState.publicKey, new BN(2), program.programId);
-        console.log("ix 1pda:", ix_1_pda.toBase58());
-        console.log("ix_2Pda", ix_2_pda.toBase58());
         const ixArgs = {
           accountKeys,
           instructions: compressedIxes,
+          activate: true,
         };
 
         await program.methods.addInstructions(ixArgs)
@@ -374,13 +366,15 @@ describe("Programs", function(){
           {pubkey: ix_1_pda, isWritable: true, isSigner: false},
           {pubkey: ix_2_pda, isWritable: true, isSigner: false},
         ])
-        .rpc({skipPreflight: true});
-
-        await squads.activateTransaction(txState.publicKey);
-        await squads.approveTransaction(txState.publicKey);
+        .rpc({
+          commitment: "confirmed",
+          skipPreflight: true
+        });
         let newTxState = await squads.getTransaction(txState.publicKey);
+        expect(newTxState.status).to.have.property("active");
+        await squads.approveTransaction(newTxState.publicKey);
+        newTxState = await squads.getTransaction(txState.publicKey);
         expect(newTxState.status).to.have.property("executeReady");
-        console.log("EXECUTE READY");
         // move funds to auth/vault
         const moveFundsToMsPDAIx = await createTestTransferTransaction(
           creator.publicKey,

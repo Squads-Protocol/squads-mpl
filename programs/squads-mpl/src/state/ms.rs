@@ -82,7 +82,7 @@ impl Ms {
 }
 
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug)]
 pub enum MsTransactionStatus {
     Draft,          // Transaction default state
     Active,         // Transaction is live and ready
@@ -308,6 +308,8 @@ pub struct AddInstructionsArgs {
     /// The list of unique account public keys (including program IDs) that will be used in the provided instructions.
     pub account_keys: Vec<Pubkey>,
     pub instructions: Vec<CompressedInstruction>,
+    /// Whether to also activate the transaction.
+    pub activate: bool,
 }
 
 #[derive(AnchorSerialize,AnchorDeserialize,Clone)]

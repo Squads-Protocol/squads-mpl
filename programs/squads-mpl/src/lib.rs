@@ -262,7 +262,11 @@ pub mod squads_mpl {
         // the number of instruction accounts passed as `remaining_accounts`.
         require_eq!(args.instructions.len(), ctx.remaining_accounts.len(), MsError::InvalidInstructionCount);
 
-        let AddInstructionsArgs { account_keys, instructions } = args;
+        let AddInstructionsArgs {
+            account_keys,
+            instructions,
+            activate
+        } = args;
 
         for (ix_index, compressed_ix) in instructions.into_iter().enumerate() {
             let ms_instruction_info = ctx.remaining_accounts.get(ix_index).unwrap();
@@ -331,6 +335,10 @@ pub mod squads_mpl {
             )?;
 
             ms_instruction.serialize(&mut &mut ms_instruction_info.try_borrow_mut_data()?[8..])?;
+        }
+
+        if activate {
+            ctx.accounts.transaction.activate()?;
         }
 
         Ok(())
