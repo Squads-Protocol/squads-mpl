@@ -314,6 +314,42 @@ export declare type SquadsMpl = {
             ];
         },
         {
+            "name": "addInstructions";
+            "docs": [
+                "Batch add instructions to a transaction."
+            ];
+            "accounts": [
+                {
+                    "name": "multisig";
+                    "isMut": false;
+                    "isSigner": false;
+                },
+                {
+                    "name": "transaction";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "creator";
+                    "isMut": true;
+                    "isSigner": true;
+                },
+                {
+                    "name": "systemProgram";
+                    "isMut": false;
+                    "isSigner": false;
+                }
+            ];
+            "args": [
+                {
+                    "name": "args";
+                    "type": {
+                        "defined": "AddInstructionsArgs";
+                    };
+                }
+            ];
+        },
+        {
             "name": "approveTransaction";
             "accounts": [
                 {
@@ -634,6 +670,75 @@ export declare type SquadsMpl = {
             };
         },
         {
+            "name": "AddInstructionsArgs";
+            "type": {
+                "kind": "struct";
+                "fields": [
+                    {
+                        "name": "accountKeys";
+                        "docs": [
+                            "The list of unique account public keys (including program IDs) that will be used in the provided instructions."
+                        ];
+                        "type": {
+                            "vec": "publicKey";
+                        };
+                    },
+                    {
+                        "name": "instructions";
+                        "type": {
+                            "vec": {
+                                "defined": "CompressedInstruction";
+                            };
+                        };
+                    },
+                    {
+                        "name": "activate";
+                        "docs": [
+                            "Whether to also activate the transaction."
+                        ];
+                        "type": "bool";
+                    }
+                ];
+            };
+        },
+        {
+            "name": "CompressedInstruction";
+            "type": {
+                "kind": "struct";
+                "fields": [
+                    {
+                        "name": "programIdIndex";
+                        "type": "u8";
+                    },
+                    {
+                        "name": "accountIndexes";
+                        "docs": [
+                            "Indices into the account_keys list indicating which accounts to pass to the instruction."
+                        ];
+                        "type": "bytes";
+                    },
+                    {
+                        "name": "signerIndexes";
+                        "docs": [
+                            "Indices into the account_keys list indicating which accounts are signers."
+                        ];
+                        "type": "bytes";
+                    },
+                    {
+                        "name": "writableIndexes";
+                        "docs": [
+                            "Indices into the account_keys list indicating which accounts are writable."
+                        ];
+                        "type": "bytes";
+                    },
+                    {
+                        "name": "data";
+                        "type": "bytes";
+                    }
+                ];
+            };
+        },
+        {
             "name": "MsTransactionStatus";
             "type": {
                 "kind": "enum";
@@ -679,38 +784,43 @@ export declare type SquadsMpl = {
         },
         {
             "code": 6004;
-            "name": "InvalidAuthorityIndex";
+            "name": "InvalidInstructionCount";
+            "msg": "Number of instruction arguments does not match number of instruction accounts.";
         },
         {
             "code": 6005;
-            "name": "TransactionAlreadyExecuted";
+            "name": "InvalidAuthorityIndex";
         },
         {
             "code": 6006;
-            "name": "CannotRemoveSoloMember";
+            "name": "TransactionAlreadyExecuted";
         },
         {
             "code": 6007;
-            "name": "InvalidThreshold";
+            "name": "CannotRemoveSoloMember";
         },
         {
             "code": 6008;
-            "name": "DeprecatedTransaction";
+            "name": "InvalidThreshold";
         },
         {
             "code": 6009;
-            "name": "InstructionFailed";
+            "name": "DeprecatedTransaction";
         },
         {
             "code": 6010;
-            "name": "MaxMembersReached";
+            "name": "InstructionFailed";
         },
         {
             "code": 6011;
-            "name": "EmptyMembers";
+            "name": "MaxMembersReached";
         },
         {
             "code": 6012;
+            "name": "EmptyMembers";
+        },
+        {
+            "code": 6013;
             "name": "PartialExecution";
         }
     ];
