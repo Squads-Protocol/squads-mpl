@@ -13,7 +13,7 @@ import {
   executeTransaction,
 } from "../helpers/transactions";
 import { execSync } from "child_process";
-import { LAMPORTS_PER_SOL, ParsedAccountData, PublicKey, SystemProgram } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, ParsedAccountData, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import Squads, {
   getMsPDA,
   getIxPDA,
@@ -22,7 +22,7 @@ import Squads, {
   getTxPDA,
 } from "@sqds/sdk";
 import BN from "bn.js";
-import { ASSOCIATED_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
+import { TOKEN_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
 import { getExecuteProxyInstruction, getUserRolePDA, getUserDelegatePDA, getRolesManager } from "../helpers/roles";
 
 import {memberListApprove} from "../helpers/approve";
@@ -104,7 +104,7 @@ describe("Programs", function(){
 
     let program: Program<SquadsMpl>;
     let squads;
-    let creator;
+    let creator: anchor.AnchorProvider["wallet"];
     let programManagerProgram;
     let randomCreateKey;
     let msPDA;
@@ -307,56 +307,6 @@ describe("Programs", function(){
           authorityPDA,
           testPayee.publicKey
         );
-
-        const getUniqueAccountKeys = (ixes: anchor.web3.TransactionInstruction[]) => {
-          const aK: anchor.web3.PublicKey[] = [];
-          for (let ix of ixes) {
-            // attempted to make compressed instruction and set account_keys
-            const pIndex = aK.findIndex((k)=>{
-              return k.equals(ix.programId);
-            });
-            if (pIndex === -1) {
-              aK.push(ix.programId);
-            }
-
-            for (let k of ix.keys) {
-              const kIndex = aK.findIndex((key)=>{
-                return key.equals(k.pubkey);
-              });
-              if (kIndex === -1) {
-                aK.push(k.pubkey);
-              }
-            }
-          }
-          return aK;
-        };
-
-        const getCompressedIxes = (accountKeys: anchor.web3.PublicKey[], ixes: anchor.web3.TransactionInstruction[]) => {
-          return ixes.map(ix => {
-            return {
-              programIdIndex: accountKeys.findIndex((k)=>{
-                return k.equals(ix.programId);
-              }),
-              accountIndexes: Buffer.from(ix.keys.map(k => {
-                return accountKeys.findIndex((key)=>{
-                  return key.equals(k.pubkey);
-                });
-              })),
-              signerIndexes: Buffer.from(ix.keys.filter(k => k.isSigner).map(k => {
-                return accountKeys.findIndex((key)=>{
-                  return key.equals(k.pubkey);
-                }
-              )})),
-              writableIndexes: Buffer.from(ix.keys.filter(k => k.isWritable).map(k => {
-                return accountKeys.findIndex((key)=>{
-                  return key.equals(k.pubkey);
-                }
-              )})),
-              data: ix.data,
-            };
-          });
-        };
-
         let txState = await squads.createTransaction(msPDA, 1);
         const accountKeys =  getUniqueAccountKeys([testIx, testIx2x]);
         const compressedIxes = getCompressedIxes(accountKeys, [testIx, testIx2x]);
@@ -402,12 +352,7 @@ describe("Programs", function(){
         await provider.sendAndConfirm(moveFundsToMsPDATx);
         const msPDAFunded = await squads.connection.getAccountInfo(authorityPDA);
         expect(msPDAFunded.lamports).to.equal(4000000);
-        
-        try {
-          await squads.executeTransaction(txState.publicKey);
-        }catch(e){
-          console.log("EXECUTION ERROR", e);
-        }
+        await squads.executeTransaction(txState.publicKey);
         txState = await squads.getTransaction(txState.publicKey);
         expect(txState.status).to.have.property("executed");
         let testPayeeAccount = await squads.connection.getParsedAccountInfo(
@@ -415,6 +360,50 @@ describe("Programs", function(){
         );
         expect(testPayeeAccount.value.lamports).to.equal(2000000);
       });
+
+      it.skip(`getInstructionsV2 wrapping overhead`, async function() {
+        // MagicEden Buy NFT tx.
+        const originalTransactionBytes = Buffer.from("AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADG/omv6Y6TpmfPm8Nv6uNO4+wIbpMEEpge++pjCXRJHafnAD+atFsxBtGSsVJXKlU4Rl6LPqgxCvgP8JumX6oPAgEJFC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtBX82VZkozhurrbZbi12eMbon+FOb7GAsyxrcKvufRnAQwjfwGJSgD4Qx0lgbtYjba02lQTrXoi+Tt9Hud6q5Zm1LzHez3eRpORE62bQk660HWs5JWsTpCUHKqqhKVzL1e/B6uWe1EG6asiC4kn2+anSeJL+Qx/12GYG+NwKoDacIr/bkEFkkZq+bSGvldnny9otBzdwx4CCSd0qPY2LtE5bClE7fneICXVOO6oTpkyP9dXySB6bpu2/M37UbiZtNw4tiKyS0JeN3O5NSihi69ksZEzxISUzTz0XmVuIZNPDljbFniLvsim6dTEc5cyoTN2b5SA3mE/vy52heCKtBsPXNul2WH2NlJWV4rgdiwGbP4az6UWif8kpvy7OdE3osDJ465OC3mEr6Ep1gB6Ce4I6WLqHK2kna5hIyk8K/w30AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL4+HroXpHP4mw9+jiSUDyCuuOvKcaiP3pXUuDtxoJYXXCW/Z3CCGN/ozP5mL25z8cjQQJ33WfsLAUj1rzV8OMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WcMbGMw+FIoKUpOBiSDt+u2rOR5JM2wLdNtmnRBHA0JL8XzARhMFxip/gfka6l966UK5BlOVMWaJrkUqN+gSCLcFIZ+JmoHU/4T7WT0u34qQrBs6s0JY998jPqUDArG9Lgan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKldDKr4rGlLvd88tmWtp8Um26HSn9iSxwtdR5YtN8SLAgQRBgABCAUPCxHyI8aJUuHytv5Apa4CAAAAABEMAAENEAgFDwMFEwsSImYGPRIB2uvq/P5Apa4CAAAAAAEAAAAAAAAAAAAAAAAAAAARFAAEAQINEAgJBQ8KAwUHBRMLDgwSKiVK2Z1PMSMG/vpApa4CAAAAAAEAAAAAAAAAAAAAAAAAAAD//////////wsCAAYMAgAAAOhgLwAAAAAA", "base64");
+        expect(originalTransactionBytes.length).to.equal(963);
+
+        const originalTransaction = anchor.web3.Transaction.from(originalTransactionBytes);
+        const originalInstructions = originalTransaction.instructions;
+
+        const txBuilder = await squads.getTransactionBuilder(msPDA, 1);
+        const [wrappedInstructions] = await txBuilder
+          .withInstructions(originalInstructions)
+          .getInstructionsV2({ activate: true });
+
+        const wrappedTx = new Transaction();
+        wrappedTx.recentBlockhash = originalTransaction.recentBlockhash;
+        wrappedTx.feePayer = creator.publicKey;
+        wrappedTx.add(...wrappedInstructions);
+        const wrappedTxBytes = wrappedTx.serialize({ requireAllSignatures: false })
+        console.log("Serialized wrapped tx size:", wrappedTxBytes.length) // 1319 (overhead 356)
+      })
+
+      it(`createTransactionV2 wrapping overhead`, async function() {
+        // MagicEden Buy NFT tx.
+        const originalTransactionBytes = Buffer.from("AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADG/omv6Y6TpmfPm8Nv6uNO4+wIbpMEEpge++pjCXRJHafnAD+atFsxBtGSsVJXKlU4Rl6LPqgxCvgP8JumX6oPAgEJFC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtBX82VZkozhurrbZbi12eMbon+FOb7GAsyxrcKvufRnAQwjfwGJSgD4Qx0lgbtYjba02lQTrXoi+Tt9Hud6q5Zm1LzHez3eRpORE62bQk660HWs5JWsTpCUHKqqhKVzL1e/B6uWe1EG6asiC4kn2+anSeJL+Qx/12GYG+NwKoDacIr/bkEFkkZq+bSGvldnny9otBzdwx4CCSd0qPY2LtE5bClE7fneICXVOO6oTpkyP9dXySB6bpu2/M37UbiZtNw4tiKyS0JeN3O5NSihi69ksZEzxISUzTz0XmVuIZNPDljbFniLvsim6dTEc5cyoTN2b5SA3mE/vy52heCKtBsPXNul2WH2NlJWV4rgdiwGbP4az6UWif8kpvy7OdE3osDJ465OC3mEr6Ep1gB6Ce4I6WLqHK2kna5hIyk8K/w30AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL4+HroXpHP4mw9+jiSUDyCuuOvKcaiP3pXUuDtxoJYXXCW/Z3CCGN/ozP5mL25z8cjQQJ33WfsLAUj1rzV8OMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WcMbGMw+FIoKUpOBiSDt+u2rOR5JM2wLdNtmnRBHA0JL8XzARhMFxip/gfka6l966UK5BlOVMWaJrkUqN+gSCLcFIZ+JmoHU/4T7WT0u34qQrBs6s0JY998jPqUDArG9Lgan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKldDKr4rGlLvd88tmWtp8Um26HSn9iSxwtdR5YtN8SLAgQRBgABCAUPCxHyI8aJUuHytv5Apa4CAAAAABEMAAENEAgFDwMFEwsSImYGPRIB2uvq/P5Apa4CAAAAAAEAAAAAAAAAAAAAAAAAAAARFAAEAQINEAgJBQ8KAwUHBRMLDgwSKiVK2Z1PMSMG/vpApa4CAAAAAAEAAAAAAAAAAAAAAAAAAAD//////////wsCAAYMAgAAAOhgLwAAAAAA", "base64");
+        expect(originalTransactionBytes.length).to.equal(963);
+
+        const originalTransaction = anchor.web3.Transaction.from(originalTransactionBytes);
+        const originalInstructions = originalTransaction.instructions;
+
+        const txBuilder = await squads.getTransactionBuilder(msPDA, 1);
+        const [createTransactionInstruction] = await txBuilder
+          .withInstructions(originalInstructions)
+          .createTransactionV2();
+
+        const wrappedTx = new Transaction();
+        wrappedTx.recentBlockhash = originalTransaction.recentBlockhash;
+        wrappedTx.feePayer = creator.publicKey;
+        wrappedTx.add(createTransactionInstruction);
+        const wrappedTxBytes = wrappedTx.serialize({ requireAllSignatures: false })
+        const overhead = wrappedTxBytes.length - originalTransactionBytes.length
+        // expect(overhead).to.equal(208); // Getting rid of remaining_account
+        expect(overhead).to.equal(148); // Using optimized header
+      })
 
       it.skip(`2X Transfer Tx Execute`, async function() {
         // create authority to use (Vault, index 1)
@@ -1049,7 +1038,7 @@ describe("Programs", function(){
         expect(puState.upgradedOn.toNumber()).to.be.greaterThan(0);
       });
     });
-  
+
     // test suite for the roles program
     describe("Roles Program", async function(){
       const userWithInitRole = anchor.web3.Keypair.generate();
@@ -1099,7 +1088,7 @@ describe("Programs", function(){
 
         // default authority to use for signing
         const [defaultAuthority] = await getAuthorityPDA(msPDA, new BN(1), program.programId);
-        
+
         //
         // create role tx -- needs to be executed by all members
         let msState = await program.account.ms.fetch(msPDA);
@@ -1134,7 +1123,7 @@ describe("Programs", function(){
               authority: defaultAuthority,
               rolesManager,
             }).instruction();
-        
+
         const createVoteRoleIx = await rolesProgram.methods.addUser(userWithVoteRole.publicKey, {vote:{}}, "Vote only")
             .accounts({
               user: userWithVoteRolePDA,
@@ -1191,7 +1180,7 @@ describe("Programs", function(){
               instruction: ixPDA_2,
               creator: provider.wallet.publicKey
             })
-            .rpc();  
+            .rpc();
 
         await program.methods.addInstruction(createExecuteRoleIx)
             .accounts({
@@ -1200,7 +1189,7 @@ describe("Programs", function(){
               instruction: ixPDA_3,
               creator: provider.wallet.publicKey
             })
-            .rpc();  
+            .rpc();
 
         // activate it
         try {
@@ -1252,11 +1241,11 @@ describe("Programs", function(){
         } catch (e) {
           console.log("failed to create the authority 0 tx", e);
         }
-        
+
         [ixPDA_1] = await getIxPDA(txPDA,new BN(1, 10),program.programId);
         [ixPDA_2] = await getIxPDA(txPDA,new BN(2, 10),program.programId);
         [ixPDA_3] = await getIxPDA(txPDA,new BN(3, 10),program.programId);
-        
+
         const addMemberIx1 = await program.methods.addMember(userWithInitRoleDelegatePDA)
             .accounts({
               multisig: msPDA,
@@ -1388,7 +1377,7 @@ describe("Programs", function(){
             })
             .signers([userWithInitRole.publicKey])
             .transaction();
-          
+
             await provider.sendAndConfirm(createProxyTx, [userWithInitRole], {skipPreflight: true});
         }catch(e){
           console.log(e);
@@ -1410,7 +1399,7 @@ describe("Programs", function(){
             squadsProgram: program.programId
           })
           .transaction();
-          
+
           try {
             await provider.sendAndConfirm(addWithdrawIxTx, [userWithInitRole], {skipPreflight: true});
           }catch(e){
@@ -2180,3 +2169,53 @@ describe("Programs", function(){
   });
 
 });
+
+function getUniqueAccountKeys(ixes: anchor.web3.TransactionInstruction[]) {
+  const aK: anchor.web3.PublicKey[] = [];
+  for (let ix of ixes) {
+    // attempted to make compressed instruction and set account_keys
+    const pIndex = aK.findIndex((k)=>{
+      return k.equals(ix.programId);
+    });
+    if (pIndex === -1) {
+      aK.push(ix.programId);
+    }
+
+    for (let k of ix.keys) {
+      const kIndex = aK.findIndex((key)=>{
+        return key.equals(k.pubkey);
+      });
+      if (kIndex === -1) {
+        aK.push(k.pubkey);
+      }
+    }
+  }
+  return aK;
+}
+
+
+function getCompressedIxes(accountKeys: anchor.web3.PublicKey[], ixes: anchor.web3.TransactionInstruction[]) {
+  return ixes.map(ix => {
+    return {
+      programIdIndex: accountKeys.findIndex((k) => {
+        return k.equals(ix.programId);
+      }),
+      accountIndexes: Buffer.from(ix.keys.map(k => {
+        return accountKeys.findIndex((key) => {
+          return key.equals(k.pubkey);
+        });
+      })),
+      signerIndexes: Buffer.from(ix.keys.filter(k => k.isSigner).map(k => {
+        return accountKeys.findIndex((key) => {
+            return key.equals(k.pubkey);
+          }
+        )})),
+      writableIndexes: Buffer.from(ix.keys.filter(k => k.isWritable).map(k => {
+        return accountKeys.findIndex((key) => {
+            return key.equals(k.pubkey);
+          }
+        )})),
+      data: ix.data,
+    };
+  });
+}
