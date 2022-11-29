@@ -219,6 +219,39 @@
       ]
     },
     {
+      "name": "createTransactionV2",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "transaction",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "creator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "CreateTransactionV2Args"
+          }
+        }
+      ]
+    },
+    {
       "name": "createTransaction",
       "accounts": [
         {
@@ -622,6 +655,115 @@
           }
         ]
       }
+    },
+    {
+      "name": "MsTransactionV2",
+      "docs": [
+        "Account containing data required for tracking the voting status, and execution of multisig transaction."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "docs": [
+              "creator, used to seed pda."
+            ],
+            "type": "publicKey"
+          },
+          {
+            "name": "ms",
+            "docs": [
+              "the multisig this belongs to."
+            ],
+            "type": "publicKey"
+          },
+          {
+            "name": "transactionIndex",
+            "docs": [
+              "used for seed."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "authorityIndex",
+            "docs": [
+              "index to use for other pdas (?)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "authorityBump",
+            "docs": [
+              "the bump corresponding to the bespoke authority."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "the status of the transaction."
+            ],
+            "type": {
+              "defined": "MsTransactionStatus"
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "bump for the seed."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "approved",
+            "docs": [
+              "keys that have approved/signed."
+            ],
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "rejected",
+            "docs": [
+              "keys that have rejected."
+            ],
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "cancelled",
+            "docs": [
+              "keys that have cancelled (ExecuteReady only)."
+            ],
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "accountKeys",
+            "docs": [
+              "unique account pubkeys (including program IDs) required for execution of the tx."
+            ],
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "instructions",
+            "docs": [
+              "list of instructions making up the tx."
+            ],
+            "type": {
+              "vec": {
+                "defined": "CompiledInstruction"
+              }
+            }
+          }
+        ]
+      }
     }
   ],
   "types": [
@@ -733,6 +875,95 @@
           },
           {
             "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateTransactionV2Args",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "accountKeys",
+            "docs": [
+              "The list of unique account public keys (including program IDs) that will be used in the provided instructions.",
+              "The signer pubkeys appear at the beginning of the vec, with writable pubkeys first, and read-only pubkeys following.",
+              "The non-signer pubkeys follow with writable pubkeys first and read-only ones following.",
+              "Program IDs are also stored at the end of the vec along with other non-signer non-writable pubkeys:",
+              "",
+              "```plaintext",
+              "[pubkey1, pubkey2, pubkey3, pubkey4, pubkey5, pubkey6, pubkey7, pubkey8]",
+              "|---writable---|  |---readonly---|  |---writable---|  |---readonly---|",
+              "|------------signers-------------|  |----------non-singers-----------|",
+              "```"
+            ],
+            "type": {
+              "vec": "publicKey"
+            }
+          },
+          {
+            "name": "numSigners",
+            "docs": [
+              "The number of signer pubkeys in the account_keys vec."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "numWritableSigners",
+            "docs": [
+              "The number of writable signer pubkeys in the account_keys vec."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "numWritableNonSigners",
+            "docs": [
+              "The number of writable non-signer pubkeys in the account_keys vec."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "authorityIndex",
+            "docs": [
+              "Authority `0` is reserved for internal instructions,",
+              "whereas authorities 1 or greater refer to a vault, upgrade authority, or other."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "instructions",
+            "type": {
+              "vec": {
+                "defined": "CompiledInstruction"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CompiledInstruction",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "programIdIndex",
+            "type": "u8"
+          },
+          {
+            "name": "accountIndexes",
+            "docs": [
+              "Indices into the tx's `account_keys` list indicating which accounts to pass to the instruction."
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "docs": [
+              "Instruction data."
+            ],
             "type": "bytes"
           }
         ]

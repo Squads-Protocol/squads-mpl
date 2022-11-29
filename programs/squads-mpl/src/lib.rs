@@ -194,6 +194,29 @@ pub mod squads_mpl {
         Ok(())
     }
 
+    /// NOTE: This way of creating a multisig transaction is highly optimized to minimize
+    ///       the size of the instruction data, so it can be used for `authority_index` up to 255.
+    ///       If you need to support authorities with higher index, use `create_transaction` instead.
+    pub fn create_transaction_v2(ctx: Context<CreateTransactionV2>, args: CreateTransactionV2Args) -> Result<()> {
+        let ms = &mut ctx.accounts.multisig;
+        let authority_index = u32::from(args.authority_index);
+        let authority_bump = match authority_index {
+            1.. => {
+                let (_, auth_bump) = Pubkey::find_program_address(&[
+                    b"squad",
+                    ms.key().as_ref(),
+                    &authority_index.to_le_bytes(),
+                    b"authority"
+                ], ctx.program_id);
+                auth_bump
+            },
+            0 => ms.bump
+        };
+
+        ms.transaction_index =  ms.transaction_index.checked_add(1).unwrap();
+        unimplemented!()
+    }
+
     // instruction to create a transaction
     // each transaction is tied to a single authority, and must be specified when
     // creating the instruction below. authority 0 is reserved for internal
@@ -737,20 +760,40 @@ pub struct AddInstructions<'info> {
     pub system_program: Program<'info, System>
 
     // `remaining_accounts` are MsInstruction accounts.
+}
 
-    // #[account(
-    //     init,
-    //     payer = creator,
-    //     space = 8 + instruction_data.get_max_size(),
-    //     seeds = [
-    //         b"squad",
-    //         transaction.key().as_ref(),
-    //         &transaction.instruction_index.checked_add(1).unwrap().to_le_bytes(),
-    //         b"instruction"
-    //     ], bump,
-    //     constraint = 8 + instruction_data.get_max_size() <= MsInstruction::MAXIMUM_SIZE @MsError::InvalidTransactionState,
-    // )]
-    // pub instruction: Account<'info, MsInstruction>,
+#[derive(Accounts)]
+#[instruction(args: CreateTransactionV2Args)]
+pub struct CreateTransactionV2<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
+    pub multisig: Account<'info, Ms>,
+
+    #[account(
+        init,
+        payer = creator,
+        space = 8 + MsTransactionV2::size_from_args(&args),
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &multisig.transaction_index.checked_add(1).unwrap().to_le_bytes(),
+            b"transaction"
+        ],
+        bump
+    )]
+    pub transaction: Account<'info, MsTransactionV2>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+    pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]

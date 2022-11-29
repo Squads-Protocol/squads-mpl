@@ -92,7 +92,6 @@ pub enum MsTransactionStatus {
     Cancelled,      // Transaction has been cancelled
 }
 
-
 #[account]
 pub struct MsTransaction {
     pub creator: Pubkey,                // creator, used to seed pda
@@ -302,7 +301,6 @@ pub struct IncomingInstruction {
     pub data: Vec<u8>
 }
 
-
 #[derive(AnchorSerialize,AnchorDeserialize,Clone)]
 pub struct AddInstructionsArgs {
     /// The list of unique account public keys (including program IDs) that will be used in the provided instructions.
@@ -321,5 +319,75 @@ pub struct CompressedInstruction {
     pub signer_indexes: Vec<u8>,
     /// Indices into the account_keys list indicating which accounts are writable.
     pub writable_indexes: Vec<u8>,
+    pub data: Vec<u8>
+}
+
+#[derive(AnchorSerialize,AnchorDeserialize,Clone)]
+pub struct CreateTransactionV2Args {
+    /// Authority `0` is reserved for internal instructions,
+    /// whereas authorities 1 or greater refer to a vault, upgrade authority, or other.
+    pub authority_index: u8,
+    /// The number of signer pubkeys in the account_keys vec.
+    pub num_signers: u8,
+    /// The number of writable signer pubkeys in the account_keys vec.
+    pub num_writable_signers: u8,
+    /// The number of writable non-signer pubkeys in the account_keys vec.
+    pub num_writable_non_signers: u8,
+    /// The list of unique account public keys (including program IDs) that will be used in the provided instructions.
+    /// The signer pubkeys appear at the beginning of the vec, with writable pubkeys first, and read-only pubkeys following.
+    /// The non-signer pubkeys follow with writable pubkeys first and read-only ones following.
+    /// Program IDs are also stored at the end of the vec along with other non-signer non-writable pubkeys:
+    ///
+    /// ```plaintext
+    /// [pubkey1, pubkey2, pubkey3, pubkey4, pubkey5, pubkey6, pubkey7, pubkey8]
+    ///  |---writable---|  |---readonly---|  |---writable---|  |---readonly---|
+    ///  |------------signers-------------|  |----------non-singers-----------|
+    /// ```
+    pub account_keys: Vec<Pubkey>,
+    pub instructions: Vec<CompiledInstruction>,
+}
+
+/// Account containing data required for tracking the voting status, and execution of multisig transaction.
+#[account]
+pub struct MsTransactionV2 {
+    /// creator, used to seed pda.
+    pub creator: Pubkey,
+    /// the multisig this belongs to.
+    pub ms: Pubkey,
+    /// used for seed.
+    pub transaction_index: u32,
+    /// index to use for other pdas (?).
+    pub authority_index: u32,
+    /// the bump corresponding to the bespoke authority.
+    pub authority_bump: u8,
+    /// the status of the transaction.
+    pub status: MsTransactionStatus,
+    /// bump for the seed.
+    pub bump: u8,
+    /// keys that have approved/signed.
+    pub approved: Vec<Pubkey>,
+    /// keys that have rejected.
+    pub rejected: Vec<Pubkey>,
+    /// keys that have cancelled (ExecuteReady only).
+    pub cancelled: Vec<Pubkey>,
+    /// unique account pubkeys (including program IDs) required for execution of the tx.
+    pub account_keys: Vec<Pubkey>,
+    /// list of instructions making up the tx.
+    pub instructions: Vec<CompiledInstruction>,
+}
+
+impl MsTransactionV2 {
+    pub fn size_from_args(args: &CreateTransactionV2Args) -> usize {
+        unimplemented!()
+    }
+}
+
+// Concise serialization schema for instructions that make up transaction.
+#[derive(AnchorSerialize,AnchorDeserialize,Clone)]
+pub struct CompiledInstruction {
+    pub program_id_index: u8,
+    /// Indices into the tx's `account_keys` list indicating which accounts to pass to the instruction.
+    pub account_indexes: Vec<u8>,
+    /// Instruction data.
     pub data: Vec<u8>
 }
