@@ -377,7 +377,8 @@ pub struct MsTransactionV2 {
 }
 
 impl MsTransactionV2 {
-    pub fn size_from_args(args: &CreateTransactionV2Args) -> usize {
+    // pub fn size_from_args(args: &CreateTransactionV2Args) -> usize {
+    pub fn size_from_args(args: &[u8]) -> usize {
         unimplemented!()
     }
 }

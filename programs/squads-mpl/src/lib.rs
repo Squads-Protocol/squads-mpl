@@ -197,23 +197,23 @@ pub mod squads_mpl {
     /// NOTE: This way of creating a multisig transaction is highly optimized to minimize
     ///       the size of the instruction data, so it can be used for `authority_index` up to 255.
     ///       If you need to support authorities with higher index, use `create_transaction` instead.
-    pub fn create_transaction_v2(ctx: Context<CreateTransactionV2>, args: CreateTransactionV2Args) -> Result<()> {
-        let ms = &mut ctx.accounts.multisig;
-        let authority_index = u32::from(args.authority_index);
-        let authority_bump = match authority_index {
-            1.. => {
-                let (_, auth_bump) = Pubkey::find_program_address(&[
-                    b"squad",
-                    ms.key().as_ref(),
-                    &authority_index.to_le_bytes(),
-                    b"authority"
-                ], ctx.program_id);
-                auth_bump
-            },
-            0 => ms.bump
-        };
-
-        ms.transaction_index =  ms.transaction_index.checked_add(1).unwrap();
+    pub fn create_transaction_v2(ctx: Context<CreateTransactionV2>, args: Vec<u8>) -> Result<()> {
+        // let ms = &mut ctx.accounts.multisig;
+        // let authority_index = u32::from(args.authority_index);
+        // let authority_bump = match authority_index {
+        //     1.. => {
+        //         let (_, auth_bump) = Pubkey::find_program_address(&[
+        //             b"squad",
+        //             ms.key().as_ref(),
+        //             &authority_index.to_le_bytes(),
+        //             b"authority"
+        //         ], ctx.program_id);
+        //         auth_bump
+        //     },
+        //     0 => ms.bump
+        // };
+        //
+        // ms.transaction_index =  ms.transaction_index.checked_add(1).unwrap();
         unimplemented!()
     }
 
@@ -759,7 +759,7 @@ pub struct AddInstructions<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(args: CreateTransactionV2Args)]
+#[instruction(args: Vec<u8>)]
 pub struct CreateTransactionV2<'info> {
     #[account(
         mut,

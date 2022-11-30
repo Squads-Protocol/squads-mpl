@@ -220,6 +220,11 @@
     },
     {
       "name": "createTransactionV2",
+      "docs": [
+        "NOTE: This way of creating a multisig transaction is highly optimized to minimize",
+        "the size of the instruction data, so it can be used for `authority_index` up to 255.",
+        "If you need to support authorities with higher index, use `create_transaction` instead."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -245,9 +250,7 @@
       "args": [
         {
           "name": "args",
-          "type": {
-            "defined": "CreateTransactionV2Args"
-          }
+          "type": "bytes"
         }
       ]
     },
@@ -886,22 +889,12 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "accountKeys",
+            "name": "authorityIndex",
             "docs": [
-              "The list of unique account public keys (including program IDs) that will be used in the provided instructions.",
-              "The signer pubkeys appear at the beginning of the vec, with writable pubkeys first, and read-only pubkeys following.",
-              "The non-signer pubkeys follow with writable pubkeys first and read-only ones following.",
-              "Program IDs are also stored at the end of the vec along with other non-signer non-writable pubkeys:",
-              "",
-              "```plaintext",
-              "[pubkey1, pubkey2, pubkey3, pubkey4, pubkey5, pubkey6, pubkey7, pubkey8]",
-              "|---writable---|  |---readonly---|  |---writable---|  |---readonly---|",
-              "|------------signers-------------|  |----------non-singers-----------|",
-              "```"
+              "Authority `0` is reserved for internal instructions,",
+              "whereas authorities 1 or greater refer to a vault, upgrade authority, or other."
             ],
-            "type": {
-              "vec": "publicKey"
-            }
+            "type": "u8"
           },
           {
             "name": "numSigners",
@@ -925,12 +918,22 @@
             "type": "u8"
           },
           {
-            "name": "authorityIndex",
+            "name": "accountKeys",
             "docs": [
-              "Authority `0` is reserved for internal instructions,",
-              "whereas authorities 1 or greater refer to a vault, upgrade authority, or other."
+              "The list of unique account public keys (including program IDs) that will be used in the provided instructions.",
+              "The signer pubkeys appear at the beginning of the vec, with writable pubkeys first, and read-only pubkeys following.",
+              "The non-signer pubkeys follow with writable pubkeys first and read-only ones following.",
+              "Program IDs are also stored at the end of the vec along with other non-signer non-writable pubkeys:",
+              "",
+              "```plaintext",
+              "[pubkey1, pubkey2, pubkey3, pubkey4, pubkey5, pubkey6, pubkey7, pubkey8]",
+              "|---writable---|  |---readonly---|  |---writable---|  |---readonly---|",
+              "|------------signers-------------|  |----------non-singers-----------|",
+              "```"
             ],
-            "type": "u8"
+            "type": {
+              "vec": "publicKey"
+            }
           },
           {
             "name": "instructions",
