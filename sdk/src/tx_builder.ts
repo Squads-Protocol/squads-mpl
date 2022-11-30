@@ -8,6 +8,10 @@ import { getAuthorityPDA, getIxPDA, getTxPDA } from "./address";
 import BN from "bn.js";
 import { AnchorProvider } from "@project-serum/anchor";
 import * as anchor from "@project-serum/anchor";
+import * as beet from '@metaplex-foundation/beet';
+import * as beetSolana from '@metaplex-foundation/beet-solana';
+import {smallArray} from "./beets"
+import {uint8Array} from "@metaplex-foundation/beet"
 
 export class TransactionBuilder {
   multisig: MultisigAccount;
@@ -174,23 +178,24 @@ export class TransactionBuilder {
       })
       .map(meta => meta.pubkey);
 
-    return await this.methods
-      .createTransactionV2({
+    const [argsBytes] = createTransactionV2ArgsBeet.serialize({
         authorityIndex: this.authorityIndex,
-        accountKeys,
         numSigners,
         numWritableSigners,
         numWritableNonSigners,
+        accountKeys,
         instructions: instructions.map(ix => {
           return {
             programIdIndex: accountKeys.findIndex(k => k.equals(ix.programId)),
-            accountIndexes: Buffer.from(
-              ix.keys.map(meta => accountKeys.findIndex(k => k.equals(meta.pubkey)))
-            ),
-            data: ix.data,
+            accountIndexes: ix.keys.map(meta => accountKeys.findIndex(k => k.equals(meta.pubkey))),
+            data: [...ix.data],
           }
         }),
-      })
+      }
+    )
+
+    return await this.methods
+      .createTransactionV2(argsBytes)
       .accounts({
         multisig: this.multisig.publicKey,
         transaction: transactionPDA,
@@ -374,3 +379,37 @@ export class TransactionBuilder {
     return [instructions, transactionPDA];
   }
 }
+
+type CompiledMsInstruction = {
+  programIdIndex: number;
+  accountIndexes: number[];
+  data: number[];
+}
+
+const compiledMsInstructionBeet = new beet.FixableBeetArgsStruct<CompiledMsInstruction>([
+    ["programIdIndex", beet.u8],
+    ["accountIndexes", smallArray(beet.u8, beet.u8)],
+    ["data", smallArray(beet.u16, beet.u8)],
+  ],
+  "CompiledMsInstruction"
+)
+
+type CreateTransactionV2Args = {
+  authorityIndex: number,
+  numSigners: number,
+  numWritableSigners: number,
+  numWritableNonSigners: number,
+  accountKeys: PublicKey[],
+  instructions: CompiledMsInstruction[],
+}
+
+const createTransactionV2ArgsBeet = new beet.FixableBeetArgsStruct<CreateTransactionV2Args>([
+    ["authorityIndex", beet.u8],
+    ["numSigners", beet.u8],
+    ["numWritableSigners", beet.u8],
+    ["numWritableNonSigners", beet.u8],
+    ["accountKeys", smallArray(beet.u8, beetSolana.publicKey)],
+    ["instructions", smallArray(beet.u8, compiledMsInstructionBeet)],
+  ],
+  "CreateTransactionV2Args"
+)
