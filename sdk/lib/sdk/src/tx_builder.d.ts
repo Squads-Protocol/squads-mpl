@@ -12,10 +12,8 @@ export declare class TransactionBuilder {
     constructor(methods: SquadsMethodsNamespace, managerMethods: ProgramManagerMethodsNamespace, provider: AnchorProvider, multisig: MultisigAccount, authorityIndex: number, programId: PublicKey, instructions?: TransactionInstruction[]);
     private _buildAddInstruction;
     private _buildAddInstructions;
-    private _buildCreateTransactionV2;
     private _cloneWithInstructions;
     transactionPDA(): PublicKey;
-    createTransactionV2(): Promise<[TransactionInstruction, PublicKey]>;
     withInstruction(instruction: TransactionInstruction): TransactionBuilder;
     withInstructions(instructions: TransactionInstruction[]): TransactionBuilder;
     withAddMember(member: PublicKey): Promise<TransactionBuilder>;

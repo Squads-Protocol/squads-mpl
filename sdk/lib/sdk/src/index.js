@@ -47,6 +47,7 @@ const address_1 = require("./address");
 const bn_js_1 = __importDefault(require("bn.js"));
 const anchor = __importStar(require("@project-serum/anchor"));
 const tx_builder_1 = require("./tx_builder");
+const beets_1 = require("./beets");
 class Squads {
     constructor({ connection, wallet, multisigProgramId, programManagerProgramId, }) {
         this.connection = connection;
@@ -234,6 +235,45 @@ class Squads {
         return __awaiter(this, void 0, void 0, function* () {
             const [methods] = yield this._createTransaction(multisigPDA, authorityIndex, transactionIndex);
             return yield methods.instruction();
+        });
+    }
+    buildCreateTransactionV2(multisigPDA, authorityIndex, message) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const nextTransactionIndex = yield this.getNextTransactionIndex(multisigPDA);
+            const [transactionPDA] = (0, address_1.getTxPDA)(multisigPDA, new bn_js_1.default(nextTransactionIndex, 10), this.multisigProgramId);
+            const createTxInstruction = yield this._buildCreateTransactionV2(multisigPDA, transactionPDA, authorityIndex, message);
+            return [createTxInstruction, transactionPDA];
+        });
+    }
+    _buildCreateTransactionV2(multisigPDA, transactionPDA, authorityIndex, message) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const allResolvableIndexes = new Set([
+                ...message.staticAccountKeys,
+                ...message.addressTableLookups.flatMap((a) => [...a.writableIndexes, ...a.readonlyIndexes]),
+            ]);
+            const [transactionMessageBytes] = beets_1.transactionMessageBeet.serialize({
+                numSigners: message.header.numRequiredSignatures,
+                numWritableSigners: message.header.numRequiredSignatures - message.header.numReadonlySignedAccounts,
+                numWritableNonSigners: message.staticAccountKeys.length - message.header.numRequiredSignatures - message.header.numReadonlyUnsignedAccounts,
+                accountKeys: message.staticAccountKeys,
+                instructions: message.compiledInstructions.map((ix) => {
+                    return {
+                        programIdIndex: ix.programIdIndex,
+                        // This is a temporary hack, MessageV0 shouldn't include into `instruction.accountKeyIndexes` ones
+                        // that are neither in `accountKeys` nor in `addressTableLookups`.
+                        accountIndexes: ix.accountKeyIndexes.filter((i) => allResolvableIndexes.has(i)),
+                        data: Array.from(ix.data),
+                    };
+                }),
+                addressTableLookups: message.addressTableLookups,
+            });
+            return yield this.multisig.methods.createTransactionV2(authorityIndex, transactionMessageBytes)
+                .accounts({
+                multisig: multisigPDA,
+                transaction: transactionPDA,
+                creator: this.provider.wallet.publicKey,
+            })
+                .instruction();
         });
     }
     _addInstruction(multisigPDA, transactionPDA, instruction, instructionIndex) {
@@ -464,10 +504,18 @@ class Squads {
             return yield this.getTransaction(transactionPDA);
         });
     }
-    _executeTransactionV2(transactionPDA, feePayer) {
+    _buildExecuteTransactionV2(transactionPDA, feePayer) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransactionV2(transactionPDA);
             const authorityPda = this.getAuthorityPDA(transaction.ms, transaction.authorityIndex);
+            const addressLookupTableKeys = transaction.message.addressTableLookups.map(({ accountKey }) => accountKey);
+            const addressLookupTableAccounts = yield Promise.all(addressLookupTableKeys.map((key) => __awaiter(this, void 0, void 0, function* () {
+                const { value } = yield this.connection.getAddressLookupTable(key);
+                if (!value) {
+                    throw new Error(`Address lookup table account ${key.toBase58()} not found`);
+                }
+                return value;
+            })));
             // Populate remaining accounts required for execution of the transaction.
             const remainingAccounts = [];
             for (const ix of transaction.message.instructions) {
@@ -476,9 +524,33 @@ class Squads {
                     remainingAccounts.push({ pubkey: programId, isSigner: false, isWritable: false });
                 }
                 for (const accountIndex of ix.accountIndexes) {
-                    const accountKey = transaction.message.accountKeys[accountIndex];
+                    let accountKey = undefined;
+                    if (accountIndex >= transaction.message.accountKeys.length) {
+                        let cursorIndex = transaction.message.accountKeys.length;
+                        for (const lookup of transaction.message.addressTableLookups) {
+                            let indexes = [...lookup.writableIndexes, ...lookup.readonlyIndexes];
+                            const found = indexes.find((index) => index === accountIndex);
+                            if (found) {
+                                const addressLookupTableAccount = addressLookupTableAccounts.find((account) => account.key.equals(lookup.accountKey));
+                                if (!addressLookupTableAccount) {
+                                    throw new Error(`Address lookup table account ${lookup.accountKey.toBase58()} not found`);
+                                }
+                                const lookupIndex = accountIndex - cursorIndex;
+                                accountKey = addressLookupTableAccount.state.addresses[lookupIndex];
+                                break;
+                            }
+                            cursorIndex += indexes.length;
+                        }
+                    }
+                    else {
+                        accountKey = transaction.message.accountKeys[accountIndex];
+                    }
+                    if (!accountKey) {
+                        throw new Error(`Account key not found for index ${accountIndex}`);
+                    }
                     const accountMeta = {
                         pubkey: accountKey,
+                        // FIXME: Take the ATLs into account.
                         isWritable: accountIndex < transaction.message.numWritableSigners
                             || (accountIndex >= transaction.message.numSigners && accountIndex < (transaction.message.numSigners + transaction.message.numWritableNonSigners)),
                         // NOTE: authorityPda cannot be marked as signer because it's a PDA.
@@ -503,25 +575,41 @@ class Squads {
             })
                 .remainingAccounts(remainingAccounts)
                 .instruction();
-            return transactionInstruction;
+            const { blockhash } = yield this.connection.getLatestBlockhash();
+            const messageV0 = new web3_js_1.TransactionMessage({
+                recentBlockhash: blockhash,
+                payerKey: feePayer,
+                instructions: [transactionInstruction],
+            }).compileToV0Message(addressLookupTableAccounts);
+            return new web3_js_1.VersionedTransaction(messageV0);
         });
     }
-    executeTransactionV2(transactionPDA, feePayer, signers, confirmOptions) {
+    buildExecuteTransactionV2(transactionPDA, feePayer) {
         return __awaiter(this, void 0, void 0, function* () {
             const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet.publicKey;
-            const executeIx = yield this._executeTransactionV2(transactionPDA, payer);
-            const { blockhash } = yield this.connection.getLatestBlockhash();
-            const lastValidBlockHeight = yield this.connection.getBlockHeight();
-            const executeTx = new anchor.web3.Transaction({
-                blockhash,
-                lastValidBlockHeight,
-                feePayer: payer,
-            });
-            executeTx.add(executeIx);
-            yield this.provider.sendAndConfirm(executeTx, signers, confirmOptions);
-            return yield this.getTransactionV2(transactionPDA);
+            return yield this._buildExecuteTransactionV2(transactionPDA, payer);
         });
     }
+    // async executeTransactionV2(
+    //   transactionPDA: PublicKey,
+    //   feePayer?: PublicKey,
+    //   signers?: Signer[],
+    //   confirmOptions?: ConfirmOptions
+    // ): Promise<TransactionV2Account> {
+    //   const payer = feePayer ?? this.wallet.publicKey;
+    //   const executeIx = await this._buildExecuteTransactionV2(transactionPDA, payer);
+    //
+    //   const { blockhash } = await this.connection.getLatestBlockhash();
+    //   const lastValidBlockHeight = await this.connection.getBlockHeight();
+    //   const executeTx = new anchor.web3.Transaction({
+    //     blockhash,
+    //     lastValidBlockHeight,
+    //     feePayer: payer,
+    //   });
+    //   executeTx.add(executeIx);
+    //   await this.provider.sendAndConfirm(executeTx, signers, confirmOptions);
+    //   return await this.getTransactionV2(transactionPDA);
+    // }
     buildExecuteTransaction(transactionPDA, feePayer) {
         return __awaiter(this, void 0, void 0, function* () {
             const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet.publicKey;

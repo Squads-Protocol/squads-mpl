@@ -979,6 +979,39 @@ exports.IDL = {
             }
         },
         {
+            "name": "MsMessageAddressTableLookup",
+            "docs": [
+                "Address table lookups describe an on-chain address lookup table to use",
+                "for loading more readonly and writable accounts in a single tx."
+            ],
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "accountKey",
+                        "docs": [
+                            "Address lookup table account key"
+                        ],
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "writableIndexes",
+                        "docs": [
+                            "List of indexes used to load writable account addresses"
+                        ],
+                        "type": "bytes"
+                    },
+                    {
+                        "name": "readonlyIndexes",
+                        "docs": [
+                            "List of indexes used to load readonly account addresses"
+                        ],
+                        "type": "bytes"
+                    }
+                ]
+            }
+        },
+        {
             "name": "MsTransactionMessage",
             "type": {
                 "kind": "struct",
@@ -1021,6 +1054,18 @@ exports.IDL = {
                         "type": {
                             "vec": {
                                 "defined": "MsCompiledInstruction"
+                            }
+                        }
+                    },
+                    {
+                        "name": "addressTableLookups",
+                        "docs": [
+                            "List of address table lookups used to load additional accounts",
+                            "for this transaction."
+                        ],
+                        "type": {
+                            "vec": {
+                                "defined": "MsMessageAddressTableLookup"
                             }
                         }
                     }

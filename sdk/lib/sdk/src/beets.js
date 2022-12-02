@@ -23,9 +23,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.smallArray = exports.fixedSizeSmallArray = void 0;
+exports.transactionMessageBeet = exports.messageAddressTableLookupBeet = exports.compiledMsInstructionBeet = exports.smallArray = exports.fixedSizeSmallArray = void 0;
 const beet_1 = require("@metaplex-foundation/beet");
 const assert = __importStar(require("assert"));
+const beet = __importStar(require("@metaplex-foundation/beet"));
+const beetSolana = __importStar(require("@metaplex-foundation/beet-solana"));
 /**
  * De/Serializes a small array with configurable length prefix and a specific number of elements of type {@link T}
  * which do not all have the same size.
@@ -112,3 +114,21 @@ function smallArray(lengthBeet, element) {
     };
 }
 exports.smallArray = smallArray;
+exports.compiledMsInstructionBeet = new beet.FixableBeetArgsStruct([
+    ["programIdIndex", beet.u8],
+    ["accountIndexes", smallArray(beet.u8, beet.u8)],
+    ["data", smallArray(beet.u16, beet.u8)],
+], "CompiledMsInstruction");
+exports.messageAddressTableLookupBeet = new beet.FixableBeetArgsStruct([
+    ["accountKey", beetSolana.publicKey],
+    ["writableIndexes", smallArray(beet.u8, beet.u8)],
+    ["readonlyIndexes", smallArray(beet.u8, beet.u8)],
+], "MessageAddressTableLookup");
+exports.transactionMessageBeet = new beet.FixableBeetArgsStruct([
+    ["numSigners", beet.u8],
+    ["numWritableSigners", beet.u8],
+    ["numWritableNonSigners", beet.u8],
+    ["accountKeys", smallArray(beet.u8, beetSolana.publicKey)],
+    ["instructions", smallArray(beet.u8, exports.compiledMsInstructionBeet)],
+    ["addressTableLookups", smallArray(beet.u8, exports.messageAddressTableLookupBeet)],
+], "TransactionMessage");

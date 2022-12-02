@@ -1,4 +1,4 @@
-import { Connection, PublicKey, Commitment, ConnectionConfig, TransactionInstruction, Signer, ConfirmOptions } from "@solana/web3.js";
+import { Connection, PublicKey, Commitment, ConnectionConfig, TransactionInstruction, Signer, ConfirmOptions, MessageV0, VersionedTransaction } from "@solana/web3.js";
 import { Wallet } from "@project-serum/anchor/dist/cjs/provider";
 import { InstructionAccount, ManagedProgramAccount, MultisigAccount, ProgramManagerAccount, ProgramUpgradeAccount, TransactionAccount, TransactionV2Account } from "./types";
 import { TransactionBuilder } from "./tx_builder";
@@ -62,6 +62,8 @@ declare class Squads {
     private _createTransaction;
     createTransaction(multisigPDA: PublicKey, authorityIndex: number): Promise<TransactionAccount>;
     buildCreateTransaction(multisigPDA: PublicKey, authorityIndex: number, transactionIndex: number): Promise<TransactionInstruction>;
+    buildCreateTransactionV2(multisigPDA: PublicKey, authorityIndex: number, message: MessageV0): Promise<[TransactionInstruction, PublicKey]>;
+    private _buildCreateTransactionV2;
     private _addInstruction;
     addInstruction(transactionPDA: PublicKey, instruction: TransactionInstruction): Promise<InstructionAccount>;
     buildAddInstruction(multisigPDA: PublicKey, transactionPDA: PublicKey, instruction: TransactionInstruction, instructionIndex: number): Promise<TransactionInstruction>;
@@ -81,8 +83,8 @@ declare class Squads {
     buildCancelTransaction(multisigPDA: PublicKey, transactionPDA: PublicKey): Promise<TransactionInstruction>;
     private _executeTransaction;
     executeTransaction(transactionPDA: PublicKey, feePayer?: PublicKey, signers?: Signer[]): Promise<TransactionAccount>;
-    private _executeTransactionV2;
-    executeTransactionV2(transactionPDA: PublicKey, feePayer?: PublicKey, signers?: Signer[], confirmOptions?: ConfirmOptions): Promise<TransactionV2Account>;
+    private _buildExecuteTransactionV2;
+    buildExecuteTransactionV2(transactionPDA: PublicKey, feePayer?: PublicKey): Promise<VersionedTransaction>;
     buildExecuteTransaction(transactionPDA: PublicKey, feePayer?: PublicKey): Promise<TransactionInstruction>;
     private _executeInstruction;
     executeInstruction(transactionPDA: PublicKey, instructionPDA: PublicKey): Promise<InstructionAccount>;

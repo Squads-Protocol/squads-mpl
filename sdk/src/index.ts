@@ -4,7 +4,13 @@ import {
   Commitment,
   ConnectionConfig,
   TransactionInstruction,
-  Signer, ConfirmOptions, AccountMeta,
+  Signer,
+  ConfirmOptions,
+  AccountMeta,
+  MessageV0,
+  VersionedTransaction,
+  TransactionMessage,
+  MessageAddressTableLookup,
 } from "@solana/web3.js"
 import {
   DEFAULT_MULTISIG_PROGRAM_ID,
@@ -15,7 +21,7 @@ import { SquadsMpl } from "../../target/types/squads_mpl";
 import programManagerJSON from "../../target/idl/program_manager.json";
 import { ProgramManager } from "../../target/types/program_manager";
 import { Wallet } from "@project-serum/anchor/dist/cjs/provider";
-import { AnchorProvider, Program } from "@project-serum/anchor";
+import {AnchorProvider, Program, web3} from "@project-serum/anchor"
 import {
   InstructionAccount,
   ManagedProgramAccount,
@@ -37,6 +43,7 @@ import {
 import BN from "bn.js";
 import * as anchor from "@project-serum/anchor";
 import { TransactionBuilder } from "./tx_builder";
+import {transactionMessageBeet} from "./beets"
 
 class Squads {
   readonly connection: Connection;
@@ -395,6 +402,62 @@ class Squads {
     );
     return await methods.instruction();
   }
+  async buildCreateTransactionV2(
+    multisigPDA: PublicKey,
+    authorityIndex: number,
+    message: MessageV0,
+  ): Promise<[TransactionInstruction, PublicKey]> {
+    const nextTransactionIndex = await this.getNextTransactionIndex(
+      multisigPDA
+    );
+    const [transactionPDA] = getTxPDA(
+      multisigPDA,
+      new BN(nextTransactionIndex, 10),
+      this.multisigProgramId
+    );
+    const createTxInstruction = await this._buildCreateTransactionV2(multisigPDA, transactionPDA, authorityIndex, message);
+
+    return [createTxInstruction, transactionPDA];
+  }
+  private async _buildCreateTransactionV2(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey,
+    authorityIndex: number,
+    message: MessageV0,
+  ): Promise<TransactionInstruction> {
+    const allResolvableIndexes = new Set([
+      ...message.staticAccountKeys,
+      ...message.addressTableLookups.flatMap(
+        (a) => [...a.writableIndexes, ...a.readonlyIndexes]
+      ),
+    ]);
+
+    const [transactionMessageBytes] = transactionMessageBeet.serialize({
+        numSigners: message.header.numRequiredSignatures,
+        numWritableSigners: message.header.numRequiredSignatures - message.header.numReadonlySignedAccounts,
+        numWritableNonSigners: message.staticAccountKeys.length - message.header.numRequiredSignatures - message.header.numReadonlyUnsignedAccounts,
+        accountKeys: message.staticAccountKeys,
+        instructions: message.compiledInstructions.map((ix) => {
+          return {
+            programIdIndex: ix.programIdIndex,
+            // This is a temporary hack, MessageV0 shouldn't include into `instruction.accountKeyIndexes` ones
+            // that are neither in `accountKeys` nor in `addressTableLookups`. We saw it happen with soma Program IDs.
+            accountIndexes: ix.accountKeyIndexes.filter((i) => allResolvableIndexes.has(i)),
+            data: Array.from(ix.data),
+          }
+        }),
+        addressTableLookups: message.addressTableLookups,
+      }
+    )
+
+    return await this.multisig.methods.createTransactionV2(authorityIndex, transactionMessageBytes)
+      .accounts({
+        multisig: multisigPDA,
+        transaction: transactionPDA,
+        creator: this.provider.wallet.publicKey,
+      })
+      .instruction();
+  }
   private async _addInstruction(
     multisigPDA: PublicKey,
     transactionPDA: PublicKey,
@@ -700,12 +763,21 @@ class Squads {
     await this.provider.sendAndConfirm(executeTx, signers);
     return await this.getTransaction(transactionPDA);
   }
-  private async _executeTransactionV2(
+  private async _buildExecuteTransactionV2(
     transactionPDA: PublicKey,
     feePayer: PublicKey
-  ): Promise<TransactionInstruction> {
+  ): Promise<VersionedTransaction> {
     const transaction = await this.getTransactionV2(transactionPDA);
     const authorityPda = this.getAuthorityPDA(transaction.ms, transaction.authorityIndex);
+
+    const addressLookupTableKeys: PublicKey[] = (transaction.message.addressTableLookups as any).map(({ accountKey }: { accountKey: anchor.web3.PublicKey }) => accountKey)
+    const addressLookupTableAccounts = await Promise.all(addressLookupTableKeys.map(async (key) => {
+      const { value } = await this.connection.getAddressLookupTable(key)
+      if (!value) {
+        throw new Error(`Address lookup table account ${key.toBase58()} not found`)
+      }
+      return value
+    }))
 
     // Populate remaining accounts required for execution of the transaction.
     const remainingAccounts: AccountMeta[] = [];
@@ -717,17 +789,45 @@ class Squads {
       }
 
       for (const accountIndex of ix.accountIndexes) {
-        const accountKey = transaction.message.accountKeys[accountIndex];
+        let accountKey: PublicKey | undefined = undefined;
+        if (accountIndex >= transaction.message.accountKeys.length) {
+          let cursorIndex = transaction.message.accountKeys.length
+          for (const lookup of transaction.message.addressTableLookups as MessageAddressTableLookup[]) {
+            let indexes = [...lookup.writableIndexes, ...lookup.readonlyIndexes]
+            const found = indexes.find((index) => index === accountIndex)
+
+            if (found) {
+              const addressLookupTableAccount = addressLookupTableAccounts.find((account) => account.key.equals(lookup.accountKey))
+              if (!addressLookupTableAccount) {
+                throw new Error(`Address lookup table account ${lookup.accountKey.toBase58()} not found`)
+              }
+
+              const lookupIndex = accountIndex - cursorIndex
+
+              accountKey = addressLookupTableAccount.state.addresses[lookupIndex]
+              break
+            }
+
+            cursorIndex += indexes.length
+          }
+        } else {
+          accountKey = transaction.message.accountKeys[accountIndex];
+        }
+
+        if (!accountKey) {
+          throw new Error(`Account key not found for index ${accountIndex}`);
+        }
 
         const accountMeta: AccountMeta = {
           pubkey: accountKey,
+          // FIXME: Take the ATLs into account.
           isWritable: accountIndex < transaction.message.numWritableSigners
             || (accountIndex >= transaction.message.numSigners && accountIndex < (transaction.message.numSigners + transaction.message.numWritableNonSigners)),
           // NOTE: authorityPda cannot be marked as signer because it's a PDA.
           isSigner: accountIndex < transaction.message.numSigners && !accountKey.equals(authorityPda)
         }
 
-        const foundMeta = remainingAccounts.find(k => k.pubkey.equals(accountKey))
+        const foundMeta = remainingAccounts.find(k => k.pubkey.equals(accountKey!))
         if (!foundMeta) {
           remainingAccounts.push(accountMeta);
         } else {
@@ -747,28 +847,44 @@ class Squads {
       .remainingAccounts(remainingAccounts)
       .instruction()
 
-    return transactionInstruction;
+    const { blockhash } = await this.connection.getLatestBlockhash();
+
+    const messageV0 = new TransactionMessage({
+      recentBlockhash: blockhash,
+      payerKey: feePayer,
+      instructions: [transactionInstruction],
+    }).compileToV0Message(addressLookupTableAccounts);
+
+    return new VersionedTransaction(messageV0);
   }
-  async executeTransactionV2(
+  async buildExecuteTransactionV2(
     transactionPDA: PublicKey,
     feePayer?: PublicKey,
-    signers?: Signer[],
-    confirmOptions?: ConfirmOptions
-  ): Promise<TransactionV2Account> {
+  ): Promise<VersionedTransaction> {
     const payer = feePayer ?? this.wallet.publicKey;
-    const executeIx = await this._executeTransactionV2(transactionPDA, payer);
 
-    const { blockhash } = await this.connection.getLatestBlockhash();
-    const lastValidBlockHeight = await this.connection.getBlockHeight();
-    const executeTx = new anchor.web3.Transaction({
-      blockhash,
-      lastValidBlockHeight,
-      feePayer: payer,
-    });
-    executeTx.add(executeIx);
-    await this.provider.sendAndConfirm(executeTx, signers, confirmOptions);
-    return await this.getTransactionV2(transactionPDA);
+    return await this._buildExecuteTransactionV2(transactionPDA, payer);
   }
+  // async executeTransactionV2(
+  //   transactionPDA: PublicKey,
+  //   feePayer?: PublicKey,
+  //   signers?: Signer[],
+  //   confirmOptions?: ConfirmOptions
+  // ): Promise<TransactionV2Account> {
+  //   const payer = feePayer ?? this.wallet.publicKey;
+  //   const executeIx = await this._buildExecuteTransactionV2(transactionPDA, payer);
+  //
+  //   const { blockhash } = await this.connection.getLatestBlockhash();
+  //   const lastValidBlockHeight = await this.connection.getBlockHeight();
+  //   const executeTx = new anchor.web3.Transaction({
+  //     blockhash,
+  //     lastValidBlockHeight,
+  //     feePayer: payer,
+  //   });
+  //   executeTx.add(executeIx);
+  //   await this.provider.sendAndConfirm(executeTx, signers, confirmOptions);
+  //   return await this.getTransactionV2(transactionPDA);
+  // }
 
   async buildExecuteTransaction(
     transactionPDA: PublicKey,

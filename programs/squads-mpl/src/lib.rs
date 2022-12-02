@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::convert::From;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
@@ -713,14 +714,12 @@ pub mod squads_mpl {
                 .account_indexes
                 .iter()
                 .map(|account_index| {
-                    let account_key = transaction_message.account_keys.get(*account_index as usize).unwrap();
+                    let account_key = transaction_message.account_keys.get(usize::from(*account_index)).unwrap();
 
                     let account_info = ctx.remaining_accounts.iter().find(|account_info| account_info.key == account_key).unwrap();
 
                     let is_signer = account_index < &transaction_message.num_signers;
-                    let is_writable = account_index < &transaction_message.num_writable_signers
-                        || account_index >= &transaction_message.num_signers
-                        && account_index < &(transaction_message.num_signers + transaction_message.num_writable_non_signers);
+                    let is_writable = transaction_message.is_writable_index(usize::from(*account_index));
 
                     let account_meta = if is_writable {
                         AccountMeta::new(*account_key, is_signer)

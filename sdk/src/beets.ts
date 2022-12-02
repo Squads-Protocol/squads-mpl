@@ -6,6 +6,9 @@ import {
   FixedSizeBeet,
 } from "@metaplex-foundation/beet"
 import * as assert from "assert"
+import * as beet from "@metaplex-foundation/beet"
+import {PublicKey} from "@solana/web3.js"
+import * as beetSolana from "@metaplex-foundation/beet-solana"
 
 /**
  * De/Serializes a small array with configurable length prefix and a specific number of elements of type {@link T}
@@ -119,3 +122,54 @@ export function smallArray<T, V = Partial<T>>(
     description: `smallArray`,
   }
 }
+
+export type CompiledMsInstruction = {
+  programIdIndex: number;
+  accountIndexes: number[];
+  data: number[];
+}
+
+export const compiledMsInstructionBeet = new beet.FixableBeetArgsStruct<CompiledMsInstruction>([
+    ["programIdIndex", beet.u8],
+    ["accountIndexes", smallArray(beet.u8, beet.u8)],
+    ["data", smallArray(beet.u16, beet.u8)],
+  ],
+  "CompiledMsInstruction"
+)
+
+export type MessageAddressTableLookup = {
+  /** Address lookup table account key */
+  accountKey: PublicKey,
+  /** List of indexes used to load writable account addresses */
+  writableIndexes: number[],
+  /** List of indexes used to load readonly account addresses */
+  readonlyIndexes: number[],
+}
+
+export const messageAddressTableLookupBeet = new beet.FixableBeetArgsStruct<MessageAddressTableLookup>([
+    ["accountKey", beetSolana.publicKey],
+    ["writableIndexes", smallArray(beet.u8, beet.u8)],
+    ["readonlyIndexes", smallArray(beet.u8, beet.u8)],
+  ],
+  "MessageAddressTableLookup"
+)
+
+export type TransactionMessage = {
+  numSigners: number,
+  numWritableSigners: number,
+  numWritableNonSigners: number,
+  accountKeys: PublicKey[],
+  instructions: CompiledMsInstruction[],
+  addressTableLookups: MessageAddressTableLookup[],
+}
+
+export const transactionMessageBeet = new beet.FixableBeetArgsStruct<TransactionMessage>([
+    ["numSigners", beet.u8],
+    ["numWritableSigners", beet.u8],
+    ["numWritableNonSigners", beet.u8],
+    ["accountKeys", smallArray(beet.u8, beetSolana.publicKey)],
+    ["instructions", smallArray(beet.u8, compiledMsInstructionBeet)],
+    ["addressTableLookups", smallArray(beet.u8, messageAddressTableLookupBeet)],
+  ],
+  "TransactionMessage"
+)

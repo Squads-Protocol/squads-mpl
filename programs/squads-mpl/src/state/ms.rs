@@ -342,6 +342,9 @@ pub struct TransactionMessage {
     /// ```
     pub account_keys: Vec<Pubkey>,
     pub instructions: Vec<CompiledInstruction>,
+    /// List of address table lookups used to load additional accounts
+    /// for this transaction.
+    pub address_table_lookups: Vec<MessageAddressTableLookup>,
 }
 
 impl AnchorDeserialize for TransactionMessage {
@@ -366,13 +369,79 @@ impl AnchorDeserialize for TransactionMessage {
             instructions
         };
 
+        let address_table_lookups_len = u8::deserialize(input)?;
+        let address_table_lookups = {
+            let mut address_table_lookups = Vec::new();
+            for _ in 0..address_table_lookups_len {
+                address_table_lookups.push(MessageAddressTableLookup::deserialize(input)?);
+            }
+            address_table_lookups
+        };
+
         Ok(Self {
             num_signers,
             num_writable_signers,
             num_writable_non_signers,
             account_keys,
             instructions,
+            address_table_lookups,
         })
+    }
+}
+
+/// Address table lookups describe an on-chain address lookup table to use
+/// for loading more readonly and writable accounts in a single tx.
+#[derive(AnchorSerialize, Clone)]
+pub struct MessageAddressTableLookup {
+    /// Address lookup table account key
+    pub account_key: Pubkey,
+    /// List of indexes used to load writable account addresses
+    pub writable_indexes: Vec<u8>,
+    /// List of indexes used to load readonly account addresses
+    pub readonly_indexes: Vec<u8>,
+}
+
+impl AnchorDeserialize for MessageAddressTableLookup {
+    fn deserialize(input: &mut &[u8]) -> std::io::Result<Self> {
+        let account_key = Pubkey::deserialize(input)?;
+
+        // `writable_indexes` are serialized as a smallvec
+        let writable_indexes_len = u8::deserialize(input)?;
+        let writable_indexes = u8::vec_from_bytes(writable_indexes_len.into(), input)?
+            .ok_or(std::io::ErrorKind::InvalidInput)?;
+
+        // `readonly_indexes` are serialized as a smallvec
+        let readonly_indexes_len = u8::deserialize(input)?;
+        let readonly_indexes = u8::vec_from_bytes(readonly_indexes_len.into(), input)?
+            .ok_or(std::io::ErrorKind::InvalidInput)?;
+
+        Ok(Self {
+            account_key,
+            writable_indexes,
+            readonly_indexes,
+        })
+    }
+}
+
+/// Address table lookups describe an on-chain address lookup table to use
+/// for loading more readonly and writable accounts in a single tx.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct MsMessageAddressTableLookup {
+    /// Address lookup table account key
+    pub account_key: Pubkey,
+    /// List of indexes used to load writable account addresses
+    pub writable_indexes: Vec<u8>,
+    /// List of indexes used to load readonly account addresses
+    pub readonly_indexes: Vec<u8>,
+}
+
+impl From<MessageAddressTableLookup> for MsMessageAddressTableLookup {
+    fn from(m: MessageAddressTableLookup) -> Self {
+        Self {
+            account_key: m.account_key,
+            writable_indexes: m.writable_indexes,
+            readonly_indexes: m.readonly_indexes,
+        }
     }
 }
 
@@ -388,6 +457,32 @@ pub struct MsTransactionMessage {
     pub account_keys: Vec<Pubkey>,
     /// list of instructions making up the tx.
     pub instructions: Vec<MsCompiledInstruction>,
+    /// List of address table lookups used to load additional accounts
+    /// for this transaction.
+    pub address_table_lookups: Vec<MsMessageAddressTableLookup>,
+}
+
+impl MsTransactionMessage {
+    /// Returns true if the account at the specified index was requested to be
+    /// writable.
+    pub fn is_writable_index(&self, key_index: usize) -> bool {
+        let num_account_keys = self.account_keys.len();
+        let num_signers = usize::from(self.num_signers);
+        if key_index >= num_account_keys {
+            let loaded_addresses_index = key_index.saturating_sub(num_account_keys);
+            let num_writable_dynamic_addresses = self
+                .address_table_lookups
+                .iter()
+                .map(|lookup| lookup.writable_indexes.len())
+                .sum();
+            loaded_addresses_index < num_writable_dynamic_addresses
+        } else if key_index >= num_signers {
+            let unsigned_account_index = key_index.saturating_sub(num_signers);
+            unsigned_account_index < usize::from(self.num_writable_non_signers)
+        } else {
+            key_index < usize::from(self.num_writable_signers)
+        }
+    }
 }
 
 impl From<TransactionMessage> for MsTransactionMessage {
@@ -397,7 +492,8 @@ impl From<TransactionMessage> for MsTransactionMessage {
             num_writable_signers: message.num_writable_signers,
             num_writable_non_signers: message.num_writable_non_signers,
             account_keys: message.account_keys,
-            instructions: message.instructions.into_iter().map(MsCompiledInstruction::from).collect()
+            instructions: message.instructions.into_iter().map(MsCompiledInstruction::from).collect(),
+            address_table_lookups: message.address_table_lookups.into_iter().map(MsMessageAddressTableLookup::from).collect()
         }
     }
 }

@@ -1,17 +1,9 @@
-import {
-  MultisigAccount,
-  ProgramManagerMethodsNamespace,
-  SquadsMethodsNamespace,
-} from "./types";
-import {AccountMeta, PublicKey, TransactionInstruction} from "@solana/web3.js"
-import { getAuthorityPDA, getIxPDA, getTxPDA } from "./address";
-import BN from "bn.js";
-import { AnchorProvider } from "@project-serum/anchor";
-import * as anchor from "@project-serum/anchor";
-import * as beet from '@metaplex-foundation/beet';
-import * as beetSolana from '@metaplex-foundation/beet-solana';
-import {smallArray} from "./beets"
-import {uint8Array} from "@metaplex-foundation/beet"
+import {MultisigAccount, ProgramManagerMethodsNamespace, SquadsMethodsNamespace,} from "./types"
+import {PublicKey, TransactionInstruction} from "@solana/web3.js"
+import {getAuthorityPDA, getIxPDA, getTxPDA} from "./address"
+import BN from "bn.js"
+import * as anchor from "@project-serum/anchor"
+import {AnchorProvider} from "@project-serum/anchor"
 
 export class TransactionBuilder {
   multisig: MultisigAccount;
@@ -112,96 +104,6 @@ export class TransactionBuilder {
       )
       .instruction();
   }
-
-  private async _buildCreateTransactionV2(
-    transactionPDA: PublicKey,
-    instructions: TransactionInstruction[],
-  ): Promise<TransactionInstruction> {
-    // Populate unique account keys.
-    const accountMetas: AccountMeta[] = [];
-    for (const ix of instructions) {
-      if (!accountMetas.find(k => k.pubkey.equals(ix.programId))) {
-        accountMetas.push({ pubkey: ix.programId, isSigner: false, isWritable: false });
-      }
-
-      for (const meta of ix.keys) {
-        const foundMeta = accountMetas.find(k => k.pubkey.equals(meta.pubkey))
-        if (!foundMeta) {
-          accountMetas.push(meta);
-        } else {
-          foundMeta.isSigner ||= meta.isSigner;
-          foundMeta.isWritable ||= meta.isWritable;
-        }
-      }
-    }
-
-    const {
-      numSigners,
-      numWritableSigners,
-      numWritableNonSigners
-    } = accountMetas.reduce((res, meta) => {
-      if (meta.isSigner) {
-        res.numSigners += 1;
-        if (meta.isWritable) {
-          res.numWritableSigners += 1;
-        }
-      } else if (meta.isWritable) {
-        res.numWritableNonSigners += 1;
-      }
-
-      return res;
-    }, {
-      numSigners: 0,
-      numWritableSigners: 0,
-      numWritableNonSigners: 0
-    })
-
-    const accountKeys = accountMetas.sort(
-      (a, b) => {
-        // Signers come before non-signers.
-        if (a.isSigner && !b.isSigner) {
-          return -1;
-        }
-        if (!a.isSigner && b.isSigner) {
-          return 1;
-        }
-
-        // Writable come before read-only.
-        if (a.isWritable && !b.isWritable) {
-          return -1;
-        }
-        if (!a.isWritable && b.isWritable) {
-          return 1;
-        }
-
-        return 0;
-      })
-      .map(meta => meta.pubkey);
-
-    const [transactionMessageBytes] = transactionMessageBeet.serialize({
-        numSigners,
-        numWritableSigners,
-        numWritableNonSigners,
-        accountKeys,
-        instructions: instructions.map(ix => {
-          return {
-            programIdIndex: accountKeys.findIndex(k => k.equals(ix.programId)),
-            accountIndexes: ix.keys.map(meta => accountKeys.findIndex(k => k.equals(meta.pubkey))),
-            data: [...ix.data],
-          }
-        }),
-      }
-    )
-
-    return await this.methods
-      .createTransactionV2(this.authorityIndex, transactionMessageBytes)
-      .accounts({
-        multisig: this.multisig.publicKey,
-        transaction: transactionPDA,
-        creator: this.provider.wallet.publicKey,
-      })
-      .instruction();
-  }
   private _cloneWithInstructions(
     instructions: TransactionInstruction[]
   ): TransactionBuilder {
@@ -222,12 +124,6 @@ export class TransactionBuilder {
       this.programId
     );
     return transactionPDA;
-  }
-  async createTransactionV2(): Promise<[TransactionInstruction, PublicKey]> {
-    const transactionPDA = this.transactionPDA();
-    const createTxInstruction = await this._buildCreateTransactionV2(transactionPDA, this.instructions);
-    this.instructions = [];
-    return [createTxInstruction, transactionPDA];
   }
   withInstruction(instruction: TransactionInstruction): TransactionBuilder {
     return this._cloneWithInstructions(this.instructions.concat(instruction));
@@ -378,35 +274,3 @@ export class TransactionBuilder {
     return [instructions, transactionPDA];
   }
 }
-
-type CompiledMsInstruction = {
-  programIdIndex: number;
-  accountIndexes: number[];
-  data: number[];
-}
-
-const compiledMsInstructionBeet = new beet.FixableBeetArgsStruct<CompiledMsInstruction>([
-    ["programIdIndex", beet.u8],
-    ["accountIndexes", smallArray(beet.u8, beet.u8)],
-    ["data", smallArray(beet.u16, beet.u8)],
-  ],
-  "CompiledMsInstruction"
-)
-
-type TransactionMessage = {
-  numSigners: number,
-  numWritableSigners: number,
-  numWritableNonSigners: number,
-  accountKeys: PublicKey[],
-  instructions: CompiledMsInstruction[],
-}
-
-const transactionMessageBeet = new beet.FixableBeetArgsStruct<TransactionMessage>([
-    ["numSigners", beet.u8],
-    ["numWritableSigners", beet.u8],
-    ["numWritableNonSigners", beet.u8],
-    ["accountKeys", smallArray(beet.u8, beetSolana.publicKey)],
-    ["instructions", smallArray(beet.u8, compiledMsInstructionBeet)]
-  ],
-  "TransactionMessage"
-)
