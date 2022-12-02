@@ -454,9 +454,24 @@ impl MsTransactionV2 {
         Ok(())
     }
 
-    pub fn size_from_transaction_message(transaction_message: &[u8]) -> usize {
-        // FIXME: calculate the actual size
-        3000
+    // the minimum size without the approved/rejected vecs
+    pub const MINIMUM_SIZE: usize =
+        8 +                                 // anchor discriminator
+        32 +                                // the creator pubkey
+        32 +                                // the multisig key
+        4 +                                 // the transaction index
+        4 +                                 // the authority index (for this transaction)
+        1 +                                 // the authority bump
+        (1 + 12) +                          // the enum size
+        1;                                  // tx bump
+
+    pub fn size_from_members_and_transaction_message(members_len: usize, transaction_message: &[u8]) -> usize {
+        let vote_vecs_size = 3 * (4 + (members_len * 32));
+
+        let transaction_message: MsTransactionMessage = TransactionMessage::deserialize(&mut &transaction_message[..]).unwrap().into();
+        let message_size = get_instance_packed_len(&transaction_message).unwrap_or_default();
+
+        MsTransactionV2::MINIMUM_SIZE + vote_vecs_size + message_size
     }
 
     // change status to Active
