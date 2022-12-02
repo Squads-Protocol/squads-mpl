@@ -222,93 +222,6 @@ exports.IDL = {
             ]
         },
         {
-            "name": "createTransactionV2",
-            "docs": [
-                "NOTE: This way of creating a multisig transaction is highly optimized to minimize",
-                "the size of the instruction data, so it can be used for `authority_index` up to 255.",
-                "If you need to support authorities with higher index, use `create_transaction` instead."
-            ],
-            "accounts": [
-                {
-                    "name": "multisig",
-                    "isMut": true,
-                    "isSigner": false
-                },
-                {
-                    "name": "transaction",
-                    "isMut": true,
-                    "isSigner": false
-                },
-                {
-                    "name": "creator",
-                    "isMut": true,
-                    "isSigner": true
-                },
-                {
-                    "name": "systemProgram",
-                    "isMut": false,
-                    "isSigner": false
-                }
-            ],
-            "args": [
-                {
-                    "name": "authorityIndex",
-                    "type": "u8"
-                },
-                {
-                    "name": "transactionMessage",
-                    "type": "bytes"
-                }
-            ]
-        },
-        {
-            "name": "approveTransactionV2",
-            "accounts": [
-                {
-                    "name": "multisig",
-                    "isMut": false,
-                    "isSigner": false
-                },
-                {
-                    "name": "transaction",
-                    "isMut": true,
-                    "isSigner": false
-                },
-                {
-                    "name": "member",
-                    "isMut": true,
-                    "isSigner": true
-                },
-                {
-                    "name": "systemProgram",
-                    "isMut": false,
-                    "isSigner": false
-                }
-            ],
-            "args": []
-        },
-        {
-            "name": "executeTransactionV2",
-            "accounts": [
-                {
-                    "name": "multisig",
-                    "isMut": true,
-                    "isSigner": false
-                },
-                {
-                    "name": "transaction",
-                    "isMut": true,
-                    "isSigner": false
-                },
-                {
-                    "name": "member",
-                    "isMut": true,
-                    "isSigner": true
-                }
-            ],
-            "args": []
-        },
-        {
             "name": "createTransaction",
             "accounts": [
                 {
@@ -558,6 +471,145 @@ exports.IDL = {
                 },
                 {
                     "name": "instruction",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "member",
+                    "isMut": true,
+                    "isSigner": true
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "createTransactionV2",
+            "docs": [
+                "NOTE: This way of creating a multisig transaction is highly optimized to minimize",
+                "the size of the instruction data, so it can be used for `authority_index` up to 255.",
+                "If you need to support authorities with higher index, use `create_transaction` instead."
+            ],
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "transaction",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "creator",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": [
+                {
+                    "name": "authorityIndex",
+                    "type": "u8"
+                },
+                {
+                    "name": "transactionMessage",
+                    "type": "bytes"
+                }
+            ]
+        },
+        {
+            "name": "approveTransactionV2",
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "transaction",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "member",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "rejectTransactionV2",
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "transaction",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "member",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "cancelTransactionV2",
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "transaction",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "member",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "executeTransactionV2",
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "transaction",
                     "isMut": true,
                     "isSigner": false
                 },
@@ -1047,44 +1099,49 @@ exports.IDL = {
         },
         {
             "code": 6004,
+            "name": "InvalidAuthorityIndex"
+        },
+        {
+            "code": 6005,
+            "name": "TransactionAlreadyExecuted"
+        },
+        {
+            "code": 6006,
+            "name": "CannotRemoveSoloMember"
+        },
+        {
+            "code": 6007,
+            "name": "InvalidThreshold"
+        },
+        {
+            "code": 6008,
+            "name": "DeprecatedTransaction"
+        },
+        {
+            "code": 6009,
+            "name": "InstructionFailed"
+        },
+        {
+            "code": 6010,
+            "name": "MaxMembersReached"
+        },
+        {
+            "code": 6011,
+            "name": "EmptyMembers"
+        },
+        {
+            "code": 6012,
+            "name": "PartialExecution"
+        },
+        {
+            "code": 6013,
             "name": "InvalidInstructionCount",
             "msg": "Number of instruction arguments does not match number of instruction accounts."
         },
         {
-            "code": 6005,
-            "name": "InvalidAuthorityIndex"
-        },
-        {
-            "code": 6006,
-            "name": "TransactionAlreadyExecuted"
-        },
-        {
-            "code": 6007,
-            "name": "CannotRemoveSoloMember"
-        },
-        {
-            "code": 6008,
-            "name": "InvalidThreshold"
-        },
-        {
-            "code": 6009,
-            "name": "DeprecatedTransaction"
-        },
-        {
-            "code": 6010,
-            "name": "InstructionFailed"
-        },
-        {
-            "code": 6011,
-            "name": "MaxMembersReached"
-        },
-        {
-            "code": 6012,
-            "name": "EmptyMembers"
-        },
-        {
-            "code": 6013,
-            "name": "PartialExecution"
+            "code": 6014,
+            "name": "InvalidRemainingAccount",
+            "msg": "Remaining account is not a part of transaction message."
         }
     ]
 };

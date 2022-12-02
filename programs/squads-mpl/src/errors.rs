@@ -6,8 +6,6 @@ pub enum MsError {
     InvalidTransactionState,
     InvalidNumberOfAccounts,
     InvalidInstructionAccount,
-    #[msg("Number of instruction arguments does not match number of instruction accounts.")]
-    InvalidInstructionCount,
     InvalidAuthorityIndex,
     TransactionAlreadyExecuted,
     CannotRemoveSoloMember,
@@ -17,4 +15,8 @@ pub enum MsError {
     MaxMembersReached,
     EmptyMembers,
     PartialExecution,
+    #[msg("Number of instruction arguments does not match number of instruction accounts.")]
+    InvalidInstructionCount,
+    #[msg("Remaining account is not a part of transaction message.")]
+    InvalidRemainingAccount,
 }
