@@ -197,24 +197,113 @@ pub mod squads_mpl {
     /// NOTE: This way of creating a multisig transaction is highly optimized to minimize
     ///       the size of the instruction data, so it can be used for `authority_index` up to 255.
     ///       If you need to support authorities with higher index, use `create_transaction` instead.
-    pub fn create_transaction_v2(ctx: Context<CreateTransactionV2>, args: Vec<u8>) -> Result<()> {
-        // let ms = &mut ctx.accounts.multisig;
-        // let authority_index = u32::from(args.authority_index);
-        // let authority_bump = match authority_index {
-        //     1.. => {
-        //         let (_, auth_bump) = Pubkey::find_program_address(&[
-        //             b"squad",
-        //             ms.key().as_ref(),
-        //             &authority_index.to_le_bytes(),
-        //             b"authority"
-        //         ], ctx.program_id);
-        //         auth_bump
-        //     },
-        //     0 => ms.bump
-        // };
-        //
-        // ms.transaction_index =  ms.transaction_index.checked_add(1).unwrap();
-        unimplemented!()
+    pub fn create_transaction_v2(ctx: Context<CreateTransactionV2>, authority_index: u8, transaction_message: Vec<u8>) -> Result<()> {
+        let transaction_message = TransactionMessage::deserialize(&mut transaction_message.as_slice())?;
+
+        let ms = &mut ctx.accounts.multisig;
+        let authority_index = u32::from(authority_index);
+        let (_, authority_bump) = Pubkey::find_program_address(&[
+            b"squad",
+            ms.key().as_ref(),
+            &authority_index.to_le_bytes(),
+            b"authority"
+        ], ctx.program_id);
+
+        ms.transaction_index =  ms.transaction_index.checked_add(1).unwrap();
+        ctx.accounts.transaction.init(
+            ctx.accounts.creator.key(),
+            ms.key(),
+            ms.transaction_index,
+            *ctx.bumps.get("transaction").unwrap(),
+            authority_index,
+            authority_bump,
+            transaction_message,
+        )
+    }
+
+    // instruction to approve a transaction on behalf of a member
+    // the transaction must have an "active" status
+    pub fn approve_transaction_v2(ctx: Context<VoteTransactionV2>) -> Result<()> {
+        // if they have previously voted to reject, remove that item (change vote check)
+        if let Some(ind) = ctx.accounts.transaction.has_voted_reject(ctx.accounts.member.key()) { ctx.accounts.transaction.remove_reject(ind)?; }
+
+        // if they haven't already approved
+        if ctx.accounts.transaction.has_voted_approve(ctx.accounts.member.key()).is_none() { ctx.accounts.transaction.sign(ctx.accounts.member.key())?; }
+
+        // if current number of signers reaches threshold, mark the transaction as execute ready
+        if ctx.accounts.transaction.approved.len() >= usize::from(ctx.accounts.multisig.threshold) {
+            ctx.accounts.transaction.ready_to_execute()?;
+        }
+        Ok(())
+    }
+
+    // instruction to execute a transaction
+    // transaction status must be "executeReady"
+    pub fn execute_transaction_v2<'info>(ctx: Context<'_,'_,'_,'info, ExecuteTransactionV2<'info>>) -> Result<()> {
+        // use for derivation for the authority
+        let ms_key = ctx.accounts.multisig.key();
+
+        // default authority seeds to auth index > 0
+        let authority_seeds = [
+            b"squad",
+            ms_key.as_ref(),
+            &ctx.accounts.transaction.authority_index.to_le_bytes(),
+            b"authority",
+            &[ctx.accounts.transaction.authority_bump]
+        ];
+
+        for ms_compiled_instruction in ctx.accounts.transaction.message.instructions.iter() {
+            let ix_program_id = *ctx.accounts.transaction.message.account_keys.get(ms_compiled_instruction.program_id_index as usize).unwrap();
+
+            let ix_accounts: Vec<(AccountInfo<'info>, AccountMeta)> = ms_compiled_instruction
+                .account_indexes
+                .iter()
+                .map(|account_index| {
+                    let account_key = ctx.accounts.transaction.message.account_keys.get(*account_index as usize).unwrap();
+
+                    let account_info = ctx.remaining_accounts.iter().find(|account_info| account_info.key == account_key).unwrap();
+
+                    let is_signer = account_index < &ctx.accounts.transaction.message.num_signers;
+                    let is_writable = account_index < &ctx.accounts.transaction.message.num_writable_signers
+                        || account_index >= &ctx.accounts.transaction.message.num_signers
+                        && account_index < &(ctx.accounts.transaction.message.num_signers + ctx.accounts.transaction.message.num_writable_non_signers);
+
+                    let account_meta = if is_writable {
+                        AccountMeta::new(*account_key, is_signer)
+                    } else {
+                        AccountMeta::new_readonly(*account_key, is_signer)
+                    };
+
+                    (account_info.clone(), account_meta)
+                })
+                .collect();
+
+            let ix = Instruction {
+                program_id: ix_program_id,
+                accounts: ix_accounts.iter().map(|(_, account_meta)| account_meta.clone()).collect(),
+                data: ms_compiled_instruction.data.clone(),
+            };
+
+            let mut account_infos: Vec<AccountInfo> = ix_accounts.into_iter()
+                .map(|(account_info, _)| account_info)
+                .collect();
+            // Add Program ID
+            account_infos.push(
+                ctx.remaining_accounts.iter()
+                    .find(|account_info| *account_info.key == ix_program_id).unwrap().clone(),
+            );
+
+
+            invoke_signed(
+                &ix,
+                &account_infos,
+                &[&authority_seeds]
+            )?;
+        }
+
+        // mark it as executed
+        ctx.accounts.transaction.set_executed()?;
+        Ok(())
     }
 
     // instruction to create a transaction
@@ -759,7 +848,7 @@ pub struct AddInstructions<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(args: Vec<u8>)]
+#[instruction(authority_index: u8, transaction_message: Vec<u8>)]
 pub struct CreateTransactionV2<'info> {
     #[account(
         mut,
@@ -776,7 +865,7 @@ pub struct CreateTransactionV2<'info> {
     #[account(
         init,
         payer = creator,
-        space = 8 + MsTransactionV2::size_from_args(&args),
+        space = 8 + MsTransactionV2::size_from_transaction_message(&transaction_message),
         seeds = [
             b"squad",
             multisig.key().as_ref(),
@@ -791,6 +880,73 @@ pub struct CreateTransactionV2<'info> {
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>
 }
+
+#[derive(Accounts)]
+pub struct VoteTransactionV2<'info> {
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
+    pub multisig: Account<'info, Ms>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ],
+        bump = transaction.bump,
+        constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
+        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
+    )]
+    pub transaction: Account<'info, MsTransactionV2>,
+
+    #[account(mut)]
+    pub member: Signer<'info>,
+    pub system_program: Program<'info, System>
+}
+
+#[derive(Accounts)]
+pub struct ExecuteTransactionV2<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        // only members can execute unless specified by the allow_external_execute setting
+        constraint = multisig.is_member(member.key()).is_some() || multisig.allow_external_execute @MsError::KeyNotInMultisig,
+    )]
+    pub multisig: Box<Account<'info, Ms>>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ],
+        bump = transaction.bump,
+        constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
+        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
+    )]
+    pub transaction: Account<'info, MsTransactionV2>,
+
+    #[account(mut)]
+    pub member: Signer<'info>,
+}
+
 
 #[derive(Accounts)]
 pub struct ActivateTransaction<'info> {

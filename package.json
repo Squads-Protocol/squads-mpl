@@ -2,6 +2,7 @@
   "private": true,
   "dependencies": {
     "@project-serum/anchor": "^0.25.0",
+    "@solana/web3.js": "^1.67.2",
     "@sqds/sdk": "^1.0.4",
     "bn.js": "^5.2.1"
   },
@@ -13,6 +14,9 @@
     "mocha": "^9.0.3",
     "ts-mocha": "10.0.0",
     "typescript": "^4.3.5"
+  },
+  "resolutions": {
+    "@solana/web3.js": "1.67.2"
   },
   "version": "1.2.0",
   "scripts": {

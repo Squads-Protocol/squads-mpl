@@ -178,8 +178,7 @@ export class TransactionBuilder {
       })
       .map(meta => meta.pubkey);
 
-    const [argsBytes] = createTransactionV2ArgsBeet.serialize({
-        authorityIndex: this.authorityIndex,
+    const [transactionMessageBytes] = transactionMessageBeet.serialize({
         numSigners,
         numWritableSigners,
         numWritableNonSigners,
@@ -195,7 +194,7 @@ export class TransactionBuilder {
     )
 
     return await this.methods
-      .createTransactionV2(argsBytes)
+      .createTransactionV2(this.authorityIndex, transactionMessageBytes)
       .accounts({
         multisig: this.multisig.publicKey,
         transaction: transactionPDA,
@@ -394,8 +393,7 @@ const compiledMsInstructionBeet = new beet.FixableBeetArgsStruct<CompiledMsInstr
   "CompiledMsInstruction"
 )
 
-type CreateTransactionV2Args = {
-  authorityIndex: number,
+type TransactionMessage = {
   numSigners: number,
   numWritableSigners: number,
   numWritableNonSigners: number,
@@ -403,13 +401,12 @@ type CreateTransactionV2Args = {
   instructions: CompiledMsInstruction[],
 }
 
-const createTransactionV2ArgsBeet = new beet.FixableBeetArgsStruct<CreateTransactionV2Args>([
-    ["authorityIndex", beet.u8],
+const transactionMessageBeet = new beet.FixableBeetArgsStruct<TransactionMessage>([
     ["numSigners", beet.u8],
     ["numWritableSigners", beet.u8],
     ["numWritableNonSigners", beet.u8],
     ["accountKeys", smallArray(beet.u8, beetSolana.publicKey)],
-    ["instructions", smallArray(beet.u8, compiledMsInstructionBeet)],
+    ["instructions", smallArray(beet.u8, compiledMsInstructionBeet)]
   ],
-  "CreateTransactionV2Args"
+  "TransactionMessage"
 )

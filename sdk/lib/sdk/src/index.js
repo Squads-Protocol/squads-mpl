@@ -97,6 +97,12 @@ class Squads {
             return Object.assign(Object.assign({}, accountData), { publicKey: address });
         });
     }
+    getTransactionV2(address) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const accountData = yield this.multisig.account.msTransactionV2.fetch(address, "processed");
+            return Object.assign(Object.assign({}, accountData), { publicKey: address });
+        });
+    }
     getTransactions(addresses) {
         return __awaiter(this, void 0, void 0, function* () {
             const accountData = yield this.multisig.account.msTransaction.fetchMultiple(addresses, "processed");
@@ -290,12 +296,29 @@ class Squads {
             });
         });
     }
+    _approveTransactionV2(multisigPDA, transactionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.multisig.methods.approveTransactionV2().accounts({
+                multisig: multisigPDA,
+                transaction: transactionPDA,
+                member: this.wallet.publicKey,
+            });
+        });
+    }
     approveTransaction(transactionPDA) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
             const methods = yield this._approveTransaction(transaction.ms, transactionPDA);
             yield methods.rpc();
             return yield this.getTransaction(transactionPDA);
+        });
+    }
+    approveTransactionV2(transactionPDA, confirmOptions) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const transaction = yield this.getTransactionV2(transactionPDA);
+            const methods = yield this._approveTransactionV2(transaction.ms, transactionPDA);
+            yield methods.rpc(confirmOptions);
+            return yield this.getTransactionV2(transactionPDA);
         });
     }
     buildApproveTransaction(multisigPDA, transactionPDA) {
@@ -439,6 +462,64 @@ class Squads {
             executeTx.add(executeIx);
             yield this.provider.sendAndConfirm(executeTx, signers);
             return yield this.getTransaction(transactionPDA);
+        });
+    }
+    _executeTransactionV2(transactionPDA, feePayer) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const transaction = yield this.getTransactionV2(transactionPDA);
+            const authorityPda = this.getAuthorityPDA(transaction.ms, transaction.authorityIndex);
+            // Populate remaining accounts required for execution of the transaction.
+            const remainingAccounts = [];
+            for (const ix of transaction.message.instructions) {
+                const programId = transaction.message.accountKeys[ix.programIdIndex];
+                if (!remainingAccounts.find(k => k.pubkey.equals(programId))) {
+                    remainingAccounts.push({ pubkey: programId, isSigner: false, isWritable: false });
+                }
+                for (const accountIndex of ix.accountIndexes) {
+                    const accountKey = transaction.message.accountKeys[accountIndex];
+                    const accountMeta = {
+                        pubkey: accountKey,
+                        isWritable: accountIndex < transaction.message.numWritableSigners
+                            || (accountIndex >= transaction.message.numSigners && accountIndex < (transaction.message.numSigners + transaction.message.numWritableNonSigners)),
+                        // NOTE: authorityPda cannot be marked as signer because it's a PDA.
+                        isSigner: accountIndex < transaction.message.numSigners && !accountKey.equals(authorityPda)
+                    };
+                    const foundMeta = remainingAccounts.find(k => k.pubkey.equals(accountKey));
+                    if (!foundMeta) {
+                        remainingAccounts.push(accountMeta);
+                    }
+                    else {
+                        foundMeta.isSigner || (foundMeta.isSigner = accountMeta.isSigner);
+                        foundMeta.isWritable || (foundMeta.isWritable = accountMeta.isWritable);
+                    }
+                }
+            }
+            const transactionInstruction = yield this.multisig.methods
+                .executeTransactionV2()
+                .accounts({
+                multisig: transaction.ms,
+                transaction: transactionPDA,
+                member: feePayer,
+            })
+                .remainingAccounts(remainingAccounts)
+                .instruction();
+            return transactionInstruction;
+        });
+    }
+    executeTransactionV2(transactionPDA, feePayer, signers, confirmOptions) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet.publicKey;
+            const executeIx = yield this._executeTransactionV2(transactionPDA, payer);
+            const { blockhash } = yield this.connection.getLatestBlockhash();
+            const lastValidBlockHeight = yield this.connection.getBlockHeight();
+            const executeTx = new anchor.web3.Transaction({
+                blockhash,
+                lastValidBlockHeight,
+                feePayer: payer,
+            });
+            executeTx.add(executeIx);
+            yield this.provider.sendAndConfirm(executeTx, signers, confirmOptions);
+            return yield this.getTransactionV2(transactionPDA);
         });
     }
     buildExecuteTransaction(transactionPDA, feePayer) {

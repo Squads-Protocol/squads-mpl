@@ -24,3 +24,4 @@ default = []
 anchor-lang = "0.25.0"
 hex = "0.3.1"
 solana-security-txt = "1.0.1"
+solana-address-lookup-table-program = "1.0.1"

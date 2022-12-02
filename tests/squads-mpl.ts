@@ -13,7 +13,15 @@ import {
   executeTransaction,
 } from "../helpers/transactions";
 import { execSync } from "child_process";
-import { LAMPORTS_PER_SOL, ParsedAccountData, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import {
+  LAMPORTS_PER_SOL
+  AddressLookupTableProgram,
+  ParsedAccountData,
+  SystemProgram,
+  Transaction,
+  TransactionMessage,
+  VersionedTransaction
+} from "@solana/web3.js"
 import Squads, {
   getMsPDA,
   getIxPDA,
@@ -291,7 +299,7 @@ describe("Programs", function(){
         expect(testPayeeAccount.value.lamports).to.equal(1000000);
       });
 
-      it(`Add 2 ixes with args`, async function() {
+      it.skip(`Add 2 ixes with args`, async function() {
         // create authority to use (Vault, index 1)
         const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
 
@@ -382,7 +390,57 @@ describe("Programs", function(){
         console.log("Serialized wrapped tx size:", wrappedTxBytes.length) // 1319 (overhead 356)
       })
 
-      it(`createTransactionV2 overhead wrapping "MagicEden Buy NFT"`, async function() {
+      it(`createTransactionV2`, async function() {
+        // create authority to use (Vault, index 1)
+        const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
+
+        // airdrop 2 SOL to the vault, we'll need it for the transfer instructions.
+        try {
+          const ad = await provider.connection.requestAirdrop(authorityPDA, 2 * anchor.web3.LAMPORTS_PER_SOL);
+          await provider.connection.confirmTransaction(ad);
+        }catch(e){
+          console.log(e);
+        }
+
+        // the test transfer instruction (2x)
+        const testPayee = anchor.web3.Keypair.generate();
+        const testIx = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey
+        );
+        const testIx2x = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee.publicKey
+        );
+        const originalInstructions = [testIx, testIx2x];
+
+        const txBuilder = await squads.getTransactionBuilder(msPDA, 1);
+        const [createTransactionInstruction, txPDA] = await txBuilder
+          .withInstructions(originalInstructions)
+          .createTransactionV2();
+
+        const wrappedTx = new Transaction();
+        wrappedTx.recentBlockhash = (await program.provider.connection.getLatestBlockhash()).blockhash;
+        wrappedTx.feePayer = creator.publicKey;
+        wrappedTx.add(createTransactionInstruction);
+        const wrappedTxBytes = wrappedTx.serialize({ requireAllSignatures: false })
+        await program.provider.sendAndConfirm(wrappedTx, [],{ skipPreflight: true, commitment: "confirmed" });
+
+        let txAccount = await program.account.msTransactionV2.fetch(txPDA)
+
+        await squads.approveTransactionV2(txPDA, { commitment: "confirmed" });
+        txAccount = await program.account.msTransactionV2.fetch(txPDA)
+        expect(txAccount.status).to.have.property("executeReady")
+
+        await squads.executeTransactionV2(txPDA, creator.publicKey, [], { commitment: "confirmed", skipPreflight: true });
+        txAccount = await program.account.msTransactionV2.fetch(txPDA)
+        expect(txAccount.status).to.have.property("executed")
+
+        const payeeBalance = await provider.connection.getBalance(testPayee.publicKey)
+        expect(payeeBalance).to.equal(2000000)
+      })
+
+      it.skip(`createTransactionV2 overhead wrapping "MagicEden Buy NFT"`, async function() {
         // MagicEden Buy NFT tx.
         const originalTransactionBytes = Buffer.from("AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADG/omv6Y6TpmfPm8Nv6uNO4+wIbpMEEpge++pjCXRJHafnAD+atFsxBtGSsVJXKlU4Rl6LPqgxCvgP8JumX6oPAgEJFC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtBX82VZkozhurrbZbi12eMbon+FOb7GAsyxrcKvufRnAQwjfwGJSgD4Qx0lgbtYjba02lQTrXoi+Tt9Hud6q5Zm1LzHez3eRpORE62bQk660HWs5JWsTpCUHKqqhKVzL1e/B6uWe1EG6asiC4kn2+anSeJL+Qx/12GYG+NwKoDacIr/bkEFkkZq+bSGvldnny9otBzdwx4CCSd0qPY2LtE5bClE7fneICXVOO6oTpkyP9dXySB6bpu2/M37UbiZtNw4tiKyS0JeN3O5NSihi69ksZEzxISUzTz0XmVuIZNPDljbFniLvsim6dTEc5cyoTN2b5SA3mE/vy52heCKtBsPXNul2WH2NlJWV4rgdiwGbP4az6UWif8kpvy7OdE3osDJ465OC3mEr6Ep1gB6Ce4I6WLqHK2kna5hIyk8K/w30AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL4+HroXpHP4mw9+jiSUDyCuuOvKcaiP3pXUuDtxoJYXXCW/Z3CCGN/ozP5mL25z8cjQQJ33WfsLAUj1rzV8OMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WcMbGMw+FIoKUpOBiSDt+u2rOR5JM2wLdNtmnRBHA0JL8XzARhMFxip/gfka6l966UK5BlOVMWaJrkUqN+gSCLcFIZ+JmoHU/4T7WT0u34qQrBs6s0JY998jPqUDArG9Lgan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKldDKr4rGlLvd88tmWtp8Um26HSn9iSxwtdR5YtN8SLAgQRBgABCAUPCxHyI8aJUuHytv5Apa4CAAAAABEMAAENEAgFDwMFEwsSImYGPRIB2uvq/P5Apa4CAAAAAAEAAAAAAAAAAAAAAAAAAAARFAAEAQINEAgJBQ8KAwUHBRMLDgwSKiVK2Z1PMSMG/vpApa4CAAAAAAEAAAAAAAAAAAAAAAAAAAD//////////wsCAAYMAgAAAOhgLwAAAAAA", "base64");
         expect(originalTransactionBytes.length).to.equal(963);
@@ -392,7 +450,7 @@ describe("Programs", function(){
         expect(originalInstructions.length).to.equal(4);
 
         const txBuilder = await squads.getTransactionBuilder(msPDA, 1);
-        const [createTransactionInstruction] = await txBuilder
+        const [createTransactionInstruction, txPDA] = await txBuilder
           .withInstructions(originalInstructions)
           .createTransactionV2();
 
@@ -405,9 +463,15 @@ describe("Programs", function(){
         // expect(overhead).to.equal(208); // Getting rid of remaining_account
         // expect(overhead).to.equal(148); // Using optimized header
         expect(overhead).to.equal(126); // Using small arrays
+
+        await program.provider.sendAndConfirm(wrappedTx, [],{ skipPreflight: true });
+        console.log("Wrapped tx confirmed")
+
+        const txAccount = await program.account.msTransactionV2.fetch(txPDA)
+        console.log("txAccount:", txAccount)
       })
 
-      it(`createTransactionV2 overhead wrapping "Solend Deposit SOL"`, async function() {
+      it.skip(`createTransactionV2 overhead wrapping "Solend Deposit SOL"`, async function() {
         // Solend deposit Sol tx.
         const originalTransactionBytes = Buffer.from("AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAoTLl06XmBMUgEaGqFEDWXlrfuG9BxuqyiqilWnn+lBhO0e7nF+ayQmWiEiWI2Ng6C3U/TmQZARFN4XJbKx/wkDaDOzHsTv+PoomuqMlUwBYy4tdkkIzlRNaGW97xEb/2ErRbSgDpkuuIlAxLykw4mGod2nd6ziifou4usSCxcEWihty/B1SeAdNCE/corYRxO1txeHL6w4E8q5Y68xLI3bzW8pOWiySsYpNA+F1v5c0yUnlsvwURGDQhu0yesZsdXTgYWto8LM5FTQcAsvb4K5zYcA4QdIFx8DA1QSIgF0Y+SUn5HzpNhL87Ljrhp5ZwCQzOu6oNRrlR0hBxy7aLDv19Yv3fLcIL4xTFJWnZMSALpCGF+53GN3/Qck68IDLXgtAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WQMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAAu6nN/XmuJp8Db7aXm0uYp3KSexdu9rcZZXaHIfHx8uTsgRBREqJX1h30z18T7gobAZGXyMU0O08qfsiEauIsGu8Ni2/aLOukHaFdQJXR2jkqDS+O0MbHvA9M+sjCgLVtBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEGm4uYWqtTKkUJDehVf83cvmy378c6CmWwb5IDXbc+7Aan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKnn3FoyEOvONH+k2VZlLywdw0FXvZMjSh2EnOzHD4qA+QkLAAUC4JMEAAsACQOVdQAAAAAAAAkCAAh8AwAAAC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtIAAAAAAAAAA0VXBEMmZoN3hIM1ZQOVFRYVh0c1MxWVkzYnh6V2h0ZsCnlwAAAAAAFAUAAAAAAAAGm4uYWqtTKkUJDehVf83cvmy378c6CmWwb5IDXbc+7BAFCAIAERIBBgkCAAEMAgAAADBgLgAAAAAACgcAAQAPCRIRAAoHAAYAAwkSEQAQDgEGBAUDAgwHCAAODQASCQ5AQg8AAAAAABIDAQAAAQk=", "base64");
         expect(originalTransactionBytes.length).to.equal(938);
@@ -428,6 +492,85 @@ describe("Programs", function(){
         const wrappedTxBytes = wrappedTx.serialize({ requireAllSignatures: false })
         const overhead = wrappedTxBytes.length - originalTransactionBytes.length
         expect(overhead).to.equal(195);
+
+        await program.provider.sendAndConfirm(wrappedTx, [],{ skipPreflight: true });
+        console.log("Wrapped tx confirmed")
+      })
+
+      it.skip(`createTransactionV2 with account lookup table`, async function() {
+        // Legacy MagicEden Buy NFT tx.
+        const legacyTransactionBytes = Buffer.from("AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADG/omv6Y6TpmfPm8Nv6uNO4+wIbpMEEpge++pjCXRJHafnAD+atFsxBtGSsVJXKlU4Rl6LPqgxCvgP8JumX6oPAgEJFC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtBX82VZkozhurrbZbi12eMbon+FOb7GAsyxrcKvufRnAQwjfwGJSgD4Qx0lgbtYjba02lQTrXoi+Tt9Hud6q5Zm1LzHez3eRpORE62bQk660HWs5JWsTpCUHKqqhKVzL1e/B6uWe1EG6asiC4kn2+anSeJL+Qx/12GYG+NwKoDacIr/bkEFkkZq+bSGvldnny9otBzdwx4CCSd0qPY2LtE5bClE7fneICXVOO6oTpkyP9dXySB6bpu2/M37UbiZtNw4tiKyS0JeN3O5NSihi69ksZEzxISUzTz0XmVuIZNPDljbFniLvsim6dTEc5cyoTN2b5SA3mE/vy52heCKtBsPXNul2WH2NlJWV4rgdiwGbP4az6UWif8kpvy7OdE3osDJ465OC3mEr6Ep1gB6Ce4I6WLqHK2kna5hIyk8K/w30AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL4+HroXpHP4mw9+jiSUDyCuuOvKcaiP3pXUuDtxoJYXXCW/Z3CCGN/ozP5mL25z8cjQQJ33WfsLAUj1rzV8OMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WcMbGMw+FIoKUpOBiSDt+u2rOR5JM2wLdNtmnRBHA0JL8XzARhMFxip/gfka6l966UK5BlOVMWaJrkUqN+gSCLcFIZ+JmoHU/4T7WT0u34qQrBs6s0JY998jPqUDArG9Lgan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKldDKr4rGlLvd88tmWtp8Um26HSn9iSxwtdR5YtN8SLAgQRBgABCAUPCxHyI8aJUuHytv5Apa4CAAAAABEMAAENEAgFDwMFEwsSImYGPRIB2uvq/P5Apa4CAAAAAAEAAAAAAAAAAAAAAAAAAAARFAAEAQINEAgJBQ8KAwUHBRMLDgwSKiVK2Z1PMSMG/vpApa4CAAAAAAEAAAAAAAAAAAAAAAAAAAD//////////wsCAAYMAgAAAOhgLwAAAAAA", "base64");
+        const legacyTransaction = anchor.web3.Transaction.from(legacyTransactionBytes);
+
+        const accountKeys = legacyTransaction.compileMessage().accountKeys
+        console.log("Account keys", JSON.stringify(accountKeys, null, 2))
+        console.log("Program IDs", JSON.stringify(
+          legacyTransaction.compileMessage().instructions.map(i => i.programIdIndex), null, 2)
+        )
+
+        const [createLookupTableInstruction, lookupTableAddress] =
+          AddressLookupTableProgram.createLookupTable({
+            authority: creator.publicKey,
+            payer: creator.publicKey,
+            recentSlot: await program.provider.connection.getSlot(),
+          });
+
+        const createLookupTableTx = new Transaction();
+        createLookupTableTx.recentBlockhash = (await program.provider.connection.getRecentBlockhash()).blockhash;
+        createLookupTableTx.feePayer = creator.publicKey;
+        createLookupTableTx.add(createLookupTableInstruction)
+        // Add all tx accounts to the lookup table.
+        createLookupTableTx.add(AddressLookupTableProgram.extendLookupTable({
+            lookupTable: lookupTableAddress,
+            authority: creator.publicKey,
+            payer: creator.publicKey,
+            addresses: accountKeys,
+        }))
+
+        // Send the tx to create the lookup table.
+        await program.provider.sendAndConfirm(createLookupTableTx, [], { skipPreflight: true });
+
+        const alt = await program.provider.connection.getAddressLookupTable(lookupTableAddress)
+        expect(alt).to.not.be.null
+        console.log("Lookup table created", lookupTableAddress.toBase58())
+        console.log("Lookup table", JSON.stringify(alt.value.state.addresses, null, 2))
+
+        // Transform legacy tx into a versioned transaction.
+        const messageV0 = new TransactionMessage({
+          recentBlockhash: legacyTransaction.recentBlockhash,
+          payerKey: legacyTransaction.feePayer,
+          instructions: legacyTransaction.instructions,
+        }).compileToV0Message([alt.value]);
+        const versionedTransaction = new VersionedTransaction(messageV0);
+
+        console.log("Versioned tx message.staticAccountKeys", JSON.stringify(versionedTransaction.message.staticAccountKeys, null, 2))
+        console.log("Versioned tx message.addressTableLookups:", JSON.stringify(versionedTransaction.message.addressTableLookups, null, 2))
+
+        const versionedTransactionBytes = versionedTransaction.serialize()
+        console.log("versionedTransactionBytes.length", versionedTransactionBytes.length)
+
+        // versionedTransaction.message.
+
+        // const originalInstructions = originalTransaction.instructions;
+        // expect(originalInstructions.length).to.equal(4);
+        //
+        // const txBuilder = await squads.getTransactionBuilder(msPDA, 1);
+        // const [createTransactionInstruction] = await txBuilder
+        //   .withInstructions(originalInstructions)
+        //   .createTransactionV2();
+        //
+        // const wrappedTx = new Transaction();
+        // wrappedTx.recentBlockhash = originalTransaction.recentBlockhash;
+        // wrappedTx.feePayer = creator.publicKey;
+        // wrappedTx.add(createTransactionInstruction);
+        // const wrappedTxBytes = wrappedTx.serialize({ requireAllSignatures: false })
+        // const overhead = wrappedTxBytes.length - originalTransactionBytes.length
+        // // expect(overhead).to.equal(208); // Getting rid of remaining_account
+        // // expect(overhead).to.equal(148); // Using optimized header
+        // expect(overhead).to.equal(126); // Using small arrays
+        //
+        // await program.provider.sendAndConfirm(wrappedTx, [],{ skipPreflight: true });
+        // console.log("Wrapped tx confirmed")
       })
 
       it.skip(`2X Transfer Tx Execute`, async function() {

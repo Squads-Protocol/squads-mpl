@@ -1,6 +1,6 @@
 import { Beet, FixableBeet, FixedSizeBeet } from "@metaplex-foundation/beet";
 /**
- * De/Serializes a small array with a specific number of elements of type {@link T}
+ * De/Serializes a small array with configurable length prefix and a specific number of elements of type {@link T}
  * which do not all have the same size.
  *
  * @template T type of elements held in the array
@@ -14,7 +14,7 @@ import { Beet, FixableBeet, FixedSizeBeet } from "@metaplex-foundation/beet";
  */
 export declare function fixedSizeSmallArray<T, V = Partial<T>>(lengthBeet: FixedSizeBeet<number>, elements: FixedSizeBeet<T, V>[], elementsByteSize: number): FixedSizeBeet<T[], V[]>;
 /**
- * Wraps a small array De/Serializer with elements of type {@link T}
+ * Wraps a small array De/Serializer with configurable length prefix and elements of type {@link T}
  * which do not all have the same size.
  *
  * @template T type of elements held in the array

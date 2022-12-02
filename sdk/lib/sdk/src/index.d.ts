@@ -1,6 +1,6 @@
-import { Connection, PublicKey, Commitment, ConnectionConfig, TransactionInstruction, Signer } from "@solana/web3.js";
+import { Connection, PublicKey, Commitment, ConnectionConfig, TransactionInstruction, Signer, ConfirmOptions } from "@solana/web3.js";
 import { Wallet } from "@project-serum/anchor/dist/cjs/provider";
-import { InstructionAccount, ManagedProgramAccount, MultisigAccount, ProgramManagerAccount, ProgramUpgradeAccount, TransactionAccount } from "./types";
+import { InstructionAccount, ManagedProgramAccount, MultisigAccount, ProgramManagerAccount, ProgramUpgradeAccount, TransactionAccount, TransactionV2Account } from "./types";
 import { TransactionBuilder } from "./tx_builder";
 declare class Squads {
     readonly connection: Connection;
@@ -41,6 +41,7 @@ declare class Squads {
     getMultisig(address: PublicKey): Promise<MultisigAccount>;
     getMultisigs(addresses: PublicKey[]): Promise<(MultisigAccount | null)[]>;
     getTransaction(address: PublicKey): Promise<TransactionAccount>;
+    getTransactionV2(address: PublicKey): Promise<TransactionV2Account>;
     getTransactions(addresses: PublicKey[]): Promise<(TransactionAccount | null)[]>;
     getInstruction(address: PublicKey): Promise<InstructionAccount>;
     getInstructions(addresses: PublicKey[]): Promise<(InstructionAccount | null)[]>;
@@ -68,7 +69,9 @@ declare class Squads {
     activateTransaction(transactionPDA: PublicKey): Promise<TransactionAccount>;
     buildActivateTransaction(multisigPDA: PublicKey, transactionPDA: PublicKey): Promise<TransactionInstruction>;
     private _approveTransaction;
+    private _approveTransactionV2;
     approveTransaction(transactionPDA: PublicKey): Promise<TransactionAccount>;
+    approveTransactionV2(transactionPDA: PublicKey, confirmOptions?: ConfirmOptions): Promise<TransactionV2Account>;
     buildApproveTransaction(multisigPDA: PublicKey, transactionPDA: PublicKey): Promise<TransactionInstruction>;
     private _rejectTransaction;
     rejectTransaction(transactionPDA: PublicKey): Promise<TransactionAccount>;
@@ -78,6 +81,8 @@ declare class Squads {
     buildCancelTransaction(multisigPDA: PublicKey, transactionPDA: PublicKey): Promise<TransactionInstruction>;
     private _executeTransaction;
     executeTransaction(transactionPDA: PublicKey, feePayer?: PublicKey, signers?: Signer[]): Promise<TransactionAccount>;
+    private _executeTransactionV2;
+    executeTransactionV2(transactionPDA: PublicKey, feePayer?: PublicKey, signers?: Signer[], confirmOptions?: ConfirmOptions): Promise<TransactionV2Account>;
     buildExecuteTransaction(transactionPDA: PublicKey, feePayer?: PublicKey): Promise<TransactionInstruction>;
     private _executeInstruction;
     executeInstruction(transactionPDA: PublicKey, instructionPDA: PublicKey): Promise<InstructionAccount>;

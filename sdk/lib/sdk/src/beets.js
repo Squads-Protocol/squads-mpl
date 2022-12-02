@@ -27,7 +27,7 @@ exports.smallArray = exports.fixedSizeSmallArray = void 0;
 const beet_1 = require("@metaplex-foundation/beet");
 const assert = __importStar(require("assert"));
 /**
- * De/Serializes a small array with a specific number of elements of type {@link T}
+ * De/Serializes a small array with configurable length prefix and a specific number of elements of type {@link T}
  * which do not all have the same size.
  *
  * @template T type of elements held in the array
@@ -72,7 +72,7 @@ function fixedSizeSmallArray(lengthBeet, elements, elementsByteSize) {
 }
 exports.fixedSizeSmallArray = fixedSizeSmallArray;
 /**
- * Wraps a small array De/Serializer with elements of type {@link T}
+ * Wraps a small array De/Serializer with configurable length prefix and elements of type {@link T}
  * which do not all have the same size.
  *
  * @template T type of elements held in the array

@@ -4,8 +4,8 @@ import {
   Commitment,
   ConnectionConfig,
   TransactionInstruction,
-  Signer,
-} from "@solana/web3.js";
+  Signer, ConfirmOptions, AccountMeta,
+} from "@solana/web3.js"
 import {
   DEFAULT_MULTISIG_PROGRAM_ID,
   DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
@@ -23,8 +23,8 @@ import {
   ProgramManagerAccount,
   ProgramUpgradeAccount,
   SquadsMethods,
-  TransactionAccount,
-} from "./types";
+  TransactionAccount, TransactionV2Account,
+} from "./types"
 import {
   getAuthorityPDA,
   getIxPDA,
@@ -182,6 +182,13 @@ class Squads {
   }
   async getTransaction(address: PublicKey): Promise<TransactionAccount> {
     const accountData = await this.multisig.account.msTransaction.fetch(
+      address,
+      "processed"
+    );
+    return { ...accountData, publicKey: address };
+  }
+  async getTransactionV2(address: PublicKey): Promise<TransactionV2Account> {
+    const accountData = await this.multisig.account.msTransactionV2.fetch(
       address,
       "processed"
     );
@@ -478,6 +485,16 @@ class Squads {
       member: this.wallet.publicKey,
     });
   }
+  private async _approveTransactionV2(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey
+  ): Promise<SquadsMethods> {
+    return this.multisig.methods.approveTransactionV2().accounts({
+      multisig: multisigPDA,
+      transaction: transactionPDA,
+      member: this.wallet.publicKey,
+    });
+  }
   async approveTransaction(
     transactionPDA: PublicKey
   ): Promise<TransactionAccount> {
@@ -488,6 +505,18 @@ class Squads {
     );
     await methods.rpc();
     return await this.getTransaction(transactionPDA);
+  }
+  async approveTransactionV2(
+    transactionPDA: PublicKey,
+    confirmOptions?: ConfirmOptions
+  ): Promise<TransactionV2Account> {
+    const transaction = await this.getTransactionV2(transactionPDA);
+    const methods = await this._approveTransactionV2(
+      transaction.ms,
+      transactionPDA
+    );
+    await methods.rpc(confirmOptions);
+    return await this.getTransactionV2(transactionPDA);
   }
   async buildApproveTransaction(
     multisigPDA: PublicKey,
@@ -671,6 +700,76 @@ class Squads {
     await this.provider.sendAndConfirm(executeTx, signers);
     return await this.getTransaction(transactionPDA);
   }
+  private async _executeTransactionV2(
+    transactionPDA: PublicKey,
+    feePayer: PublicKey
+  ): Promise<TransactionInstruction> {
+    const transaction = await this.getTransactionV2(transactionPDA);
+    const authorityPda = this.getAuthorityPDA(transaction.ms, transaction.authorityIndex);
+
+    // Populate remaining accounts required for execution of the transaction.
+    const remainingAccounts: AccountMeta[] = [];
+    for (const ix of transaction.message.instructions as any) {
+      const programId = transaction.message.accountKeys[ix.programIdIndex];
+
+      if (!remainingAccounts.find(k => k.pubkey.equals(programId))) {
+        remainingAccounts.push({ pubkey: programId, isSigner: false, isWritable: false });
+      }
+
+      for (const accountIndex of ix.accountIndexes) {
+        const accountKey = transaction.message.accountKeys[accountIndex];
+
+        const accountMeta: AccountMeta = {
+          pubkey: accountKey,
+          isWritable: accountIndex < transaction.message.numWritableSigners
+            || (accountIndex >= transaction.message.numSigners && accountIndex < (transaction.message.numSigners + transaction.message.numWritableNonSigners)),
+          // NOTE: authorityPda cannot be marked as signer because it's a PDA.
+          isSigner: accountIndex < transaction.message.numSigners && !accountKey.equals(authorityPda)
+        }
+
+        const foundMeta = remainingAccounts.find(k => k.pubkey.equals(accountKey))
+        if (!foundMeta) {
+          remainingAccounts.push(accountMeta);
+        } else {
+          foundMeta.isSigner ||= accountMeta.isSigner;
+          foundMeta.isWritable ||= accountMeta.isWritable;
+        }
+      }
+    }
+
+    const transactionInstruction = await this.multisig.methods
+      .executeTransactionV2()
+      .accounts({
+        multisig: transaction.ms,
+        transaction: transactionPDA,
+        member: feePayer,
+      })
+      .remainingAccounts(remainingAccounts)
+      .instruction()
+
+    return transactionInstruction;
+  }
+  async executeTransactionV2(
+    transactionPDA: PublicKey,
+    feePayer?: PublicKey,
+    signers?: Signer[],
+    confirmOptions?: ConfirmOptions
+  ): Promise<TransactionV2Account> {
+    const payer = feePayer ?? this.wallet.publicKey;
+    const executeIx = await this._executeTransactionV2(transactionPDA, payer);
+
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    const lastValidBlockHeight = await this.connection.getBlockHeight();
+    const executeTx = new anchor.web3.Transaction({
+      blockhash,
+      lastValidBlockHeight,
+      feePayer: payer,
+    });
+    executeTx.add(executeIx);
+    await this.provider.sendAndConfirm(executeTx, signers, confirmOptions);
+    return await this.getTransactionV2(transactionPDA);
+  }
+
   async buildExecuteTransaction(
     transactionPDA: PublicKey,
     feePayer?: PublicKey
