@@ -427,7 +427,7 @@ describe("Programs", function(){
         expect(payeeBalance).to.equal(2000000)
       })
 
-      it.skip(`createTransactionV2 overhead wrapping "MagicEden Buy NFT"`, async function() {
+      it(`createTransactionV2 overhead wrapping "MagicEden Buy NFT"`, async function() {
         // MagicEden Buy NFT tx.
         const originalTransactionBytes = Buffer.from("AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADG/omv6Y6TpmfPm8Nv6uNO4+wIbpMEEpge++pjCXRJHafnAD+atFsxBtGSsVJXKlU4Rl6LPqgxCvgP8JumX6oPAgEJFC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtBX82VZkozhurrbZbi12eMbon+FOb7GAsyxrcKvufRnAQwjfwGJSgD4Qx0lgbtYjba02lQTrXoi+Tt9Hud6q5Zm1LzHez3eRpORE62bQk660HWs5JWsTpCUHKqqhKVzL1e/B6uWe1EG6asiC4kn2+anSeJL+Qx/12GYG+NwKoDacIr/bkEFkkZq+bSGvldnny9otBzdwx4CCSd0qPY2LtE5bClE7fneICXVOO6oTpkyP9dXySB6bpu2/M37UbiZtNw4tiKyS0JeN3O5NSihi69ksZEzxISUzTz0XmVuIZNPDljbFniLvsim6dTEc5cyoTN2b5SA3mE/vy52heCKtBsPXNul2WH2NlJWV4rgdiwGbP4az6UWif8kpvy7OdE3osDJ465OC3mEr6Ep1gB6Ce4I6WLqHK2kna5hIyk8K/w30AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL4+HroXpHP4mw9+jiSUDyCuuOvKcaiP3pXUuDtxoJYXXCW/Z3CCGN/ozP5mL25z8cjQQJ33WfsLAUj1rzV8OMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WcMbGMw+FIoKUpOBiSDt+u2rOR5JM2wLdNtmnRBHA0JL8XzARhMFxip/gfka6l966UK5BlOVMWaJrkUqN+gSCLcFIZ+JmoHU/4T7WT0u34qQrBs6s0JY998jPqUDArG9Lgan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKldDKr4rGlLvd88tmWtp8Um26HSn9iSxwtdR5YtN8SLAgQRBgABCAUPCxHyI8aJUuHytv5Apa4CAAAAABEMAAENEAgFDwMFEwsSImYGPRIB2uvq/P5Apa4CAAAAAAEAAAAAAAAAAAAAAAAAAAARFAAEAQINEAgJBQ8KAwUHBRMLDgwSKiVK2Z1PMSMG/vpApa4CAAAAAAEAAAAAAAAAAAAAAAAAAAD//////////wsCAAYMAgAAAOhgLwAAAAAA", "base64");
         expect(originalTransactionBytes.length).to.equal(963);
@@ -452,13 +452,11 @@ describe("Programs", function(){
         expect(overhead).to.equal(126); // Using small arrays
 
         await program.provider.sendAndConfirm(wrappedTx, [],{ skipPreflight: true });
-        console.log("Wrapped tx confirmed")
-
         const txAccount = await program.account.msTransactionV2.fetch(txPDA)
-        console.log("txAccount:", txAccount)
+        expect(txAccount.status).to.have.property("active")
       })
 
-      it.skip(`createTransactionV2 overhead wrapping "Solend Deposit SOL"`, async function() {
+      it(`createTransactionV2 overhead wrapping "Solend Deposit SOL"`, async function() {
         // Solend deposit Sol tx.
         const originalTransactionBytes = Buffer.from("AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAoTLl06XmBMUgEaGqFEDWXlrfuG9BxuqyiqilWnn+lBhO0e7nF+ayQmWiEiWI2Ng6C3U/TmQZARFN4XJbKx/wkDaDOzHsTv+PoomuqMlUwBYy4tdkkIzlRNaGW97xEb/2ErRbSgDpkuuIlAxLykw4mGod2nd6ziifou4usSCxcEWihty/B1SeAdNCE/corYRxO1txeHL6w4E8q5Y68xLI3bzW8pOWiySsYpNA+F1v5c0yUnlsvwURGDQhu0yesZsdXTgYWto8LM5FTQcAsvb4K5zYcA4QdIFx8DA1QSIgF0Y+SUn5HzpNhL87Ljrhp5ZwCQzOu6oNRrlR0hBxy7aLDv19Yv3fLcIL4xTFJWnZMSALpCGF+53GN3/Qck68IDLXgtAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WQMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAAu6nN/XmuJp8Db7aXm0uYp3KSexdu9rcZZXaHIfHx8uTsgRBREqJX1h30z18T7gobAZGXyMU0O08qfsiEauIsGu8Ni2/aLOukHaFdQJXR2jkqDS+O0MbHvA9M+sjCgLVtBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEGm4uYWqtTKkUJDehVf83cvmy378c6CmWwb5IDXbc+7Aan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKnn3FoyEOvONH+k2VZlLywdw0FXvZMjSh2EnOzHD4qA+QkLAAUC4JMEAAsACQOVdQAAAAAAAAkCAAh8AwAAAC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtIAAAAAAAAAA0VXBEMmZoN3hIM1ZQOVFRYVh0c1MxWVkzYnh6V2h0ZsCnlwAAAAAAFAUAAAAAAAAGm4uYWqtTKkUJDehVf83cvmy378c6CmWwb5IDXbc+7BAFCAIAERIBBgkCAAEMAgAAADBgLgAAAAAACgcAAQAPCRIRAAoHAAYAAwkSEQAQDgEGBAUDAgwHCAAODQASCQ5AQg8AAAAAABIDAQAAAQk=", "base64");
         expect(originalTransactionBytes.length).to.equal(938);
@@ -468,7 +466,7 @@ describe("Programs", function(){
         expect(originalInstructions.length).to.equal(9);
 
         const txBuilder = await squads.getTransactionBuilder(msPDA, 1);
-        const [createTransactionInstruction] = await txBuilder
+        const [createTransactionInstruction, txPDA] = await txBuilder
           .withInstructions(originalInstructions)
           .createTransactionV2();
 
@@ -481,7 +479,8 @@ describe("Programs", function(){
         expect(overhead).to.equal(195);
 
         await program.provider.sendAndConfirm(wrappedTx, [],{ skipPreflight: true });
-        console.log("Wrapped tx confirmed")
+        const txAccount = await program.account.msTransactionV2.fetch(txPDA)
+        expect(txAccount.status).to.have.property("active")
       })
 
       it.skip(`createTransactionV2 with account lookup table`, async function() {
