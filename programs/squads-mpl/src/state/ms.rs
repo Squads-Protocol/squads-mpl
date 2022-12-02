@@ -322,11 +322,8 @@ pub struct CompressedInstruction {
     pub data: Vec<u8>
 }
 
-#[derive(AnchorSerialize,AnchorDeserialize,Clone)]
-pub struct CreateTransactionV2Args {
-    /// Authority `0` is reserved for internal instructions,
-    /// whereas authorities 1 or greater refer to a vault, upgrade authority, or other.
-    pub authority_index: u8,
+#[derive(AnchorSerialize, Clone)]
+pub struct TransactionMessage {
     /// The number of signer pubkeys in the account_keys vec.
     pub num_signers: u8,
     /// The number of writable signer pubkeys in the account_keys vec.
@@ -345,6 +342,64 @@ pub struct CreateTransactionV2Args {
     /// ```
     pub account_keys: Vec<Pubkey>,
     pub instructions: Vec<CompiledInstruction>,
+}
+
+impl AnchorDeserialize for TransactionMessage {
+    fn deserialize(input: &mut &[u8]) -> std::io::Result<Self> {
+        let num_signers = u8::deserialize(input)?;
+        let num_writable_signers = u8::deserialize(input)?;
+        let num_writable_non_signers = u8::deserialize(input)?;
+        let account_keys_len = u8::deserialize(input)?;
+        let account_keys = {
+            let mut account_keys = Vec::new();
+            for _ in 0..account_keys_len {
+                account_keys.push(Pubkey::deserialize(input)?);
+            }
+            account_keys
+        };
+        let instructions_len = u8::deserialize(input)?;
+        let instructions = {
+            let mut instructions = Vec::new();
+            for _ in 0..instructions_len {
+                instructions.push(CompiledInstruction::deserialize(input)?);
+            }
+            instructions
+        };
+
+        Ok(Self {
+            num_signers,
+            num_writable_signers,
+            num_writable_non_signers,
+            account_keys,
+            instructions,
+        })
+    }
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct MsTransactionMessage {
+    /// The number of signer pubkeys in the account_keys vec.
+    pub num_signers: u8,
+    /// The number of writable signer pubkeys in the account_keys vec.
+    pub num_writable_signers: u8,
+    /// The number of writable non-signer pubkeys in the account_keys vec.
+    pub num_writable_non_signers: u8,
+    /// unique account pubkeys (including program IDs) required for execution of the tx.
+    pub account_keys: Vec<Pubkey>,
+    /// list of instructions making up the tx.
+    pub instructions: Vec<MsCompiledInstruction>,
+}
+
+impl From<TransactionMessage> for MsTransactionMessage {
+    fn from(message: TransactionMessage) -> Self {
+        Self {
+            num_signers: message.num_signers,
+            num_writable_signers: message.num_writable_signers,
+            num_writable_non_signers: message.num_writable_non_signers,
+            account_keys: message.account_keys,
+            instructions: message.instructions.into_iter().map(MsCompiledInstruction::from).collect()
+        }
+    }
 }
 
 /// Account containing data required for tracking the voting status, and execution of multisig transaction.
@@ -370,25 +425,172 @@ pub struct MsTransactionV2 {
     pub rejected: Vec<Pubkey>,
     /// keys that have cancelled (ExecuteReady only).
     pub cancelled: Vec<Pubkey>,
-    /// unique account pubkeys (including program IDs) required for execution of the tx.
-    pub account_keys: Vec<Pubkey>,
-    /// list of instructions making up the tx.
-    pub instructions: Vec<CompiledInstruction>,
+    /// data required for executing the transaction.
+    pub message: MsTransactionMessage,
 }
 
 impl MsTransactionV2 {
-    // pub fn size_from_args(args: &CreateTransactionV2Args) -> usize {
-    pub fn size_from_args(args: &[u8]) -> usize {
-        unimplemented!()
+    pub fn init(
+        &mut self,
+        creator: Pubkey,
+        multisig: Pubkey,
+        transaction_index: u32,
+        bump: u8,
+        authority_index: u32,
+        authority_bump: u8,
+        message: TransactionMessage,
+    ) -> Result<()>{
+        self.creator = creator;
+        self.ms = multisig;
+        self.transaction_index = transaction_index;
+        self.authority_index = authority_index;
+        self.authority_bump = authority_bump;
+        self.status = MsTransactionStatus::Active;
+        self.approved = Vec::new();
+        self.rejected = Vec::new();
+        self.cancelled = Vec::new();
+        self.bump = bump;
+        self.message = message.into();
+        Ok(())
+    }
+
+    pub fn size_from_transaction_message(transaction_message: &[u8]) -> usize {
+        // FIXME: calculate the actual size
+        3000
+    }
+
+    // change status to Active
+    pub fn activate(&mut self)-> Result<()>{
+        self.status = MsTransactionStatus::Active;
+        Ok(())
+    }
+
+    // change status to ExecuteReady
+    pub fn ready_to_execute(&mut self)-> Result<()>{
+        self.status = MsTransactionStatus::ExecuteReady;
+        Ok(())
+    }
+
+    // set status to Rejected
+    pub fn set_rejected(&mut self) -> Result<()>{
+        self.status = MsTransactionStatus::Rejected;
+        Ok(())
+    }
+
+    pub fn set_cancelled(&mut self) -> Result<()>{
+        self.status = MsTransactionStatus::Cancelled;
+        Ok(())
+    }
+
+    // set status to executed
+    pub fn set_executed(&mut self) -> Result<()>{
+        self.status = MsTransactionStatus::Executed;
+        Ok(())
+    }
+
+    // sign to approve a transaction
+    pub fn sign(&mut self, member: Pubkey) -> Result<()>{
+        self.approved.push(member);
+        self.approved.sort();
+        Ok(())
+    }
+
+    // sign to reject the transaction
+    pub fn reject(&mut self, member: Pubkey) -> Result<()> {
+        self.rejected.push(member);
+        self.rejected.sort();
+        Ok(())
+    }
+
+    // sign to cancel the transaction if execute_ready
+    pub fn cancel(&mut self, member: Pubkey) -> Result<()> {
+        self.cancelled.push(member);
+        self.cancelled.sort();
+        Ok(())
+    }
+
+
+    // check if a user has voted already
+    pub fn has_voted(&self, member: Pubkey) -> bool {
+        let approved = self.approved.binary_search(&member).is_ok();
+        let rejected = self.rejected.binary_search(&member).is_ok();
+        approved || rejected
+    }
+
+    // check if a user has signed to approve
+    pub fn has_voted_approve(&self, member: Pubkey) -> Option<usize> {
+        self.approved.binary_search(&member).ok()
+    }
+
+    // check if a use has signed to reject
+    pub fn has_voted_reject(&self, member: Pubkey) -> Option<usize> {
+        self.rejected.binary_search(&member).ok()
+    }
+
+    // check if a user has signed to cancel
+    pub fn has_cancelled(&self, member: Pubkey) -> Option<usize> {
+        self.cancelled.binary_search(&member).ok()
+    }
+
+    pub fn remove_reject(&mut self, index: usize) -> Result<()>{
+        self.rejected.remove(index);
+        Ok(())
+    }
+
+    pub fn remove_approve(&mut self, index: usize) -> Result<()>{
+        self.approved.remove(index);
+        Ok(())
     }
 }
 
 // Concise serialization schema for instructions that make up transaction.
-#[derive(AnchorSerialize,AnchorDeserialize,Clone)]
+#[derive(AnchorSerialize, Clone, Debug, Default)]
 pub struct CompiledInstruction {
     pub program_id_index: u8,
     /// Indices into the tx's `account_keys` list indicating which accounts to pass to the instruction.
     pub account_indexes: Vec<u8>,
     /// Instruction data.
     pub data: Vec<u8>
+}
+
+// TODO: add a comment.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
+pub struct MsCompiledInstruction {
+    pub program_id_index: u8,
+    /// Indices into the tx's `account_keys` list indicating which accounts to pass to the instruction.
+    pub account_indexes: Vec<u8>,
+    /// Instruction data.
+    pub data: Vec<u8>
+}
+
+impl From<CompiledInstruction> for MsCompiledInstruction {
+    fn from(compiled_instruction: CompiledInstruction) -> Self {
+        MsCompiledInstruction {
+            program_id_index: compiled_instruction.program_id_index,
+            account_indexes: compiled_instruction.account_indexes,
+            data: compiled_instruction.data,
+        }
+    }
+}
+
+impl AnchorDeserialize for CompiledInstruction {
+    fn deserialize(input: &mut &[u8]) -> std::io::Result<Self> {
+        let program_id_index = u8::deserialize(input)?;
+        let account_indexes_len = u8::deserialize(input)?;
+        let account_indexes = {
+            let mut account_indexes = Vec::new();
+            for _ in 0..account_indexes_len {
+                account_indexes.push(u8::deserialize(input)?);
+            }
+            account_indexes
+        };
+        let data_len = u16::deserialize(input)?;
+        let data = u8::vec_from_bytes(data_len.into(), input)?.ok_or(std::io::ErrorKind::InvalidInput)?;
+
+        Ok(CompiledInstruction {
+            program_id_index,
+            account_indexes,
+            data,
+        })
+    }
 }

@@ -26,6 +26,8 @@ export type TransactionAccount =
   AccountDefDictionary<SquadsMpl>["msTransaction"];
 export type InstructionAccount =
   AccountDefDictionary<SquadsMpl>["msInstruction"];
+export type TransactionV2Account =
+  AccountDefDictionary<SquadsMpl>["msTransactionV2"];
 
 export type ProgramManagerAccount =
   AccountDefDictionary<ProgramManager>["programManager"];

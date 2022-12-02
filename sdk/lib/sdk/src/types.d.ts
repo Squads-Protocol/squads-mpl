@@ -16,6 +16,7 @@ declare type AccountDefDictionary<T extends Idl> = TypeDefDictionary<NonNullable
 export declare type MultisigAccount = AccountDefDictionary<SquadsMpl>["ms"];
 export declare type TransactionAccount = AccountDefDictionary<SquadsMpl>["msTransaction"];
 export declare type InstructionAccount = AccountDefDictionary<SquadsMpl>["msInstruction"];
+export declare type TransactionV2Account = AccountDefDictionary<SquadsMpl>["msTransactionV2"];
 export declare type ProgramManagerAccount = AccountDefDictionary<ProgramManager>["programManager"];
 export declare type ManagedProgramAccount = AccountDefDictionary<ProgramManager>["managedProgram"];
 export declare type ProgramUpgradeAccount = AccountDefDictionary<ProgramManager>["programUpgrade"];

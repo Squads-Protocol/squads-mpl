@@ -249,10 +249,61 @@ export declare type SquadsMpl = {
             ];
             "args": [
                 {
-                    "name": "args";
+                    "name": "authorityIndex";
+                    "type": "u8";
+                },
+                {
+                    "name": "transactionMessage";
                     "type": "bytes";
                 }
             ];
+        },
+        {
+            "name": "approveTransactionV2";
+            "accounts": [
+                {
+                    "name": "multisig";
+                    "isMut": false;
+                    "isSigner": false;
+                },
+                {
+                    "name": "transaction";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "member";
+                    "isMut": true;
+                    "isSigner": true;
+                },
+                {
+                    "name": "systemProgram";
+                    "isMut": false;
+                    "isSigner": false;
+                }
+            ];
+            "args": [];
+        },
+        {
+            "name": "executeTransactionV2";
+            "accounts": [
+                {
+                    "name": "multisig";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "transaction";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "member";
+                    "isMut": true;
+                    "isSigner": true;
+                }
+            ];
+            "args": [];
         },
         {
             "name": "createTransaction";
@@ -746,23 +797,12 @@ export declare type SquadsMpl = {
                         };
                     },
                     {
-                        "name": "accountKeys";
+                        "name": "message";
                         "docs": [
-                            "unique account pubkeys (including program IDs) required for execution of the tx."
+                            "data required for executing the transaction."
                         ];
                         "type": {
-                            "vec": "publicKey";
-                        };
-                    },
-                    {
-                        "name": "instructions";
-                        "docs": [
-                            "list of instructions making up the tx."
-                        ];
-                        "type": {
-                            "vec": {
-                                "defined": "CompiledInstruction";
-                            };
+                            "defined": "MsTransactionMessage";
                         };
                     }
                 ];
@@ -884,18 +924,10 @@ export declare type SquadsMpl = {
             };
         },
         {
-            "name": "CreateTransactionV2Args";
+            "name": "MsTransactionMessage";
             "type": {
                 "kind": "struct";
                 "fields": [
-                    {
-                        "name": "authorityIndex";
-                        "docs": [
-                            "Authority `0` is reserved for internal instructions,",
-                            "whereas authorities 1 or greater refer to a vault, upgrade authority, or other."
-                        ];
-                        "type": "u8";
-                    },
                     {
                         "name": "numSigners";
                         "docs": [
@@ -920,16 +952,7 @@ export declare type SquadsMpl = {
                     {
                         "name": "accountKeys";
                         "docs": [
-                            "The list of unique account public keys (including program IDs) that will be used in the provided instructions.",
-                            "The signer pubkeys appear at the beginning of the vec, with writable pubkeys first, and read-only pubkeys following.",
-                            "The non-signer pubkeys follow with writable pubkeys first and read-only ones following.",
-                            "Program IDs are also stored at the end of the vec along with other non-signer non-writable pubkeys:",
-                            "",
-                            "```plaintext",
-                            "[pubkey1, pubkey2, pubkey3, pubkey4, pubkey5, pubkey6, pubkey7, pubkey8]",
-                            "|---writable---|  |---readonly---|  |---writable---|  |---readonly---|",
-                            "|------------signers-------------|  |----------non-singers-----------|",
-                            "```"
+                            "unique account pubkeys (including program IDs) required for execution of the tx."
                         ];
                         "type": {
                             "vec": "publicKey";
@@ -937,9 +960,12 @@ export declare type SquadsMpl = {
                     },
                     {
                         "name": "instructions";
+                        "docs": [
+                            "list of instructions making up the tx."
+                        ];
                         "type": {
                             "vec": {
-                                "defined": "CompiledInstruction";
+                                "defined": "MsCompiledInstruction";
                             };
                         };
                     }
@@ -947,7 +973,7 @@ export declare type SquadsMpl = {
             };
         },
         {
-            "name": "CompiledInstruction";
+            "name": "MsCompiledInstruction";
             "type": {
                 "kind": "struct";
                 "fields": [
