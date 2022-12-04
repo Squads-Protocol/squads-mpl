@@ -463,8 +463,18 @@ pub struct MsTransactionMessage {
 }
 
 impl MsTransactionMessage {
-    /// Returns true if the account at the specified index was requested to be
-    /// writable.
+    /// Returns all the account keys in the message.
+    pub fn num_all_account_keys(&self) -> usize {
+        let num_account_keys_from_lookups = self
+            .address_table_lookups
+            .iter()
+            .map(|lookup| lookup.writable_indexes.len() + lookup.readonly_indexes.len())
+            .sum::<usize>();
+
+        num_account_keys_from_lookups + self.account_keys.len()
+    }
+
+    /// Returns true if the account at the specified index was requested to be writable.
     pub fn is_writable_index(&self, key_index: usize) -> bool {
         let num_account_keys = self.account_keys.len();
         let num_signers = usize::from(self.num_signers);
@@ -482,6 +492,11 @@ impl MsTransactionMessage {
         } else {
             key_index < usize::from(self.num_writable_signers)
         }
+    }
+
+    /// Returns true if the account at the specified index was requested to be a signer.
+    pub fn is_signer_index(&self, key_index: usize) -> bool {
+        key_index < usize::from(self.num_signers)
     }
 }
 

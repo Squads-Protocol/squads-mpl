@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import fs from "fs";
 import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
+import {Program, web3} from "@project-serum/anchor"
 import { SquadsMpl } from "../idl/squads_mpl";
 import { ProgramManager } from "../idl/program_manager";
 import { Roles } from "../idl/roles";
@@ -390,7 +390,7 @@ describe("Programs", function(){
         console.log("Serialized wrapped tx size:", wrappedTxBytes.length) // 1319 (overhead 356)
       })
 
-      it.skip(`createTransactionV2`, async function() {
+      it(`createTransactionV2`, async function() {
         // create authority to use (Vault, index 1)
         const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
 
@@ -404,38 +404,61 @@ describe("Programs", function(){
 
         // the test transfer instruction (2x)
         const testPayee = anchor.web3.Keypair.generate();
-        const testIx = await createTestTransferTransaction(
+        const testIx1 = await createTestTransferTransaction(
           authorityPDA,
           testPayee.publicKey
         );
-        const testIx2x = await createTestTransferTransaction(
+        const testIx2 = await createTestTransferTransaction(
           authorityPDA,
           testPayee.publicKey
         );
-        const originalInstructions = [testIx, testIx2x];
+        const originalInstructions = [testIx1, testIx2];
+        const testTransferMessage = new TransactionMessage({
+          recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+          payerKey: authorityPDA,
+          instructions: [testIx1, testIx2],
+        })
 
-        const txBuilder = await squads.getTransactionBuilder(msPDA, 1);
-        const [createTransactionInstruction, txPDA] = await txBuilder
-          .withInstructions(originalInstructions)
-          .createTransactionV2();
-
-        const wrappedTx = new Transaction();
-        wrappedTx.recentBlockhash = (await program.provider.connection.getLatestBlockhash()).blockhash;
-        wrappedTx.feePayer = creator.publicKey;
-        wrappedTx.add(createTransactionInstruction);
-        const wrappedTxBytes = wrappedTx.serialize({ requireAllSignatures: false })
-        await program.provider.sendAndConfirm(wrappedTx, [],{ skipPreflight: true, commitment: "confirmed" });
+        // Create.
+        const [createTransactionIx, txPDA] = await squads.buildCreateTransactionV2(msPDA, 1, testTransferMessage);
+        const createTransactionMessage = new TransactionMessage({
+          recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+          payerKey: provider.wallet.payer.publicKey,
+          instructions: [createTransactionIx],
+        }).compileToV0Message()
+        const createTransactionTx = new VersionedTransaction(createTransactionMessage)
+        createTransactionTx.sign([provider.wallet.payer])
+        const sig1 = await provider.connection.sendTransaction(createTransactionTx, { skipPreflight: true, commitment: "confirmed" });
+        await provider.connection.confirmTransaction(sig1, "confirmed");
 
         let txAccount = await program.account.msTransactionV2.fetch(txPDA)
+        expect(txAccount.status).to.have.property("active")
 
-        await squads.approveTransactionV2(txPDA, { commitment: "confirmed" });
+        // Approve.
+        const approveIx = await squads.buildApproveTransactionV2(txPDA);
+        const approveMessage = new TransactionMessage({
+          recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+          payerKey: provider.wallet.payer.publicKey,
+          instructions: [approveIx],
+        }).compileToV0Message()
+        const approveTx = new VersionedTransaction(approveMessage)
+        approveTx.sign([provider.wallet.payer])
+        const sig2 = await provider.connection.sendTransaction(approveTx, { skipPreflight: true, commitment: "confirmed" });
+        await provider.connection.confirmTransaction(sig2, "confirmed");
+
         txAccount = await program.account.msTransactionV2.fetch(txPDA)
         expect(txAccount.status).to.have.property("executeReady")
 
-        await squads.executeTransactionV2(txPDA, creator.publicKey, [], { commitment: "confirmed", skipPreflight: true });
+        // Execute.
+        const executeTx = await squads.buildExecuteTransactionV2(txPDA, provider.wallet.publicKey);
+        executeTx.sign([provider.wallet.payer])
+        const sig3 = await provider.connection.sendTransaction(executeTx, { skipPreflight: true, commitment: "confirmed" });
+        await provider.connection.confirmTransaction(sig3, "confirmed");
+
         txAccount = await program.account.msTransactionV2.fetch(txPDA)
         expect(txAccount.status).to.have.property("executed")
 
+        // Verify the transfer instructions were executed.
         const payeeBalance = await provider.connection.getBalance(testPayee.publicKey)
         expect(payeeBalance).to.equal(2000000)
       })
@@ -496,120 +519,179 @@ describe("Programs", function(){
         expect(txAccount.status).to.have.property("active")
       })
 
-      it(`createTransactionV2 with account lookup table`, async function() {
-        // Legacy MagicEden Buy NFT tx.
-        const legacyTransactionBytes = Buffer.from("AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADG/omv6Y6TpmfPm8Nv6uNO4+wIbpMEEpge++pjCXRJHafnAD+atFsxBtGSsVJXKlU4Rl6LPqgxCvgP8JumX6oPAgEJFC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtBX82VZkozhurrbZbi12eMbon+FOb7GAsyxrcKvufRnAQwjfwGJSgD4Qx0lgbtYjba02lQTrXoi+Tt9Hud6q5Zm1LzHez3eRpORE62bQk660HWs5JWsTpCUHKqqhKVzL1e/B6uWe1EG6asiC4kn2+anSeJL+Qx/12GYG+NwKoDacIr/bkEFkkZq+bSGvldnny9otBzdwx4CCSd0qPY2LtE5bClE7fneICXVOO6oTpkyP9dXySB6bpu2/M37UbiZtNw4tiKyS0JeN3O5NSihi69ksZEzxISUzTz0XmVuIZNPDljbFniLvsim6dTEc5cyoTN2b5SA3mE/vy52heCKtBsPXNul2WH2NlJWV4rgdiwGbP4az6UWif8kpvy7OdE3osDJ465OC3mEr6Ep1gB6Ce4I6WLqHK2kna5hIyk8K/w30AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL4+HroXpHP4mw9+jiSUDyCuuOvKcaiP3pXUuDtxoJYXXCW/Z3CCGN/ozP5mL25z8cjQQJ33WfsLAUj1rzV8OMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WcMbGMw+FIoKUpOBiSDt+u2rOR5JM2wLdNtmnRBHA0JL8XzARhMFxip/gfka6l966UK5BlOVMWaJrkUqN+gSCLcFIZ+JmoHU/4T7WT0u34qQrBs6s0JY998jPqUDArG9Lgan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKldDKr4rGlLvd88tmWtp8Um26HSn9iSxwtdR5YtN8SLAgQRBgABCAUPCxHyI8aJUuHytv5Apa4CAAAAABEMAAENEAgFDwMFEwsSImYGPRIB2uvq/P5Apa4CAAAAAAEAAAAAAAAAAAAAAAAAAAARFAAEAQINEAgJBQ8KAwUHBRMLDgwSKiVK2Z1PMSMG/vpApa4CAAAAAAEAAAAAAAAAAAAAAAAAAAD//////////wsCAAYMAgAAAOhgLwAAAAAA", "base64");
-        const legacyTransaction = anchor.web3.Transaction.from(legacyTransactionBytes);
+      it(`createTransactionV2 simple transfer with account lookup table`, async function() {
+        // Simple transaction - transfer to two different recipients.
+        const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
+        const testPayee1 = anchor.web3.Keypair.generate();
+        const testPayee2 = anchor.web3.Keypair.generate();
+        const testIx1 = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee1.publicKey
+        );
+        const testIx2 = await createTestTransferTransaction(
+          authorityPDA,
+          testPayee2.publicKey
+        );
+        const testTransferMessage = new TransactionMessage({
+          recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+          payerKey: authorityPDA,
+          instructions: [testIx1, testIx2],
+        });
 
-        const accountKeys = legacyTransaction.compileMessage().accountKeys
-        console.log("Account keys", JSON.stringify(accountKeys, null, 2))
-        console.log("Program IDs", JSON.stringify(
-          legacyTransaction.compileMessage().instructions.map(i => i.programIdIndex), null, 2)
-        )
+        // Additional keys to add to the lookup table, to make sure they don't affect the tx.
+        const notUsedKeys = [Keypair.generate().publicKey, Keypair.generate().publicKey];
 
-        // Add a few more pubkeys to the lookup table to see how it affects our transaction.
-        const notUsedKeys = [
-          new Keypair().publicKey,
-          new Keypair().publicKey,
-          new Keypair().publicKey,
-        ]
-
-        const [createLookupTableInstruction, lookupTableAddress] =
+        // Create lookup table.
+        const [createLookupTableIx, lookupTableAddress] =
           AddressLookupTableProgram.createLookupTable({
             authority: creator.publicKey,
             payer: creator.publicKey,
             recentSlot: await program.provider.connection.getSlot(),
           });
-
         const createLookupTableTx = new Transaction();
-        createLookupTableTx.recentBlockhash = (await program.provider.connection.getRecentBlockhash()).blockhash;
+        createLookupTableTx.recentBlockhash = (await program.provider.connection.getLatestBlockhash()).blockhash;
         createLookupTableTx.feePayer = creator.publicKey;
-        createLookupTableTx.add(createLookupTableInstruction)
+        createLookupTableTx.add(createLookupTableIx)
+        // Add all tx accounts to the lookup table.
+        createLookupTableTx.add(AddressLookupTableProgram.extendLookupTable({
+          lookupTable: lookupTableAddress,
+          authority: creator.publicKey,
+          payer: creator.publicKey,
+          addresses: [...notUsedKeys, authorityPDA, testPayee1.publicKey, testPayee2.publicKey],
+        }))
+        // Send the tx to create the lookup table.
+        await program.provider.sendAndConfirm(createLookupTableTx, [], { skipPreflight: true });
+
+        // Fetch the created lookup table.
+        const {value: lookupTable} = await program.provider.connection.getAddressLookupTable(lookupTableAddress)
+        expect(lookupTable).to.not.be.null
+
+        // Create.
+        const [createTransactionIx, txPDA] = await squads.buildCreateTransactionV2(msPDA, 1, testTransferMessage, [lookupTable]);
+        const createTransactionMessage = new TransactionMessage({
+          recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+          payerKey: provider.wallet.payer.publicKey,
+          instructions: [createTransactionIx],
+        }).compileToV0Message()
+        const createTransactionTx = new VersionedTransaction(createTransactionMessage)
+        createTransactionTx.sign([provider.wallet.payer])
+        const sig2 = await provider.connection.sendTransaction(createTransactionTx, { skipPreflight: true, commitment: "confirmed" });
+        await provider.connection.confirmTransaction(sig2, "confirmed");
+
+        let txAccount = await program.account.msTransactionV2.fetch(txPDA)
+        expect(txAccount.status).to.have.property("active")
+
+        // Approve.
+        const approveIx = await squads.buildApproveTransactionV2(txPDA);
+        const approveMessage = new TransactionMessage({
+          recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+          payerKey: provider.wallet.payer.publicKey,
+          instructions: [approveIx],
+        }).compileToV0Message()
+        const approveTx = new VersionedTransaction(approveMessage)
+        approveTx.sign([provider.wallet.payer])
+        const sig3 = await provider.connection.sendTransaction(approveTx, { skipPreflight: true, commitment: "confirmed" });
+        await provider.connection.confirmTransaction(sig3, "confirmed");
+
+        txAccount = await program.account.msTransactionV2.fetch(txPDA)
+        expect(txAccount.status).to.have.property("executeReady")
+
+        // Execute.
+        const executeTx = await squads.buildExecuteTransactionV2(txPDA, provider.wallet.publicKey);
+        executeTx.sign([provider.wallet.payer])
+        const sig4 = await provider.connection.sendTransaction(executeTx, { skipPreflight: true, commitment: "confirmed" });
+        await provider.connection.confirmTransaction(sig4, "confirmed");
+
+        txAccount = await program.account.msTransactionV2.fetch(txPDA)
+        expect(txAccount.status).to.have.property("executed")
+
+        // Verify the transfer instructions were executed.
+        const payee1Balance = await provider.connection.getBalance(testPayee1.publicKey)
+        expect(payee1Balance).to.equal(1000000)
+        const payee2Balance = await provider.connection.getBalance(testPayee2.publicKey)
+        expect(payee2Balance).to.equal(1000000)
+      })
+
+      it.skip(`createTransactionV2 MagicEden Tx with account lookup table`, async function() {
+        // Legacy MagicEden Buy NFT tx.
+        const legacyTransactionBytes = Buffer.from("AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADG/omv6Y6TpmfPm8Nv6uNO4+wIbpMEEpge++pjCXRJHafnAD+atFsxBtGSsVJXKlU4Rl6LPqgxCvgP8JumX6oPAgEJFC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtBX82VZkozhurrbZbi12eMbon+FOb7GAsyxrcKvufRnAQwjfwGJSgD4Qx0lgbtYjba02lQTrXoi+Tt9Hud6q5Zm1LzHez3eRpORE62bQk660HWs5JWsTpCUHKqqhKVzL1e/B6uWe1EG6asiC4kn2+anSeJL+Qx/12GYG+NwKoDacIr/bkEFkkZq+bSGvldnny9otBzdwx4CCSd0qPY2LtE5bClE7fneICXVOO6oTpkyP9dXySB6bpu2/M37UbiZtNw4tiKyS0JeN3O5NSihi69ksZEzxISUzTz0XmVuIZNPDljbFniLvsim6dTEc5cyoTN2b5SA3mE/vy52heCKtBsPXNul2WH2NlJWV4rgdiwGbP4az6UWif8kpvy7OdE3osDJ465OC3mEr6Ep1gB6Ce4I6WLqHK2kna5hIyk8K/w30AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL4+HroXpHP4mw9+jiSUDyCuuOvKcaiP3pXUuDtxoJYXXCW/Z3CCGN/ozP5mL25z8cjQQJ33WfsLAUj1rzV8OMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WcMbGMw+FIoKUpOBiSDt+u2rOR5JM2wLdNtmnRBHA0JL8XzARhMFxip/gfka6l966UK5BlOVMWaJrkUqN+gSCLcFIZ+JmoHU/4T7WT0u34qQrBs6s0JY998jPqUDArG9Lgan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKldDKr4rGlLvd88tmWtp8Um26HSn9iSxwtdR5YtN8SLAgQRBgABCAUPCxHyI8aJUuHytv5Apa4CAAAAABEMAAENEAgFDwMFEwsSImYGPRIB2uvq/P5Apa4CAAAAAAEAAAAAAAAAAAAAAAAAAAARFAAEAQINEAgJBQ8KAwUHBRMLDgwSKiVK2Z1PMSMG/vpApa4CAAAAAAEAAAAAAAAAAAAAAAAAAAD//////////wsCAAYMAgAAAOhgLwAAAAAA", "base64");
+        const legacyTransaction = anchor.web3.Transaction.from(legacyTransactionBytes);
+
+        const accountKeys = legacyTransaction.compileMessage().accountKeys
+        // Additional keys to add to the lookup table, to make sure they don't affect the tx.
+        const notUsedKeys = [Keypair.generate().publicKey, Keypair.generate().publicKey];
+
+        // Create lookup table.
+        const [createLookupTableIx, lookupTableAddress] =
+          AddressLookupTableProgram.createLookupTable({
+            authority: creator.publicKey,
+            payer: creator.publicKey,
+            recentSlot: await program.provider.connection.getSlot(),
+          });
+        const createLookupTableTx = new Transaction();
+        createLookupTableTx.recentBlockhash = (await program.provider.connection.getLatestBlockhash()).blockhash;
+        createLookupTableTx.feePayer = creator.publicKey;
+        createLookupTableTx.add(createLookupTableIx)
         // Add all tx accounts to the lookup table.
         createLookupTableTx.add(AddressLookupTableProgram.extendLookupTable({
             lookupTable: lookupTableAddress,
             authority: creator.publicKey,
             payer: creator.publicKey,
-            addresses: [...accountKeys, ...notUsedKeys],
+            addresses: [...notUsedKeys, ...accountKeys],
         }))
 
         // Send the tx to create the lookup table.
         await program.provider.sendAndConfirm(createLookupTableTx, [], { skipPreflight: true });
 
-        const alt = await program.provider.connection.getAddressLookupTable(lookupTableAddress)
-        expect(alt).to.not.be.null
-        console.log("Lookup table created", lookupTableAddress.toBase58())
-        console.log("Lookup table", JSON.stringify(alt.value.state.addresses, null, 2))
+        // Fetch the created lookup table.
+        const {value: lookupTable} = await program.provider.connection.getAddressLookupTable(lookupTableAddress)
+        expect(lookupTable).to.not.be.null
 
         // Transform legacy tx into a versioned transaction.
-        const messageV0 = new TransactionMessage({
+        const message = new TransactionMessage({
           recentBlockhash: legacyTransaction.recentBlockhash,
           payerKey: legacyTransaction.feePayer,
           instructions: legacyTransaction.instructions,
-        }).compileToV0Message([alt.value]);
+        });
 
-        const versionedTransaction = new VersionedTransaction(messageV0);
-
-        console.log("Versioned tx message.staticAccountKeys", JSON.stringify(versionedTransaction.message.staticAccountKeys, null, 2))
-        console.log("Versioned tx message.addressTableLookups:", JSON.stringify(versionedTransaction.message.addressTableLookups, null, 2))
-
-        const versionedTransactionBytes = versionedTransaction.serialize()
-        console.log("versionedTransactionBytes.length", versionedTransactionBytes.length)
-
-        const [createTransactionInstruction, txPDA] = await squads.buildCreateTransactionV2(msPDA, 1, messageV0)
-        const wrappedTx = new Transaction();
-        wrappedTx.recentBlockhash = legacyTransaction.recentBlockhash;
-        wrappedTx.feePayer = creator.publicKey;
-        wrappedTx.add(createTransactionInstruction);
-
-        await program.provider.sendAndConfirm(wrappedTx, [], { skipPreflight: true, commitment: "confirmed" });
+        // Create.
+        const [createTransactionIx, txPDA] = await squads.buildCreateTransactionV2(msPDA, 1, message, [lookupTable]);
+        const createTransactionMessage = new TransactionMessage({
+          recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+          payerKey: provider.wallet.payer.publicKey,
+          instructions: [createTransactionIx],
+        }).compileToV0Message()
+        const createTransactionTx = new VersionedTransaction(createTransactionMessage)
+        createTransactionTx.sign([provider.wallet.payer])
+        const sig1 = await provider.connection.sendTransaction(createTransactionTx, { skipPreflight: true, commitment: "confirmed" });
+        await provider.connection.confirmTransaction(sig1, "confirmed");
 
         let txAccount = await program.account.msTransactionV2.fetch(txPDA)
-        console.log("Tx account", JSON.stringify(txAccount, null, 2))
         expect(txAccount.status).to.have.property("active")
 
-        await squads.approveTransactionV2(txPDA, {commitment: "confirmed"})
+        // Approve.
+        const approveIx = await squads.buildApproveTransactionV2(txPDA);
+        const approveMessage = new TransactionMessage({
+          recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
+          payerKey: provider.wallet.payer.publicKey,
+          instructions: [approveIx],
+        }).compileToV0Message()
+        const approveTx = new VersionedTransaction(approveMessage)
+        approveTx.sign([provider.wallet.payer])
+        const sig2 = await provider.connection.sendTransaction(approveTx, { skipPreflight: true, commitment: "confirmed" });
+        await provider.connection.confirmTransaction(sig2, "confirmed");
+
         txAccount = await program.account.msTransactionV2.fetch(txPDA)
         expect(txAccount.status).to.have.property("executeReady")
 
-        const executeVersionedTx = await squads.buildExecuteTransactionV2(txPDA);
+        // Execute.
+        const executeTx = await squads.buildExecuteTransactionV2(txPDA, provider.wallet.publicKey);
+        executeTx.sign([provider.wallet.payer])
+        const sig3 = await provider.connection.sendTransaction(executeTx, { skipPreflight: true, commitment: "confirmed" });
+        await provider.connection.confirmTransaction(sig3, "confirmed");
 
-        // airdrop
-        try {
-          const ad = await provider.connection.requestAirdrop(memberList[0].publicKey, 2 * anchor.web3.LAMPORTS_PER_SOL);
-          await provider.connection.confirmTransaction(ad);
-        }catch(e){
-          console.log(e);
-        }
-
-        executeVersionedTx.sign([memberList[0]])
-        const executeVersionedTxBytes = executeVersionedTx.serialize()
-        await provider.connection.sendRawTransaction(executeVersionedTxBytes, {skipPreflight: true, commitment: "confirmed"})
         txAccount = await program.account.msTransactionV2.fetch(txPDA)
         expect(txAccount.status).to.have.property("executed")
-
-        // versionedTransaction.message.
-
-        // const originalInstructions = originalTransaction.instructions;
-        // expect(originalInstructions.length).to.equal(4);
-        //
-        // const txBuilder = await squads.getTransactionBuilder(msPDA, 1);
-        // const [createTransactionInstruction] = await txBuilder
-        //   .withInstructions(originalInstructions)
-        //   .createTransactionV2();
-        //
-        // const wrappedTx = new Transaction();
-        // wrappedTx.recentBlockhash = originalTransaction.recentBlockhash;
-        // wrappedTx.feePayer = creator.publicKey;
-        // wrappedTx.add(createTransactionInstruction);
-        // const wrappedTxBytes = wrappedTx.serialize({ requireAllSignatures: false })
-        // const overhead = wrappedTxBytes.length - originalTransactionBytes.length
-        // // expect(overhead).to.equal(208); // Getting rid of remaining_account
-        // // expect(overhead).to.equal(148); // Using optimized header
-        // expect(overhead).to.equal(126); // Using small arrays
-        //
-        // await program.provider.sendAndConfirm(wrappedTx, [],{ skipPreflight: true });
-        // console.log("Wrapped tx confirmed")
       })
 
       it.skip(`2X Transfer Tx Execute`, async function() {

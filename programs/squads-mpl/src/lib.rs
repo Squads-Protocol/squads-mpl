@@ -1,7 +1,5 @@
 use std::convert::TryInto;
 use std::convert::From;
-use std::collections::HashSet;
-use std::iter::FromIterator;
 
 use anchor_lang::{Discriminator, prelude::*, solana_program::instruction::Instruction};
 use anchor_lang::solana_program::{program::{invoke, invoke_signed}, system_instruction::transfer};
@@ -10,13 +8,11 @@ use solana_security_txt::security_txt;
 
 use errors::*;
 use state::ms::*;
-
-use crate::util::InitPdaArgs;
+use state::aux::ExecutableTransactionMessage;
+use util::InitPdaArgs;
 
 pub mod state;
-
 pub mod errors;
-
 mod util;
 
 security_txt! {
@@ -683,13 +679,11 @@ pub mod squads_mpl {
         Ok(())
     }
 
-    // instruction to execute a transaction
-    // transaction status must be "executeReady"
+    // Instruction to execute a MsTransactionV2.
+    // Transaction status must be "executeReady".
     pub fn execute_transaction_v2<'info>(ctx: Context<'_,'_,'_,'info, ExecuteTransactionV2<'info>>) -> Result<()> {
-        // use for derivation for the authority
         let ms_key = ctx.accounts.multisig.key();
-
-        // default authority seeds to auth index > 0
+        // Default authority seeds to auth index > 0.
         let authority_seeds = [
             b"squad",
             ms_key.as_ref(),
@@ -698,63 +692,27 @@ pub mod squads_mpl {
             &[ctx.accounts.transaction.authority_bump]
         ];
 
+        let authority_pubkey = Pubkey::create_program_address(&authority_seeds, ctx.program_id).unwrap();
+
         let transaction_message = &ctx.accounts.transaction.message;
+        let num_lookups = transaction_message.address_table_lookups.len();
+        let loaded_message = ExecutableTransactionMessage::new_validated(
+            transaction_message,
+            ctx.remaining_accounts.get(num_lookups..).ok_or(MsError::InvalidNumberOfAccounts)?,
+            ctx.remaining_accounts.get(..num_lookups).ok_or(MsError::InvalidNumberOfAccounts)?,
+            &authority_pubkey,
+        )?;
 
-        // sanity check, `remaining_accounts` should be the same as the `transaction_message.account_keys`
-        require_eq!(ctx.remaining_accounts.len(), transaction_message.account_keys.len(), MsError::InvalidNumberOfAccounts);
-        let transaction_account_keys_set: HashSet<&Pubkey> = HashSet::from_iter(transaction_message.account_keys.iter());
-        for remaining_account in ctx.remaining_accounts {
-            require!(transaction_account_keys_set.contains(&remaining_account.key()), MsError::InvalidRemainingAccount);
-        }
-
-        for ms_compiled_instruction in transaction_message.instructions.iter() {
-            let ix_program_id = *transaction_message.account_keys.get(ms_compiled_instruction.program_id_index as usize).unwrap();
-
-            let ix_accounts: Vec<(AccountInfo<'info>, AccountMeta)> = ms_compiled_instruction
-                .account_indexes
-                .iter()
-                .map(|account_index| {
-                    let account_key = transaction_message.account_keys.get(usize::from(*account_index)).unwrap();
-
-                    let account_info = ctx.remaining_accounts.iter().find(|account_info| account_info.key == account_key).unwrap();
-
-                    let is_signer = account_index < &transaction_message.num_signers;
-                    let is_writable = transaction_message.is_writable_index(usize::from(*account_index));
-
-                    let account_meta = if is_writable {
-                        AccountMeta::new(*account_key, is_signer)
-                    } else {
-                        AccountMeta::new_readonly(*account_key, is_signer)
-                    };
-
-                    (account_info.clone(), account_meta)
-                })
-                .collect();
-
-            let ix = Instruction {
-                program_id: ix_program_id,
-                accounts: ix_accounts.iter().map(|(_, account_meta)| account_meta.clone()).collect(),
-                data: ms_compiled_instruction.data.clone(),
-            };
-
-            let mut account_infos: Vec<AccountInfo> = ix_accounts.into_iter()
-                .map(|(account_info, _)| account_info)
-                .collect();
-            // Add Program ID
-            account_infos.push(
-                ctx.remaining_accounts.iter()
-                    .find(|account_info| *account_info.key == ix_program_id).unwrap().clone(),
-            );
-
-
+        // Execute the transaction instructions one-by-one.
+        for (ix, account_infos) in loaded_message.to_instructions_and_accounts().iter() {
             invoke_signed(
-                &ix,
-                &account_infos,
+                ix,
+                account_infos,
                 &[&authority_seeds]
             )?;
         }
 
-        // mark it as executed
+        // Mark it as executed
         ctx.accounts.transaction.set_executed()?;
         Ok(())
     }
@@ -1235,4 +1193,9 @@ pub struct ExecuteTransactionV2<'info> {
 
     #[account(mut)]
     pub member: Signer<'info>,
+
+    // `remaining_accounts` must include the following accounts in the exact order:
+    // 1. AddressLookupTable accounts in the order they appear in `message.address_table_lookups`.
+    // 2. Accounts in the order they appear in `message.account_keys`.
+    // 3. Accounts in the order they appear in `message.address_table_lookups`.
 }

@@ -10,7 +10,7 @@ import {
   MessageV0,
   VersionedTransaction,
   TransactionMessage,
-  MessageAddressTableLookup,
+  MessageAddressTableLookup, AddressLookupTableAccount,
 } from "@solana/web3.js"
 import {
   DEFAULT_MULTISIG_PROGRAM_ID,
@@ -21,7 +21,7 @@ import { SquadsMpl } from "../../target/types/squads_mpl";
 import programManagerJSON from "../../target/idl/program_manager.json";
 import { ProgramManager } from "../../target/types/program_manager";
 import { Wallet } from "@project-serum/anchor/dist/cjs/provider";
-import {AnchorProvider, Program, web3} from "@project-serum/anchor"
+import {Address, AnchorProvider, Program, web3} from "@project-serum/anchor"
 import {
   InstructionAccount,
   ManagedProgramAccount,
@@ -43,7 +43,8 @@ import {
 import BN from "bn.js";
 import * as anchor from "@project-serum/anchor";
 import { TransactionBuilder } from "./tx_builder";
-import {transactionMessageBeet} from "./beets"
+import {transactionMessageBeet, TransactionMessage as MsTransactionMessage} from "./beets"
+import * as assert from "assert"
 
 class Squads {
   readonly connection: Connection;
@@ -402,62 +403,6 @@ class Squads {
     );
     return await methods.instruction();
   }
-  async buildCreateTransactionV2(
-    multisigPDA: PublicKey,
-    authorityIndex: number,
-    message: MessageV0,
-  ): Promise<[TransactionInstruction, PublicKey]> {
-    const nextTransactionIndex = await this.getNextTransactionIndex(
-      multisigPDA
-    );
-    const [transactionPDA] = getTxPDA(
-      multisigPDA,
-      new BN(nextTransactionIndex, 10),
-      this.multisigProgramId
-    );
-    const createTxInstruction = await this._buildCreateTransactionV2(multisigPDA, transactionPDA, authorityIndex, message);
-
-    return [createTxInstruction, transactionPDA];
-  }
-  private async _buildCreateTransactionV2(
-    multisigPDA: PublicKey,
-    transactionPDA: PublicKey,
-    authorityIndex: number,
-    message: MessageV0,
-  ): Promise<TransactionInstruction> {
-    const allResolvableIndexes = new Set([
-      ...message.staticAccountKeys,
-      ...message.addressTableLookups.flatMap(
-        (a) => [...a.writableIndexes, ...a.readonlyIndexes]
-      ),
-    ]);
-
-    const [transactionMessageBytes] = transactionMessageBeet.serialize({
-        numSigners: message.header.numRequiredSignatures,
-        numWritableSigners: message.header.numRequiredSignatures - message.header.numReadonlySignedAccounts,
-        numWritableNonSigners: message.staticAccountKeys.length - message.header.numRequiredSignatures - message.header.numReadonlyUnsignedAccounts,
-        accountKeys: message.staticAccountKeys,
-        instructions: message.compiledInstructions.map((ix) => {
-          return {
-            programIdIndex: ix.programIdIndex,
-            // This is a temporary hack, MessageV0 shouldn't include into `instruction.accountKeyIndexes` ones
-            // that are neither in `accountKeys` nor in `addressTableLookups`. We saw it happen with soma Program IDs.
-            accountIndexes: ix.accountKeyIndexes.filter((i) => allResolvableIndexes.has(i)),
-            data: Array.from(ix.data),
-          }
-        }),
-        addressTableLookups: message.addressTableLookups,
-      }
-    )
-
-    return await this.multisig.methods.createTransactionV2(authorityIndex, transactionMessageBytes)
-      .accounts({
-        multisig: multisigPDA,
-        transaction: transactionPDA,
-        creator: this.provider.wallet.publicKey,
-      })
-      .instruction();
-  }
   private async _addInstruction(
     multisigPDA: PublicKey,
     transactionPDA: PublicKey,
@@ -548,16 +493,6 @@ class Squads {
       member: this.wallet.publicKey,
     });
   }
-  private async _approveTransactionV2(
-    multisigPDA: PublicKey,
-    transactionPDA: PublicKey
-  ): Promise<SquadsMethods> {
-    return this.multisig.methods.approveTransactionV2().accounts({
-      multisig: multisigPDA,
-      transaction: transactionPDA,
-      member: this.wallet.publicKey,
-    });
-  }
   async approveTransaction(
     transactionPDA: PublicKey
   ): Promise<TransactionAccount> {
@@ -568,18 +503,6 @@ class Squads {
     );
     await methods.rpc();
     return await this.getTransaction(transactionPDA);
-  }
-  async approveTransactionV2(
-    transactionPDA: PublicKey,
-    confirmOptions?: ConfirmOptions
-  ): Promise<TransactionV2Account> {
-    const transaction = await this.getTransactionV2(transactionPDA);
-    const methods = await this._approveTransactionV2(
-      transaction.ms,
-      transactionPDA
-    );
-    await methods.rpc(confirmOptions);
-    return await this.getTransactionV2(transactionPDA);
   }
   async buildApproveTransaction(
     multisigPDA: PublicKey,
@@ -763,129 +686,6 @@ class Squads {
     await this.provider.sendAndConfirm(executeTx, signers);
     return await this.getTransaction(transactionPDA);
   }
-  private async _buildExecuteTransactionV2(
-    transactionPDA: PublicKey,
-    feePayer: PublicKey
-  ): Promise<VersionedTransaction> {
-    const transaction = await this.getTransactionV2(transactionPDA);
-    const authorityPda = this.getAuthorityPDA(transaction.ms, transaction.authorityIndex);
-
-    const addressLookupTableKeys: PublicKey[] = (transaction.message.addressTableLookups as any).map(({ accountKey }: { accountKey: anchor.web3.PublicKey }) => accountKey)
-    const addressLookupTableAccounts = await Promise.all(addressLookupTableKeys.map(async (key) => {
-      const { value } = await this.connection.getAddressLookupTable(key)
-      if (!value) {
-        throw new Error(`Address lookup table account ${key.toBase58()} not found`)
-      }
-      return value
-    }))
-
-    // Populate remaining accounts required for execution of the transaction.
-    const remainingAccounts: AccountMeta[] = [];
-    for (const ix of transaction.message.instructions as any) {
-      const programId = transaction.message.accountKeys[ix.programIdIndex];
-
-      if (!remainingAccounts.find(k => k.pubkey.equals(programId))) {
-        remainingAccounts.push({ pubkey: programId, isSigner: false, isWritable: false });
-      }
-
-      for (const accountIndex of ix.accountIndexes) {
-        let accountKey: PublicKey | undefined = undefined;
-        if (accountIndex >= transaction.message.accountKeys.length) {
-          let cursorIndex = transaction.message.accountKeys.length
-          for (const lookup of transaction.message.addressTableLookups as MessageAddressTableLookup[]) {
-            let indexes = [...lookup.writableIndexes, ...lookup.readonlyIndexes]
-            const found = indexes.find((index) => index === accountIndex)
-
-            if (found) {
-              const addressLookupTableAccount = addressLookupTableAccounts.find((account) => account.key.equals(lookup.accountKey))
-              if (!addressLookupTableAccount) {
-                throw new Error(`Address lookup table account ${lookup.accountKey.toBase58()} not found`)
-              }
-
-              const lookupIndex = accountIndex - cursorIndex
-
-              accountKey = addressLookupTableAccount.state.addresses[lookupIndex]
-              break
-            }
-
-            cursorIndex += indexes.length
-          }
-        } else {
-          accountKey = transaction.message.accountKeys[accountIndex];
-        }
-
-        if (!accountKey) {
-          throw new Error(`Account key not found for index ${accountIndex}`);
-        }
-
-        const accountMeta: AccountMeta = {
-          pubkey: accountKey,
-          // FIXME: Take the ATLs into account.
-          isWritable: accountIndex < transaction.message.numWritableSigners
-            || (accountIndex >= transaction.message.numSigners && accountIndex < (transaction.message.numSigners + transaction.message.numWritableNonSigners)),
-          // NOTE: authorityPda cannot be marked as signer because it's a PDA.
-          isSigner: accountIndex < transaction.message.numSigners && !accountKey.equals(authorityPda)
-        }
-
-        const foundMeta = remainingAccounts.find(k => k.pubkey.equals(accountKey!))
-        if (!foundMeta) {
-          remainingAccounts.push(accountMeta);
-        } else {
-          foundMeta.isSigner ||= accountMeta.isSigner;
-          foundMeta.isWritable ||= accountMeta.isWritable;
-        }
-      }
-    }
-
-    const transactionInstruction = await this.multisig.methods
-      .executeTransactionV2()
-      .accounts({
-        multisig: transaction.ms,
-        transaction: transactionPDA,
-        member: feePayer,
-      })
-      .remainingAccounts(remainingAccounts)
-      .instruction()
-
-    const { blockhash } = await this.connection.getLatestBlockhash();
-
-    const messageV0 = new TransactionMessage({
-      recentBlockhash: blockhash,
-      payerKey: feePayer,
-      instructions: [transactionInstruction],
-    }).compileToV0Message(addressLookupTableAccounts);
-
-    return new VersionedTransaction(messageV0);
-  }
-  async buildExecuteTransactionV2(
-    transactionPDA: PublicKey,
-    feePayer?: PublicKey,
-  ): Promise<VersionedTransaction> {
-    const payer = feePayer ?? this.wallet.publicKey;
-
-    return await this._buildExecuteTransactionV2(transactionPDA, payer);
-  }
-  // async executeTransactionV2(
-  //   transactionPDA: PublicKey,
-  //   feePayer?: PublicKey,
-  //   signers?: Signer[],
-  //   confirmOptions?: ConfirmOptions
-  // ): Promise<TransactionV2Account> {
-  //   const payer = feePayer ?? this.wallet.publicKey;
-  //   const executeIx = await this._buildExecuteTransactionV2(transactionPDA, payer);
-  //
-  //   const { blockhash } = await this.connection.getLatestBlockhash();
-  //   const lastValidBlockHeight = await this.connection.getBlockHeight();
-  //   const executeTx = new anchor.web3.Transaction({
-  //     blockhash,
-  //     lastValidBlockHeight,
-  //     feePayer: payer,
-  //   });
-  //   executeTx.add(executeIx);
-  //   await this.provider.sendAndConfirm(executeTx, signers, confirmOptions);
-  //   return await this.getTransactionV2(transactionPDA);
-  // }
-
   async buildExecuteTransaction(
     transactionPDA: PublicKey,
     feePayer?: PublicKey
@@ -1009,6 +809,231 @@ class Squads {
       .rpc();
     return await this.getProgramUpgrade(programUpgradePDA);
   }
+  async buildCreateTransactionV2(
+    multisigPDA: PublicKey,
+    authorityIndex: number,
+    message: TransactionMessage,
+    addressLookupTableAccounts?: AddressLookupTableAccount[]
+  ): Promise<[TransactionInstruction, PublicKey]> {
+    // .compileToV0Message([alt.value]);
+    // console.log("message.staticAccountKeys", JSON.stringify(testTransferMessageV0.staticAccountKeys, null, 2))
+    // console.log("message.addressTableLookups:", JSON.stringify(testTransferMessageV0.addressTableLookups, null, 2))
+    const nextTransactionIndex = await this.getNextTransactionIndex(
+      multisigPDA
+    );
+    const [transactionPDA] = getTxPDA(
+      multisigPDA,
+      new BN(nextTransactionIndex, 10),
+      this.multisigProgramId
+    );
+    const createTxInstruction = await this._buildCreateTransactionV2(multisigPDA, transactionPDA, authorityIndex, message, addressLookupTableAccounts);
+
+    return [createTxInstruction, transactionPDA];
+  }
+  private async _buildCreateTransactionV2(
+    multisigPDA: PublicKey,
+    transactionPDA: PublicKey,
+    authorityIndex: number,
+    message: TransactionMessage,
+    addressLookupTableAccounts?: AddressLookupTableAccount[]
+  ): Promise<TransactionInstruction> {
+    const authorityPDA = await this.getAuthorityPDA(multisigPDA, authorityIndex);
+    // Make sure authority is marked as non-signer in all instructions,
+    // otherwise the message will be serialized in incorrect format.
+    message.instructions.forEach((instruction) => {
+      instruction.keys.forEach((key) => {
+        if (key.pubkey.equals(authorityPDA)) {
+          key.isSigner = false;
+        }
+      });
+    });
+
+    const compiledMessage = message.compileToV0Message(addressLookupTableAccounts);
+
+    const [transactionMessageBytes] = transactionMessageBeet.serialize({
+        numSigners: compiledMessage.header.numRequiredSignatures,
+        numWritableSigners: compiledMessage.header.numRequiredSignatures - compiledMessage.header.numReadonlySignedAccounts,
+        numWritableNonSigners: compiledMessage.staticAccountKeys.length - compiledMessage.header.numRequiredSignatures - compiledMessage.header.numReadonlyUnsignedAccounts,
+        accountKeys: compiledMessage.staticAccountKeys,
+        instructions: compiledMessage.compiledInstructions.map((ix) => {
+          return {
+            programIdIndex: ix.programIdIndex,
+            accountIndexes: ix.accountKeyIndexes,
+            data: Array.from(ix.data),
+          }
+        }),
+        addressTableLookups: compiledMessage.addressTableLookups,
+      }
+    )
+
+    return await this.multisig.methods.createTransactionV2(authorityIndex, transactionMessageBytes)
+      .accounts({
+        multisig: multisigPDA,
+        transaction: transactionPDA,
+        creator: this.provider.wallet.publicKey,
+      })
+      .instruction();
+  }
+  async buildApproveTransactionV2(
+    transactionPDA: PublicKey,
+  ): Promise<TransactionInstruction> {
+    const transaction = await this.getTransactionV2(transactionPDA);
+
+    return await this.multisig.methods.approveTransactionV2().accounts({
+      multisig: transaction.ms,
+      transaction: transactionPDA,
+      member: this.wallet.publicKey,
+    }).instruction();
+  }
+  async approveTransactionV2(
+    transactionPDA: PublicKey,
+    confirmOptions?: ConfirmOptions
+  ): Promise<TransactionV2Account> {
+    const transaction = await this.getTransactionV2(transactionPDA);
+    await this.multisig.methods.approveTransactionV2().accounts({
+      multisig: transaction.ms,
+      transaction: transactionPDA,
+      member: this.wallet.publicKey,
+    }).rpc(confirmOptions);
+    return await this.getTransactionV2(transactionPDA);
+  }
+  async buildExecuteTransactionV2(
+    transactionPDA: PublicKey,
+    feePayer?: PublicKey,
+  ): Promise<VersionedTransaction> {
+    const payer = feePayer ?? this.wallet.publicKey;
+
+    return await this._buildExecuteTransactionV2(transactionPDA, payer);
+  }
+  private async _buildExecuteTransactionV2(
+    transactionPDA: PublicKey,
+    feePayer: PublicKey
+  ): Promise<VersionedTransaction> {
+    const transaction = await this.getTransactionV2(transactionPDA);
+    const authorityPda = this.getAuthorityPDA(transaction.ms, transaction.authorityIndex);
+
+    const message = transaction.message as MsTransactionMessage
+
+    const addressLookupTableKeys: PublicKey[] = (message.addressTableLookups as any).map(({ accountKey }: { accountKey: anchor.web3.PublicKey }) => accountKey)
+    const addressLookupTableAccounts: Map<string, AddressLookupTableAccount> = new Map(
+      await Promise.all(
+        addressLookupTableKeys.map(async (key) => {
+          const { value } = await this.connection.getAddressLookupTable(key)
+          if (!value) {
+            throw new Error(`Address lookup table account ${key.toBase58()} not found`)
+          }
+          return [key.toBase58(), value] as const
+        }))
+    )
+
+    // Populate remaining accounts required for execution of the transaction.
+    const remainingAccounts: AccountMeta[] = [];
+    // First add the lookup table accounts used by the transaction. They are needed for on-chain validation.
+    remainingAccounts.push(...addressLookupTableKeys.map((key) => {
+      return { pubkey: key, isSigner: false, isWritable: false }
+    }));
+    // Then add static account keys included into the message.
+    for (const [accountIndex, accountKey] of message.accountKeys.entries()) {
+      remainingAccounts.push({
+        pubkey: accountKey,
+        isWritable: isWritableIndex(message, accountIndex),
+        // NOTE: authorityPda cannot be marked as signer because it's a PDA.
+        isSigner: isSignerIndex(message, accountIndex) && !accountKey.equals(authorityPda)
+      })
+    }
+    // Then add accounts that will be loaded with address lookup tables.
+    for (const lookup of message.addressTableLookups) {
+      const lookupTableAccount = addressLookupTableAccounts.get(lookup.accountKey.toBase58())
+      assert.ok(lookupTableAccount, `Address lookup table account ${lookup.accountKey.toBase58()} not found`)
+
+      for (const accountIndex of lookup.writableIndexes) {
+        const pubkey = lookupTableAccount.state.addresses[accountIndex]
+        assert.ok(pubkey, `Address lookup table account ${lookup.accountKey.toBase58()} does not contain address at index ${accountIndex}`)
+        remainingAccounts.push({
+          pubkey,
+          isWritable: true,
+          // Accounts in address lookup tables can not be signers.
+          isSigner: false
+        })
+      }
+      for (const accountIndex of lookup.readonlyIndexes) {
+        const pubkey = lookupTableAccount.state.addresses[accountIndex]
+        assert.ok(pubkey, `Address lookup table account ${lookup.accountKey.toBase58()} does not contain address at index ${accountIndex}`)
+        remainingAccounts.push({
+          pubkey,
+          isWritable: false,
+          // Accounts in address lookup tables can not be signers.
+          isSigner: false
+        })
+      }
+    }
+
+    const transactionInstruction = await this.multisig.methods
+      .executeTransactionV2()
+      .accounts({
+        multisig: transaction.ms,
+        transaction: transactionPDA,
+        member: feePayer,
+      })
+      .remainingAccounts(remainingAccounts)
+      .instruction()
+
+    const { blockhash } = await this.connection.getLatestBlockhash();
+
+    const messageV0 = new TransactionMessage({
+      recentBlockhash: blockhash,
+      payerKey: feePayer,
+      instructions: [transactionInstruction],
+    }).compileToV0Message([...addressLookupTableAccounts.values()]);
+
+    return new VersionedTransaction(messageV0);
+  }
+  // async executeTransactionV2(
+  //   transactionPDA: PublicKey,
+  //   feePayer?: PublicKey,
+  //   signers?: Signer[],
+  //   confirmOptions?: ConfirmOptions
+  // ): Promise<TransactionV2Account> {
+  //   const payer = feePayer ?? this.wallet.publicKey;
+  //   const executeIx = await this._buildExecuteTransactionV2(transactionPDA, payer);
+  //
+  //   const { blockhash } = await this.connection.getLatestBlockhash();
+  //   const lastValidBlockHeight = await this.connection.getBlockHeight();
+  //   const executeTx = new anchor.web3.Transaction({
+  //     blockhash,
+  //     lastValidBlockHeight,
+  //     feePayer: payer,
+  //   });
+  //   executeTx.add(executeIx);
+  //   await this.provider.sendAndConfirm(executeTx, signers, confirmOptions);
+  //   return await this.getTransactionV2(transactionPDA);
+  // }
+}
+
+
+function isWritableIndex(message: MsTransactionMessage, index: number) {
+  const numAccountKeys = message.accountKeys.length;
+  const numSigners = message.numSigners;
+  if (index >= numAccountKeys) {
+    // Check if the index corresponds to a writable account loaded with a lookup table.
+    const loadedAddressesIndex = index - numAccountKeys;
+    const numWritableDynamicAddresses = message.addressTableLookups.reduce((sum, {writableIndexes}) => {
+        sum += writableIndexes.length;
+        return sum;
+      }, 0)
+    return loadedAddressesIndex < numWritableDynamicAddresses;
+  } else if (index >= numSigners) {
+    // Check if the account is a writable non-signer.
+    const nonSignerAccountIndex = index - numSigners;
+    return nonSignerAccountIndex < message.numWritableNonSigners;
+  } else {
+    // Check if the account is a writable signer.
+    return index < message.numWritableSigners;
+  }
+}
+
+function isSignerIndex(message: MsTransactionMessage, index: number) {
+  return index < message.numSigners
 }
 
 export default Squads;

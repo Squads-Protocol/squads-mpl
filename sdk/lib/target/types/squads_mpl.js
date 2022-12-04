@@ -1185,8 +1185,7 @@ exports.IDL = {
         },
         {
             "code": 6014,
-            "name": "InvalidRemainingAccount",
-            "msg": "Remaining account is not a part of transaction message."
+            "name": "InvalidAccount"
         }
     ]
 };

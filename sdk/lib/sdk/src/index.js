@@ -48,6 +48,7 @@ const bn_js_1 = __importDefault(require("bn.js"));
 const anchor = __importStar(require("@project-serum/anchor"));
 const tx_builder_1 = require("./tx_builder");
 const beets_1 = require("./beets");
+const assert = __importStar(require("assert"));
 class Squads {
     constructor({ connection, wallet, multisigProgramId, programManagerProgramId, }) {
         this.connection = connection;
@@ -237,45 +238,6 @@ class Squads {
             return yield methods.instruction();
         });
     }
-    buildCreateTransactionV2(multisigPDA, authorityIndex, message) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const nextTransactionIndex = yield this.getNextTransactionIndex(multisigPDA);
-            const [transactionPDA] = (0, address_1.getTxPDA)(multisigPDA, new bn_js_1.default(nextTransactionIndex, 10), this.multisigProgramId);
-            const createTxInstruction = yield this._buildCreateTransactionV2(multisigPDA, transactionPDA, authorityIndex, message);
-            return [createTxInstruction, transactionPDA];
-        });
-    }
-    _buildCreateTransactionV2(multisigPDA, transactionPDA, authorityIndex, message) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const allResolvableIndexes = new Set([
-                ...message.staticAccountKeys,
-                ...message.addressTableLookups.flatMap((a) => [...a.writableIndexes, ...a.readonlyIndexes]),
-            ]);
-            const [transactionMessageBytes] = beets_1.transactionMessageBeet.serialize({
-                numSigners: message.header.numRequiredSignatures,
-                numWritableSigners: message.header.numRequiredSignatures - message.header.numReadonlySignedAccounts,
-                numWritableNonSigners: message.staticAccountKeys.length - message.header.numRequiredSignatures - message.header.numReadonlyUnsignedAccounts,
-                accountKeys: message.staticAccountKeys,
-                instructions: message.compiledInstructions.map((ix) => {
-                    return {
-                        programIdIndex: ix.programIdIndex,
-                        // This is a temporary hack, MessageV0 shouldn't include into `instruction.accountKeyIndexes` ones
-                        // that are neither in `accountKeys` nor in `addressTableLookups`.
-                        accountIndexes: ix.accountKeyIndexes.filter((i) => allResolvableIndexes.has(i)),
-                        data: Array.from(ix.data),
-                    };
-                }),
-                addressTableLookups: message.addressTableLookups,
-            });
-            return yield this.multisig.methods.createTransactionV2(authorityIndex, transactionMessageBytes)
-                .accounts({
-                multisig: multisigPDA,
-                transaction: transactionPDA,
-                creator: this.provider.wallet.publicKey,
-            })
-                .instruction();
-        });
-    }
     _addInstruction(multisigPDA, transactionPDA, instruction, instructionIndex) {
         return __awaiter(this, void 0, void 0, function* () {
             const [instructionPDA] = (0, address_1.getIxPDA)(transactionPDA, new bn_js_1.default(instructionIndex, 10), this.multisigProgramId);
@@ -336,29 +298,12 @@ class Squads {
             });
         });
     }
-    _approveTransactionV2(multisigPDA, transactionPDA) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.multisig.methods.approveTransactionV2().accounts({
-                multisig: multisigPDA,
-                transaction: transactionPDA,
-                member: this.wallet.publicKey,
-            });
-        });
-    }
     approveTransaction(transactionPDA) {
         return __awaiter(this, void 0, void 0, function* () {
             const transaction = yield this.getTransaction(transactionPDA);
             const methods = yield this._approveTransaction(transaction.ms, transactionPDA);
             yield methods.rpc();
             return yield this.getTransaction(transactionPDA);
-        });
-    }
-    approveTransactionV2(transactionPDA, confirmOptions) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const transaction = yield this.getTransactionV2(transactionPDA);
-            const methods = yield this._approveTransactionV2(transaction.ms, transactionPDA);
-            yield methods.rpc(confirmOptions);
-            return yield this.getTransactionV2(transactionPDA);
         });
     }
     buildApproveTransaction(multisigPDA, transactionPDA) {
@@ -504,112 +449,6 @@ class Squads {
             return yield this.getTransaction(transactionPDA);
         });
     }
-    _buildExecuteTransactionV2(transactionPDA, feePayer) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const transaction = yield this.getTransactionV2(transactionPDA);
-            const authorityPda = this.getAuthorityPDA(transaction.ms, transaction.authorityIndex);
-            const addressLookupTableKeys = transaction.message.addressTableLookups.map(({ accountKey }) => accountKey);
-            const addressLookupTableAccounts = yield Promise.all(addressLookupTableKeys.map((key) => __awaiter(this, void 0, void 0, function* () {
-                const { value } = yield this.connection.getAddressLookupTable(key);
-                if (!value) {
-                    throw new Error(`Address lookup table account ${key.toBase58()} not found`);
-                }
-                return value;
-            })));
-            // Populate remaining accounts required for execution of the transaction.
-            const remainingAccounts = [];
-            for (const ix of transaction.message.instructions) {
-                const programId = transaction.message.accountKeys[ix.programIdIndex];
-                if (!remainingAccounts.find(k => k.pubkey.equals(programId))) {
-                    remainingAccounts.push({ pubkey: programId, isSigner: false, isWritable: false });
-                }
-                for (const accountIndex of ix.accountIndexes) {
-                    let accountKey = undefined;
-                    if (accountIndex >= transaction.message.accountKeys.length) {
-                        let cursorIndex = transaction.message.accountKeys.length;
-                        for (const lookup of transaction.message.addressTableLookups) {
-                            let indexes = [...lookup.writableIndexes, ...lookup.readonlyIndexes];
-                            const found = indexes.find((index) => index === accountIndex);
-                            if (found) {
-                                const addressLookupTableAccount = addressLookupTableAccounts.find((account) => account.key.equals(lookup.accountKey));
-                                if (!addressLookupTableAccount) {
-                                    throw new Error(`Address lookup table account ${lookup.accountKey.toBase58()} not found`);
-                                }
-                                const lookupIndex = accountIndex - cursorIndex;
-                                accountKey = addressLookupTableAccount.state.addresses[lookupIndex];
-                                break;
-                            }
-                            cursorIndex += indexes.length;
-                        }
-                    }
-                    else {
-                        accountKey = transaction.message.accountKeys[accountIndex];
-                    }
-                    if (!accountKey) {
-                        throw new Error(`Account key not found for index ${accountIndex}`);
-                    }
-                    const accountMeta = {
-                        pubkey: accountKey,
-                        // FIXME: Take the ATLs into account.
-                        isWritable: accountIndex < transaction.message.numWritableSigners
-                            || (accountIndex >= transaction.message.numSigners && accountIndex < (transaction.message.numSigners + transaction.message.numWritableNonSigners)),
-                        // NOTE: authorityPda cannot be marked as signer because it's a PDA.
-                        isSigner: accountIndex < transaction.message.numSigners && !accountKey.equals(authorityPda)
-                    };
-                    const foundMeta = remainingAccounts.find(k => k.pubkey.equals(accountKey));
-                    if (!foundMeta) {
-                        remainingAccounts.push(accountMeta);
-                    }
-                    else {
-                        foundMeta.isSigner || (foundMeta.isSigner = accountMeta.isSigner);
-                        foundMeta.isWritable || (foundMeta.isWritable = accountMeta.isWritable);
-                    }
-                }
-            }
-            const transactionInstruction = yield this.multisig.methods
-                .executeTransactionV2()
-                .accounts({
-                multisig: transaction.ms,
-                transaction: transactionPDA,
-                member: feePayer,
-            })
-                .remainingAccounts(remainingAccounts)
-                .instruction();
-            const { blockhash } = yield this.connection.getLatestBlockhash();
-            const messageV0 = new web3_js_1.TransactionMessage({
-                recentBlockhash: blockhash,
-                payerKey: feePayer,
-                instructions: [transactionInstruction],
-            }).compileToV0Message(addressLookupTableAccounts);
-            return new web3_js_1.VersionedTransaction(messageV0);
-        });
-    }
-    buildExecuteTransactionV2(transactionPDA, feePayer) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet.publicKey;
-            return yield this._buildExecuteTransactionV2(transactionPDA, payer);
-        });
-    }
-    // async executeTransactionV2(
-    //   transactionPDA: PublicKey,
-    //   feePayer?: PublicKey,
-    //   signers?: Signer[],
-    //   confirmOptions?: ConfirmOptions
-    // ): Promise<TransactionV2Account> {
-    //   const payer = feePayer ?? this.wallet.publicKey;
-    //   const executeIx = await this._buildExecuteTransactionV2(transactionPDA, payer);
-    //
-    //   const { blockhash } = await this.connection.getLatestBlockhash();
-    //   const lastValidBlockHeight = await this.connection.getBlockHeight();
-    //   const executeTx = new anchor.web3.Transaction({
-    //     blockhash,
-    //     lastValidBlockHeight,
-    //     feePayer: payer,
-    //   });
-    //   executeTx.add(executeIx);
-    //   await this.provider.sendAndConfirm(executeTx, signers, confirmOptions);
-    //   return await this.getTransactionV2(transactionPDA);
-    // }
     buildExecuteTransaction(transactionPDA, feePayer) {
         return __awaiter(this, void 0, void 0, function* () {
             const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet.publicKey;
@@ -688,6 +527,176 @@ class Squads {
             return yield this.getProgramUpgrade(programUpgradePDA);
         });
     }
+    buildCreateTransactionV2(multisigPDA, authorityIndex, message, addressLookupTableAccounts) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // .compileToV0Message([alt.value]);
+            // console.log("message.staticAccountKeys", JSON.stringify(testTransferMessageV0.staticAccountKeys, null, 2))
+            // console.log("message.addressTableLookups:", JSON.stringify(testTransferMessageV0.addressTableLookups, null, 2))
+            const nextTransactionIndex = yield this.getNextTransactionIndex(multisigPDA);
+            const [transactionPDA] = (0, address_1.getTxPDA)(multisigPDA, new bn_js_1.default(nextTransactionIndex, 10), this.multisigProgramId);
+            const createTxInstruction = yield this._buildCreateTransactionV2(multisigPDA, transactionPDA, authorityIndex, message, addressLookupTableAccounts);
+            return [createTxInstruction, transactionPDA];
+        });
+    }
+    _buildCreateTransactionV2(multisigPDA, transactionPDA, authorityIndex, message, addressLookupTableAccounts) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const authorityPDA = yield this.getAuthorityPDA(multisigPDA, authorityIndex);
+            // Make sure authority is marked as non-signer in all instructions,
+            // otherwise the message will be serialized in incorrect format.
+            message.instructions.forEach((instruction) => {
+                instruction.keys.forEach((key) => {
+                    if (key.pubkey.equals(authorityPDA)) {
+                        key.isSigner = false;
+                    }
+                });
+            });
+            const compiledMessage = message.compileToV0Message(addressLookupTableAccounts);
+            const [transactionMessageBytes] = beets_1.transactionMessageBeet.serialize({
+                numSigners: compiledMessage.header.numRequiredSignatures,
+                numWritableSigners: compiledMessage.header.numRequiredSignatures - compiledMessage.header.numReadonlySignedAccounts,
+                numWritableNonSigners: compiledMessage.staticAccountKeys.length - compiledMessage.header.numRequiredSignatures - compiledMessage.header.numReadonlyUnsignedAccounts,
+                accountKeys: compiledMessage.staticAccountKeys,
+                instructions: compiledMessage.compiledInstructions.map((ix) => {
+                    return {
+                        programIdIndex: ix.programIdIndex,
+                        accountIndexes: ix.accountKeyIndexes,
+                        data: Array.from(ix.data),
+                    };
+                }),
+                addressTableLookups: compiledMessage.addressTableLookups,
+            });
+            return yield this.multisig.methods.createTransactionV2(authorityIndex, transactionMessageBytes)
+                .accounts({
+                multisig: multisigPDA,
+                transaction: transactionPDA,
+                creator: this.provider.wallet.publicKey,
+            })
+                .instruction();
+        });
+    }
+    buildApproveTransactionV2(transactionPDA) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const transaction = yield this.getTransactionV2(transactionPDA);
+            return yield this.multisig.methods.approveTransactionV2().accounts({
+                multisig: transaction.ms,
+                transaction: transactionPDA,
+                member: this.wallet.publicKey,
+            }).instruction();
+        });
+    }
+    approveTransactionV2(transactionPDA, confirmOptions) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const transaction = yield this.getTransactionV2(transactionPDA);
+            yield this.multisig.methods.approveTransactionV2().accounts({
+                multisig: transaction.ms,
+                transaction: transactionPDA,
+                member: this.wallet.publicKey,
+            }).rpc(confirmOptions);
+            return yield this.getTransactionV2(transactionPDA);
+        });
+    }
+    buildExecuteTransactionV2(transactionPDA, feePayer) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const payer = feePayer !== null && feePayer !== void 0 ? feePayer : this.wallet.publicKey;
+            return yield this._buildExecuteTransactionV2(transactionPDA, payer);
+        });
+    }
+    _buildExecuteTransactionV2(transactionPDA, feePayer) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const transaction = yield this.getTransactionV2(transactionPDA);
+            const authorityPda = this.getAuthorityPDA(transaction.ms, transaction.authorityIndex);
+            const message = transaction.message;
+            const addressLookupTableKeys = message.addressTableLookups.map(({ accountKey }) => accountKey);
+            const addressLookupTableAccounts = new Map(yield Promise.all(addressLookupTableKeys.map((key) => __awaiter(this, void 0, void 0, function* () {
+                const { value } = yield this.connection.getAddressLookupTable(key);
+                if (!value) {
+                    throw new Error(`Address lookup table account ${key.toBase58()} not found`);
+                }
+                return [key.toBase58(), value];
+            }))));
+            // Populate remaining accounts required for execution of the transaction.
+            const remainingAccounts = [];
+            // First add the lookup table accounts used by the transaction. They are needed for on-chain validation.
+            remainingAccounts.push(...addressLookupTableKeys.map((key) => {
+                return { pubkey: key, isSigner: false, isWritable: false };
+            }));
+            // Then add static account keys included into the message.
+            for (const [accountIndex, accountKey] of message.accountKeys.entries()) {
+                remainingAccounts.push({
+                    pubkey: accountKey,
+                    isWritable: isWritableIndex(message, accountIndex),
+                    // NOTE: authorityPda cannot be marked as signer because it's a PDA.
+                    isSigner: isSignerIndex(message, accountIndex) && !accountKey.equals(authorityPda)
+                });
+            }
+            // Then add accounts that will be loaded with address lookup tables.
+            for (const lookup of message.addressTableLookups) {
+                const lookupTableAccount = addressLookupTableAccounts.get(lookup.accountKey.toBase58());
+                assert.ok(lookupTableAccount, `Address lookup table account ${lookup.accountKey.toBase58()} not found`);
+                for (const accountIndex of lookup.writableIndexes) {
+                    const pubkey = lookupTableAccount.state.addresses[accountIndex];
+                    assert.ok(pubkey, `Address lookup table account ${lookup.accountKey.toBase58()} does not contain address at index ${accountIndex}`);
+                    remainingAccounts.push({
+                        pubkey,
+                        isWritable: true,
+                        // Accounts in address lookup tables can not be signers.
+                        isSigner: false
+                    });
+                }
+                for (const accountIndex of lookup.readonlyIndexes) {
+                    const pubkey = lookupTableAccount.state.addresses[accountIndex];
+                    assert.ok(pubkey, `Address lookup table account ${lookup.accountKey.toBase58()} does not contain address at index ${accountIndex}`);
+                    remainingAccounts.push({
+                        pubkey,
+                        isWritable: false,
+                        // Accounts in address lookup tables can not be signers.
+                        isSigner: false
+                    });
+                }
+            }
+            const transactionInstruction = yield this.multisig.methods
+                .executeTransactionV2()
+                .accounts({
+                multisig: transaction.ms,
+                transaction: transactionPDA,
+                member: feePayer,
+            })
+                .remainingAccounts(remainingAccounts)
+                .instruction();
+            const { blockhash } = yield this.connection.getLatestBlockhash();
+            const messageV0 = new web3_js_1.TransactionMessage({
+                recentBlockhash: blockhash,
+                payerKey: feePayer,
+                instructions: [transactionInstruction],
+            }).compileToV0Message([...addressLookupTableAccounts.values()]);
+            return new web3_js_1.VersionedTransaction(messageV0);
+        });
+    }
+}
+function isWritableIndex(message, index) {
+    const numAccountKeys = message.accountKeys.length;
+    const numSigners = message.numSigners;
+    if (index >= numAccountKeys) {
+        // Check if the index corresponds to a writable account loaded with a lookup table.
+        const loadedAddressesIndex = index - numAccountKeys;
+        const numWritableDynamicAddresses = message.addressTableLookups.reduce((sum, { writableIndexes }) => {
+            sum += writableIndexes.length;
+            return sum;
+        }, 0);
+        return loadedAddressesIndex < numWritableDynamicAddresses;
+    }
+    else if (index >= numSigners) {
+        // Check if the account is a writable non-signer.
+        const nonSignerAccountIndex = index - numSigners;
+        return nonSignerAccountIndex < message.numWritableNonSigners;
+    }
+    else {
+        // Check if the account is a writable signer.
+        return index < message.numWritableSigners;
+    }
+}
+function isSignerIndex(message, index) {
+    return index < message.numSigners;
 }
 exports.default = Squads;
 __exportStar(require("./constants"), exports);
