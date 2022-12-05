@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import fs from "fs";
 import * as anchor from "@project-serum/anchor";
-import {Program, web3} from "@project-serum/anchor"
+import {Program} from "@project-serum/anchor"
 import { SquadsMpl } from "../idl/squads_mpl";
 import { ProgramManager } from "../idl/program_manager";
 import { Roles } from "../idl/roles";
@@ -15,9 +15,9 @@ import {
 import { execSync } from "child_process";
 import {
   LAMPORTS_PER_SOL,
-  AddressLookupTableProgram, Keypair, MessageV0,
+  AddressLookupTableProgram,
+  Keypair,
   ParsedAccountData,
-  SystemProgram,
   Transaction,
   TransactionMessage,
   VersionedTransaction
@@ -298,97 +298,6 @@ describe("Programs", function(){
         );
         expect(testPayeeAccount.value.lamports).to.equal(1000000);
       });
-
-      it.skip(`Add 2 ixes with args`, async function() {
-        // create authority to use (Vault, index 1)
-        const authorityPDA = squads.getAuthorityPDA(msPDA, 1);
-
-        // the test transfer instruction (2x)
-        const testPayee = anchor.web3.Keypair.generate();
-        const testIx = await createTestTransferTransaction(
-          authorityPDA,
-          testPayee.publicKey
-        );
-        // console.log("test ix 1", testIx);
-        // console.log("test ix 2", testIx);
-        const testIx2x = await createTestTransferTransaction(
-          authorityPDA,
-          testPayee.publicKey
-        );
-        let txState = await squads.createTransaction(msPDA, 1);
-        const accountKeys =  getUniqueAccountKeys([testIx, testIx2x]);
-        const compressedIxes = getCompressedIxes(accountKeys, [testIx, testIx2x]);
-        const [ix_1_pda] = await getIxPDA(txState.publicKey, new BN(1), program.programId);
-        const [ix_2_pda] = await getIxPDA(txState.publicKey, new BN(2), program.programId);
-        const ixArgs = {
-          accountKeys,
-          instructions: compressedIxes,
-          activate: true,
-        };
-
-        await program.methods.addInstructions(ixArgs)
-        .accounts({
-          multisig: msPDA,
-          transaction: txState.publicKey,
-          creator: provider.wallet.publicKey
-        })
-        .remainingAccounts([
-          {pubkey: ix_1_pda, isWritable: true, isSigner: false},
-          {pubkey: ix_2_pda, isWritable: true, isSigner: false},
-        ])
-        .rpc({
-          commitment: "confirmed",
-          skipPreflight: true
-        });
-        let newTxState = await squads.getTransaction(txState.publicKey);
-        expect(newTxState.status).to.have.property("active");
-        await squads.approveTransaction(newTxState.publicKey);
-        newTxState = await squads.getTransaction(txState.publicKey);
-        expect(newTxState.status).to.have.property("executeReady");
-        // move funds to auth/vault
-        const moveFundsToMsPDAIx = await createTestTransferTransaction(
-          creator.publicKey,
-          authorityPDA,
-          3000000
-        );
-
-        const moveFundsToMsPDATx = await createBlankTransaction(
-          squads.connection,
-          creator.publicKey
-        );
-        moveFundsToMsPDATx.add(moveFundsToMsPDAIx);
-        await provider.sendAndConfirm(moveFundsToMsPDATx);
-        const msPDAFunded = await squads.connection.getAccountInfo(authorityPDA);
-        expect(msPDAFunded.lamports).to.equal(4000000);
-        await squads.executeTransaction(txState.publicKey);
-        txState = await squads.getTransaction(txState.publicKey);
-        expect(txState.status).to.have.property("executed");
-        let testPayeeAccount = await squads.connection.getParsedAccountInfo(
-          testPayee.publicKey
-        );
-        expect(testPayeeAccount.value.lamports).to.equal(2000000);
-      });
-
-      it.skip(`getInstructionsV2 wrapping overhead`, async function() {
-        // MagicEden Buy NFT tx.
-        const originalTransactionBytes = Buffer.from("AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADG/omv6Y6TpmfPm8Nv6uNO4+wIbpMEEpge++pjCXRJHafnAD+atFsxBtGSsVJXKlU4Rl6LPqgxCvgP8JumX6oPAgEJFC5dOl5gTFIBGhqhRA1l5a37hvQcbqsoqopVp5/pQYTtBX82VZkozhurrbZbi12eMbon+FOb7GAsyxrcKvufRnAQwjfwGJSgD4Qx0lgbtYjba02lQTrXoi+Tt9Hud6q5Zm1LzHez3eRpORE62bQk660HWs5JWsTpCUHKqqhKVzL1e/B6uWe1EG6asiC4kn2+anSeJL+Qx/12GYG+NwKoDacIr/bkEFkkZq+bSGvldnny9otBzdwx4CCSd0qPY2LtE5bClE7fneICXVOO6oTpkyP9dXySB6bpu2/M37UbiZtNw4tiKyS0JeN3O5NSihi69ksZEzxISUzTz0XmVuIZNPDljbFniLvsim6dTEc5cyoTN2b5SA3mE/vy52heCKtBsPXNul2WH2NlJWV4rgdiwGbP4az6UWif8kpvy7OdE3osDJ465OC3mEr6Ep1gB6Ce4I6WLqHK2kna5hIyk8K/w30AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL4+HroXpHP4mw9+jiSUDyCuuOvKcaiP3pXUuDtxoJYXXCW/Z3CCGN/ozP5mL25z8cjQQJ33WfsLAUj1rzV8OMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WcMbGMw+FIoKUpOBiSDt+u2rOR5JM2wLdNtmnRBHA0JL8XzARhMFxip/gfka6l966UK5BlOVMWaJrkUqN+gSCLcFIZ+JmoHU/4T7WT0u34qQrBs6s0JY998jPqUDArG9Lgan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKldDKr4rGlLvd88tmWtp8Um26HSn9iSxwtdR5YtN8SLAgQRBgABCAUPCxHyI8aJUuHytv5Apa4CAAAAABEMAAENEAgFDwMFEwsSImYGPRIB2uvq/P5Apa4CAAAAAAEAAAAAAAAAAAAAAAAAAAARFAAEAQINEAgJBQ8KAwUHBRMLDgwSKiVK2Z1PMSMG/vpApa4CAAAAAAEAAAAAAAAAAAAAAAAAAAD//////////wsCAAYMAgAAAOhgLwAAAAAA", "base64");
-        expect(originalTransactionBytes.length).to.equal(963);
-
-        const originalTransaction = anchor.web3.Transaction.from(originalTransactionBytes);
-        const originalInstructions = originalTransaction.instructions;
-
-        const txBuilder = await squads.getTransactionBuilder(msPDA, 1);
-        const [wrappedInstructions] = await txBuilder
-          .withInstructions(originalInstructions)
-          .getInstructionsV2({ activate: true });
-
-        const wrappedTx = new Transaction();
-        wrappedTx.recentBlockhash = originalTransaction.recentBlockhash;
-        wrappedTx.feePayer = creator.publicKey;
-        wrappedTx.add(...wrappedInstructions);
-        const wrappedTxBytes = wrappedTx.serialize({ requireAllSignatures: false })
-        console.log("Serialized wrapped tx size:", wrappedTxBytes.length) // 1319 (overhead 356)
-      })
 
       it(`createTransactionV2`, async function() {
         // create authority to use (Vault, index 1)

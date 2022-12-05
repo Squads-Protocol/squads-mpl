@@ -301,27 +301,6 @@ pub struct IncomingInstruction {
     pub data: Vec<u8>
 }
 
-#[derive(AnchorSerialize,AnchorDeserialize,Clone)]
-pub struct AddInstructionsArgs {
-    /// The list of unique account public keys (including program IDs) that will be used in the provided instructions.
-    pub account_keys: Vec<Pubkey>,
-    pub instructions: Vec<CompressedInstruction>,
-    /// Whether to also activate the transaction.
-    pub activate: bool,
-}
-
-#[derive(AnchorSerialize,AnchorDeserialize,Clone)]
-pub struct CompressedInstruction {
-    pub program_id_index: u8,
-    /// Indices into the account_keys list indicating which accounts to pass to the instruction.
-    pub account_indexes: Vec<u8>,
-    /// Indices into the account_keys list indicating which accounts are signers.
-    pub signer_indexes: Vec<u8>,
-    /// Indices into the account_keys list indicating which accounts are writable.
-    pub writable_indexes: Vec<u8>,
-    pub data: Vec<u8>
-}
-
 #[derive(AnchorSerialize, Clone)]
 pub struct TransactionMessage {
     /// The number of signer pubkeys in the account_keys vec.

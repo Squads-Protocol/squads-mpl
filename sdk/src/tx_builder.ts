@@ -51,59 +51,6 @@ export class TransactionBuilder {
       })
       .instruction();
   }
-  private async _buildAddInstructions(
-    transactionPDA: PublicKey,
-    instructions: TransactionInstruction[],
-    activate: boolean
-  ): Promise<TransactionInstruction> {
-    // Populate unique account keys.
-    const accountKeys: PublicKey[] = [];
-    for (const ix of instructions) {
-      if (!accountKeys.find(k => k.equals(ix.programId))) {
-        accountKeys.push(ix.programId);
-      }
-      for (const meta of ix.keys) {
-        if (!accountKeys.find(k => k.equals(meta.pubkey))) {
-          accountKeys.push(meta.pubkey);
-        }
-      }
-    }
-
-    return await this.methods
-      .addInstructions({
-        accountKeys,
-        instructions: instructions.map(ix => {
-          return {
-            programIdIndex: accountKeys.findIndex(k => k.equals(ix.programId)),
-            accountIndexes: Buffer.from(
-              ix.keys.map(meta => accountKeys.findIndex(k => k.equals(meta.pubkey)))
-            ),
-            signerIndexes: Buffer.from(ix.keys
-              .filter(meta => meta.isSigner)
-              .map(meta => accountKeys.findIndex(k => k.equals(meta.pubkey)))),
-            writableIndexes: Buffer.from(ix.keys
-              .filter(meta => meta.isWritable)
-              .map(meta => accountKeys.findIndex(k => k.equals(meta.pubkey)))),
-            data: ix.data,
-          }
-        }),
-        activate,
-      })
-      .accounts({
-        multisig: this.multisig.publicKey,
-        transaction: transactionPDA,
-        creator: this.provider.wallet.publicKey,
-      })
-      .remainingAccounts(Array.from({ length: instructions.length }, (_, index) => {
-          return {
-            pubkey: getIxPDA(transactionPDA, new BN(index + 1, 10), this.programId)[0],
-            isSigner: false,
-            isWritable: true,
-          };
-        })
-      )
-      .instruction();
-  }
   private _cloneWithInstructions(
     instructions: TransactionInstruction[]
   ): TransactionBuilder {
@@ -240,22 +187,6 @@ export class TransactionBuilder {
       })
       .instruction();
     const instructions = [createTxInstruction, ...wrappedAddInstructions];
-    this.instructions = [];
-    return [instructions, transactionPDA];
-  }
-
-  async getInstructionsV2({ activate }: { activate: boolean }): Promise<[TransactionInstruction[], PublicKey]> {
-    const transactionPDA = this.transactionPDA();
-    const createTxInstruction = await this.methods
-      .createTransaction(this.authorityIndex)
-      .accounts({
-        multisig: this.multisig.publicKey,
-        transaction: transactionPDA,
-        creator: this.provider.wallet.publicKey,
-      })
-      .instruction();
-    const wrappedAddInstructions = await this._buildAddInstructions(transactionPDA, this.instructions, activate);
-    const instructions = [createTxInstruction, wrappedAddInstructions];
     this.instructions = [];
     return [instructions, transactionPDA];
   }

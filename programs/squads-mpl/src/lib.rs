@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::convert::From;
 
-use anchor_lang::{Discriminator, prelude::*, solana_program::instruction::Instruction};
+use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 use anchor_lang::solana_program::{program::{invoke, invoke_signed}, system_instruction::transfer};
 use hex::FromHex;
 use solana_security_txt::security_txt;
@@ -9,11 +9,9 @@ use solana_security_txt::security_txt;
 use errors::*;
 use state::ms::*;
 use state::aux::ExecutableTransactionMessage;
-use util::InitPdaArgs;
 
 pub mod state;
 pub mod errors;
-mod util;
 
 security_txt! {
     name: "Squads MPL",
@@ -25,7 +23,7 @@ security_txt! {
     auditors: "OtterSec"
 }
 
-declare_id!("J7j1uANJkX5BALTfhRmX2HDJ1D9cHg5hHY5uujJdRBcS");
+declare_id!("SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu");
 
 #[program]
 pub mod squads_mpl {
@@ -247,99 +245,6 @@ pub mod squads_mpl {
             incoming_instruction,
             *ctx.bumps.get("instruction").unwrap()
         )
-    }
-
-    /// Batch add instructions to a transaction.
-    pub fn add_instructions<'a, 'info>(
-        ctx: Context<'a, '_, '_, 'info, AddInstructions<'info>>,
-        args: AddInstructionsArgs
-    ) -> Result<()> {
-        let tx = &mut ctx.accounts.transaction;
-
-        // make sure the number of instructions passed in `args` matches
-        // the number of instruction accounts passed as `remaining_accounts`.
-        require_eq!(args.instructions.len(), ctx.remaining_accounts.len(), MsError::InvalidInstructionCount);
-
-        let AddInstructionsArgs {
-            account_keys,
-            instructions,
-            activate
-        } = args;
-
-        for (ix_index, compressed_ix) in instructions.into_iter().enumerate() {
-            let ms_instruction_info = ctx.remaining_accounts.get(ix_index).unwrap();
-
-            let incoming_instruction = IncomingInstruction {
-                program_id: *account_keys.get(compressed_ix.program_id_index as usize).unwrap(),
-                keys: compressed_ix.account_indexes.iter().map(|index| {
-                    MsAccountMeta {
-                        pubkey: *account_keys.get(*index as usize).unwrap(),
-                        is_signer: compressed_ix.signer_indexes.contains(index),
-                        is_writable: compressed_ix.writable_indexes.contains(index),
-                    }
-                }).collect(),
-                data: compressed_ix.data,
-            };
-
-            // TODO: extract into an assert function.
-            // make sure internal transactions have a matching program id for attached instructions
-            if tx.authority_index == 0 && &incoming_instruction.program_id != ctx.program_id {
-                return err!(MsError::InvalidAuthorityIndex);
-            }
-
-            tx.instruction_index = tx.instruction_index.checked_add(1).unwrap();
-
-            let tx_key = tx.key();
-
-            let seeds = [
-                b"squad" as &[u8],
-                tx_key.as_ref(),
-                &tx.instruction_index.to_le_bytes(),
-                b"instruction"
-            ];
-
-            let (ix_pda, ix_pda_bump) = Pubkey::find_program_address(&seeds, ctx.program_id);
-
-            require_keys_eq!(ix_pda, ms_instruction_info.key(), MsError::InvalidInstructionAccount);
-
-            let seeds_with_bump = [
-                b"squad" as &[u8],
-                tx_key.as_ref(),
-                &tx.instruction_index.to_le_bytes(),
-                b"instruction",
-                &[ix_pda_bump]
-            ];
-
-            util::init_pda(InitPdaArgs {
-                account_info: ms_instruction_info.to_account_info(),
-                payer: ctx.accounts.creator.to_account_info(),
-                space: 8 + incoming_instruction.get_max_size(),
-                seeds_with_bump: &seeds_with_bump,
-                owner: ctx.program_id,
-                system_program: ctx.accounts.system_program.to_account_info(),
-            })?;
-
-            let discriminator = MsInstruction::discriminator();
-            ms_instruction_info.try_borrow_mut_data()?[..discriminator.len()].copy_from_slice(discriminator[..].as_ref());
-
-            let mut ms_instruction = Account::<MsInstruction>::try_from(
-                ms_instruction_info
-            )?;
-
-            ms_instruction.init(
-                tx.instruction_index,
-                incoming_instruction,
-                ix_pda_bump
-            )?;
-
-            ms_instruction.serialize(&mut &mut ms_instruction_info.try_borrow_mut_data()?[8..])?;
-        }
-
-        if activate {
-            ctx.accounts.transaction.activate()?;
-        }
-
-        Ok(())
     }
 
     // instruction to approve a transaction on behalf of a member
@@ -812,41 +717,6 @@ pub struct AddInstruction<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>
-}
-
-#[derive(Accounts)]
-#[instruction(args: AddInstructionsArgs)]
-pub struct AddInstructions<'info> {
-    #[account(
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ],
-        bump = multisig.bump,
-        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
-    )]
-    pub multisig: Account<'info, Ms>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &transaction.transaction_index.to_le_bytes(),
-            b"transaction"
-        ], bump = transaction.bump,
-        constraint = creator.key() == transaction.creator,
-        constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-    )]
-    pub transaction: Account<'info, MsTransaction>,
-
-    #[account(mut)]
-    pub creator: Signer<'info>,
-    pub system_program: Program<'info, System>
-
-    // `remaining_accounts` are MsInstruction accounts.
 }
 
 #[derive(Accounts)]

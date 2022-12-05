@@ -63,53 +63,6 @@ class TransactionBuilder {
                 .instruction();
         });
     }
-    _buildAddInstructions(transactionPDA, instructions, activate) {
-        return __awaiter(this, void 0, void 0, function* () {
-            // Populate unique account keys.
-            const accountKeys = [];
-            for (const ix of instructions) {
-                if (!accountKeys.find(k => k.equals(ix.programId))) {
-                    accountKeys.push(ix.programId);
-                }
-                for (const meta of ix.keys) {
-                    if (!accountKeys.find(k => k.equals(meta.pubkey))) {
-                        accountKeys.push(meta.pubkey);
-                    }
-                }
-            }
-            return yield this.methods
-                .addInstructions({
-                accountKeys,
-                instructions: instructions.map(ix => {
-                    return {
-                        programIdIndex: accountKeys.findIndex(k => k.equals(ix.programId)),
-                        accountIndexes: Buffer.from(ix.keys.map(meta => accountKeys.findIndex(k => k.equals(meta.pubkey)))),
-                        signerIndexes: Buffer.from(ix.keys
-                            .filter(meta => meta.isSigner)
-                            .map(meta => accountKeys.findIndex(k => k.equals(meta.pubkey)))),
-                        writableIndexes: Buffer.from(ix.keys
-                            .filter(meta => meta.isWritable)
-                            .map(meta => accountKeys.findIndex(k => k.equals(meta.pubkey)))),
-                        data: ix.data,
-                    };
-                }),
-                activate,
-            })
-                .accounts({
-                multisig: this.multisig.publicKey,
-                transaction: transactionPDA,
-                creator: this.provider.wallet.publicKey,
-            })
-                .remainingAccounts(Array.from({ length: instructions.length }, (_, index) => {
-                return {
-                    pubkey: (0, address_1.getIxPDA)(transactionPDA, new bn_js_1.default(index + 1, 10), this.programId)[0],
-                    isSigner: false,
-                    isWritable: true,
-                };
-            }))
-                .instruction();
-        });
-    }
     _cloneWithInstructions(instructions) {
         return new TransactionBuilder(this.methods, this.managerMethods, this.provider, this.multisig, this.authorityIndex, this.programId, instructions);
     }
@@ -222,23 +175,6 @@ class TransactionBuilder {
             })
                 .instruction();
             const instructions = [createTxInstruction, ...wrappedAddInstructions];
-            this.instructions = [];
-            return [instructions, transactionPDA];
-        });
-    }
-    getInstructionsV2({ activate }) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const transactionPDA = this.transactionPDA();
-            const createTxInstruction = yield this.methods
-                .createTransaction(this.authorityIndex)
-                .accounts({
-                multisig: this.multisig.publicKey,
-                transaction: transactionPDA,
-                creator: this.provider.wallet.publicKey,
-            })
-                .instruction();
-            const wrappedAddInstructions = yield this._buildAddInstructions(transactionPDA, this.instructions, activate);
-            const instructions = [createTxInstruction, wrappedAddInstructions];
             this.instructions = [];
             return [instructions, transactionPDA];
         });

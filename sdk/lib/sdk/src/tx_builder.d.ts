@@ -11,7 +11,6 @@ export declare class TransactionBuilder {
     private instructions;
     constructor(methods: SquadsMethodsNamespace, managerMethods: ProgramManagerMethodsNamespace, provider: AnchorProvider, multisig: MultisigAccount, authorityIndex: number, programId: PublicKey, instructions?: TransactionInstruction[]);
     private _buildAddInstruction;
-    private _buildAddInstructions;
     private _cloneWithInstructions;
     transactionPDA(): PublicKey;
     withInstruction(instruction: TransactionInstruction): TransactionBuilder;
@@ -23,8 +22,5 @@ export declare class TransactionBuilder {
     withChangeThreshold(threshold: number): Promise<TransactionBuilder>;
     withSetAsExecuted(programManagerPDA: PublicKey, managedProgramPDA: PublicKey, programUpgradePDA: PublicKey, transactionPDA: PublicKey, instructionPDA: PublicKey, authorityIndex: number): Promise<TransactionBuilder>;
     getInstructions(): Promise<[TransactionInstruction[], PublicKey]>;
-    getInstructionsV2({ activate }: {
-        activate: boolean;
-    }): Promise<[TransactionInstruction[], PublicKey]>;
     executeInstructions(): Promise<[TransactionInstruction[], PublicKey]>;
 }

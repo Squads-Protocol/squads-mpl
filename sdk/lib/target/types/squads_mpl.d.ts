@@ -314,42 +314,6 @@ export declare type SquadsMpl = {
             ];
         },
         {
-            "name": "addInstructions";
-            "docs": [
-                "Batch add instructions to a transaction."
-            ];
-            "accounts": [
-                {
-                    "name": "multisig";
-                    "isMut": false;
-                    "isSigner": false;
-                },
-                {
-                    "name": "transaction";
-                    "isMut": true;
-                    "isSigner": false;
-                },
-                {
-                    "name": "creator";
-                    "isMut": true;
-                    "isSigner": true;
-                },
-                {
-                    "name": "systemProgram";
-                    "isMut": false;
-                    "isSigner": false;
-                }
-            ];
-            "args": [
-                {
-                    "name": "args";
-                    "type": {
-                        "defined": "AddInstructionsArgs";
-                    };
-                }
-            ];
-        },
-        {
             "name": "approveTransaction";
             "accounts": [
                 {
@@ -898,75 +862,6 @@ export declare type SquadsMpl = {
                                 "defined": "MsAccountMeta";
                             };
                         };
-                    },
-                    {
-                        "name": "data";
-                        "type": "bytes";
-                    }
-                ];
-            };
-        },
-        {
-            "name": "AddInstructionsArgs";
-            "type": {
-                "kind": "struct";
-                "fields": [
-                    {
-                        "name": "accountKeys";
-                        "docs": [
-                            "The list of unique account public keys (including program IDs) that will be used in the provided instructions."
-                        ];
-                        "type": {
-                            "vec": "publicKey";
-                        };
-                    },
-                    {
-                        "name": "instructions";
-                        "type": {
-                            "vec": {
-                                "defined": "CompressedInstruction";
-                            };
-                        };
-                    },
-                    {
-                        "name": "activate";
-                        "docs": [
-                            "Whether to also activate the transaction."
-                        ];
-                        "type": "bool";
-                    }
-                ];
-            };
-        },
-        {
-            "name": "CompressedInstruction";
-            "type": {
-                "kind": "struct";
-                "fields": [
-                    {
-                        "name": "programIdIndex";
-                        "type": "u8";
-                    },
-                    {
-                        "name": "accountIndexes";
-                        "docs": [
-                            "Indices into the account_keys list indicating which accounts to pass to the instruction."
-                        ];
-                        "type": "bytes";
-                    },
-                    {
-                        "name": "signerIndexes";
-                        "docs": [
-                            "Indices into the account_keys list indicating which accounts are signers."
-                        ];
-                        "type": "bytes";
-                    },
-                    {
-                        "name": "writableIndexes";
-                        "docs": [
-                            "Indices into the account_keys list indicating which accounts are writable."
-                        ];
-                        "type": "bytes";
                     },
                     {
                         "name": "data";
