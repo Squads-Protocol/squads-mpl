@@ -31,7 +31,7 @@ pub mod squads_mpl {
     use super::*;
     
     // instruction to create a multisig
-    pub fn create(ctx: Context<Create>, threshold:u16, create_key: Pubkey, members: Vec<Pubkey>) -> Result<()> {
+    pub fn create(ctx: Context<Create>, threshold:u16, create_key: Pubkey, members: Vec<Pubkey>, _meta: String) -> Result<()> {
         // sort the members and remove duplicates
         let mut members = members;
         members.sort();
@@ -510,7 +510,7 @@ pub mod squads_mpl {
 }
 
 #[derive(Accounts)]
-#[instruction(threshold: u16, create_key: Pubkey, members: Vec<Pubkey>)]
+#[instruction(threshold: u16, create_key: Pubkey, members: Vec<Pubkey>, meta: String)]
 pub struct Create<'info> {
     #[account(
         init,
