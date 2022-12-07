@@ -1,6 +1,6 @@
 {
   "name": "@sqds/sdk",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "An SDK for easily interacting with Squads Multisig Programs",
   "main": "lib/sdk/src/index.js",
   "files": [

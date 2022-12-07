@@ -35,6 +35,10 @@ export declare type SquadsMpl = {
                     "type": {
                         "vec": "publicKey";
                     };
+                },
+                {
+                    "name": "meta";
+                    "type": "string";
                 }
             ];
         },
