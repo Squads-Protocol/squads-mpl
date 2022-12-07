@@ -18,7 +18,7 @@ import Squads from "@sqds/sdk";
 // The 'wallet' passed in will be the signer/feePayer on all transactions through the Squads object.
 const squads = Squads.localnet(wallet); // or Squads.devnet(...); Squads.mainnet(...)
 
-const multisigAccount = await squads.createMultisig(threshold, createKey, members);
+const multisigAccount = await squads.createMultisig(threshold, createKey, members, name, description, image);
 ```
 
 Generally you will want to import the default `Squads` class from `@sqds/sdk` and pass in a `Wallet` instance. This would come from your preferred client-side wallet adapter or would likely be a `NodeWallet` if running server-side.

@@ -186,28 +186,28 @@ class Squads {
     getAuthorityPDA(multisigPDA, authorityIndex) {
         return (0, address_1.getAuthorityPDA)(multisigPDA, new bn_js_1.default(authorityIndex, 10), this.multisigProgramId)[0];
     }
-    _createMultisig(threshold, createKey, initialMembers) {
+    _createMultisig(threshold, createKey, initialMembers, name, description = "", image = "") {
         if (!initialMembers.find((member) => member.equals(this.wallet.publicKey))) {
             initialMembers.push(this.wallet.publicKey);
         }
         const [multisigPDA] = (0, address_1.getMsPDA)(createKey, this.multisigProgramId);
         return [
             this.multisig.methods
-                .create(threshold, createKey, initialMembers)
+                .create(threshold, createKey, initialMembers, JSON.stringify({ name, description, image }))
                 .accounts({ multisig: multisigPDA, creator: this.wallet.publicKey }),
             multisigPDA,
         ];
     }
-    createMultisig(threshold, createKey, initialMembers) {
+    createMultisig(threshold, createKey, initialMembers, name, description = "", image = "") {
         return __awaiter(this, void 0, void 0, function* () {
-            const [methods, multisigPDA] = this._createMultisig(threshold, createKey, initialMembers);
+            const [methods, multisigPDA] = this._createMultisig(threshold, createKey, initialMembers, JSON.stringify({ name, description, image }));
             yield methods.rpc();
             return yield this.getMultisig(multisigPDA);
         });
     }
-    buildCreateMultisig(threshold, createKey, initialMembers) {
+    buildCreateMultisig(threshold, createKey, initialMembers, name, description = "", image = "") {
         return __awaiter(this, void 0, void 0, function* () {
-            const [methods] = this._createMultisig(threshold, createKey, initialMembers);
+            const [methods] = this._createMultisig(threshold, createKey, initialMembers, JSON.stringify({ name, description, image }));
             return yield methods.instruction();
         });
     }

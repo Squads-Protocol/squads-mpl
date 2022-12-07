@@ -38,6 +38,10 @@ exports.IDL = {
                     "type": {
                         "vec": "publicKey"
                     }
+                },
+                {
+                    "name": "meta",
+                    "type": "string"
                 }
             ]
         },

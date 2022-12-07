@@ -35,6 +35,10 @@
                     "type": {
                         "vec": "publicKey"
                     }
+                },
+                {
+                    "name": "meta",
+                    "type": "string"
                 }
             ]
         },
