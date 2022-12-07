@@ -35,6 +35,10 @@ export type SquadsMpl = {
           "type": {
             "vec": "publicKey"
           }
+        },
+        {
+          "name": "meta",
+          "type": "string"
         }
       ]
     },
@@ -753,6 +757,10 @@ export const IDL: SquadsMpl = {
           "type": {
             "vec": "publicKey"
           }
+        },
+        {
+          "name": "meta",
+          "type": "string"
         }
       ]
     },
