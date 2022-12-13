@@ -357,7 +357,6 @@ pub struct RemoveManagedProgram<'info> {
     pub multisig: Account<'info, Ms>,
 
     #[account(
-        mut,
         seeds = [
             b"squad",
             multisig.key().as_ref(),
@@ -435,7 +434,6 @@ pub struct RemoveUpgrade<'info> {
 
     // derive the managed program from the program manager
     #[account(
-        mut,
         seeds = [
             b"squad",
             program_manager.key().as_ref(),
