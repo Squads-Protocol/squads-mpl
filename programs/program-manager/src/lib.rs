@@ -8,9 +8,6 @@ declare_id!("SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK");
 
 #[program]
 pub mod program_manager {
-    use std::io::{Cursor, Write};
-    use std::ops::DerefMut;
-    use anchor_lang::__private::CLOSED_ACCOUNT_DISCRIMINATOR;
     use anchor_lang::solana_program::{bpf_loader_upgradeable::upgrade};
 
     use super::*;
@@ -65,45 +62,11 @@ pub mod program_manager {
         Ok(())
     }
 
-    pub fn close_managed_program_account(ctx: Context<RemoveManagedProgram>) -> Result<()>{
-        let dest_starting_lamports = ctx.accounts.authority.lamports();
-
-        let account = ctx.accounts.managed_program.to_account_info();
-        **ctx.accounts.authority.lamports.borrow_mut() = dest_starting_lamports
-            .checked_add(account.lamports())
-            .unwrap();
-        **account.lamports.borrow_mut() = 0;
-
-        let mut data = account.try_borrow_mut_data()?;
-        for byte in data.deref_mut().iter_mut() {
-            *byte = 0;
-        }
-
-        let dst: &mut [u8] = &mut data;
-        let mut cursor = Cursor::new(dst);
-        cursor.write_all(&CLOSED_ACCOUNT_DISCRIMINATOR).unwrap();
-
+    pub fn close_managed_program_account(_ctx: Context<RemoveManagedProgram>) -> Result<()>{
         Ok(())
     }
 
-    pub fn close_upgrade_account(ctx: Context<RemoveUpgrade>)->Result<()>{
-        let dest_starting_lamports = ctx.accounts.authority.lamports();
-
-        let account = ctx.accounts.program_upgrade.to_account_info();
-        **ctx.accounts.authority.lamports.borrow_mut() = dest_starting_lamports
-            .checked_add(account.lamports())
-            .unwrap();
-        **account.lamports.borrow_mut() = 0;
-
-        let mut data = account.try_borrow_mut_data()?;
-        for byte in data.deref_mut().iter_mut() {
-            *byte = 0;
-        }
-
-        let dst: &mut [u8] = &mut data;
-        let mut cursor = Cursor::new(dst);
-        cursor.write_all(&CLOSED_ACCOUNT_DISCRIMINATOR).unwrap();
-
+    pub fn close_upgrade_account(_ctx: Context<RemoveUpgrade>)->Result<()>{
         Ok(())
     }
 
@@ -376,6 +339,7 @@ pub struct RemoveManagedProgram<'info> {
             b"program"
         ],
         bump = managed_program.bump,
+        close = authority
     )]
     pub managed_program: Account<'info, ManagedProgram>,
 
@@ -453,6 +417,7 @@ pub struct RemoveUpgrade<'info> {
             &program_upgrade.upgrade_index.to_le_bytes(),
             b"pupgrade"
         ], bump = program_upgrade.bump,
+        close = authority
     )]
     pub program_upgrade: Account<'info, ProgramUpgrade>,
 
