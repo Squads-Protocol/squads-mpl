@@ -321,7 +321,6 @@ describe("Programs", function(){
           authorityPDA,
           testPayee.publicKey
         );
-        const originalInstructions = [testIx1, testIx2];
         const testTransferMessage = new TransactionMessage({
           recentBlockhash: (await provider.connection.getLatestBlockhash()).blockhash,
           payerKey: authorityPDA,

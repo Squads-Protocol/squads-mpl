@@ -950,7 +950,7 @@ pub struct CreateTransactionV2<'info> {
     #[account(
         init,
         payer = creator,
-        space = MsTransactionV2::size_from_members_and_transaction_message(multisig.keys.len(), &transaction_message),
+        space = MsTransactionV2::size_from_members_and_transaction_message(multisig.keys.len(), &transaction_message)?,
         seeds = [
             b"squad",
             multisig.key().as_ref(),

@@ -54,7 +54,7 @@ impl <'a, 'info> ExecutableTransactionMessage<'a, 'info> {
         for (i, account_key) in message.account_keys.iter().enumerate() {
             let account_info = &message_account_infos[i];
             require_keys_eq!(*account_info.key, *account_key, MsError::InvalidAccount);
-            require_eq!(account_info.is_writable, message.is_writable_index(i), MsError::InvalidAccount);
+            require_eq!(account_info.is_writable, message.is_static_writable_index(i), MsError::InvalidAccount);
             // For authority `is_signer` might differ because it's always false in the passed account infos.
             if account_info.key != authority_pubkey {
                 require_eq!(account_info.is_signer, message.is_signer_index(i), MsError::InvalidAccount);
@@ -117,10 +117,11 @@ impl <'a, 'info> ExecutableTransactionMessage<'a, 'info> {
                 .map(|account_index| {
                     let account_info = *self.account_infos_by_message_index.get(&usize::from(*account_index)).unwrap();
 
+                    // `is_signer` cannot just be taken from the account info, because for `authority`
+                    // it's always false in the passed account infos, but might be true in the actual instructions.
                     let is_signer = self.message.is_signer_index(usize::from(*account_index));
-                    let is_writable = self.message.is_writable_index(usize::from(*account_index));
 
-                    let account_meta = if is_writable {
+                    let account_meta = if account_info.is_writable {
                         AccountMeta::new(*account_info.key, is_signer)
                     } else {
                         AccountMeta::new_readonly(*account_info.key, is_signer)

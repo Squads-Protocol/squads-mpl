@@ -1,7 +1,9 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 use anchor_lang::solana_program::borsh::get_instance_packed_len;
+
+use crate::errors::MsError;
 
 #[account]
 pub struct Ms {
@@ -301,6 +303,7 @@ pub struct IncomingInstruction {
     pub data: Vec<u8>
 }
 
+/// Unvalidated instruction data, must be treated as untrusted.
 #[derive(AnchorSerialize, Clone)]
 pub struct TransactionMessage {
     /// The number of signer pubkeys in the account_keys vec.
@@ -442,7 +445,7 @@ pub struct MsTransactionMessage {
 }
 
 impl MsTransactionMessage {
-    /// Returns all the account keys in the message.
+    /// Returns the number of all the account keys (static + dynamic) in the message.
     pub fn num_all_account_keys(&self) -> usize {
         let num_account_keys_from_lookups = self
             .address_table_lookups
@@ -450,27 +453,34 @@ impl MsTransactionMessage {
             .map(|lookup| lookup.writable_indexes.len() + lookup.readonly_indexes.len())
             .sum::<usize>();
 
-        num_account_keys_from_lookups + self.account_keys.len()
+        self.account_keys.len() + num_account_keys_from_lookups
     }
 
-    /// Returns true if the account at the specified index was requested to be writable.
-    pub fn is_writable_index(&self, key_index: usize) -> bool {
+    /// Returns true if the account at the specified index is a part of static `account_keys` and was requested to be writable.
+    pub fn is_static_writable_index(&self, key_index: usize) -> bool {
         let num_account_keys = self.account_keys.len();
         let num_signers = usize::from(self.num_signers);
+        let num_writable_signers = usize::from(self.num_writable_signers);
+        let num_writable_non_signers = usize::from(self.num_writable_non_signers);
+
         if key_index >= num_account_keys {
-            let loaded_addresses_index = key_index.saturating_sub(num_account_keys);
-            let num_writable_dynamic_addresses = self
-                .address_table_lookups
-                .iter()
-                .map(|lookup| lookup.writable_indexes.len())
-                .sum();
-            loaded_addresses_index < num_writable_dynamic_addresses
-        } else if key_index >= num_signers {
-            let unsigned_account_index = key_index.saturating_sub(num_signers);
-            unsigned_account_index < usize::from(self.num_writable_non_signers)
-        } else {
-            key_index < usize::from(self.num_writable_signers)
+            // `index` is not a part of static `account_keys`.
+            return false;
         }
+
+        if key_index < num_writable_signers {
+            // `index` is within the range of writable signer keys.
+            return true;
+        }
+
+        if key_index >= num_signers {
+            // `index` is within the range of non-signer keys.
+            let index_into_non_signers = key_index.saturating_sub(num_signers);
+            // Whether `index` is within the range of writable non-signer keys.
+            return index_into_non_signers < num_writable_non_signers;
+        }
+
+        false
     }
 
     /// Returns true if the account at the specified index was requested to be a signer.
@@ -479,16 +489,25 @@ impl MsTransactionMessage {
     }
 }
 
-impl From<TransactionMessage> for MsTransactionMessage {
-    fn from(message: TransactionMessage) -> Self {
-        Self {
+impl TryFrom<TransactionMessage> for MsTransactionMessage {
+    type Error = Error;
+
+    fn try_from(message: TransactionMessage) -> Result<Self> {
+        require!(usize::from(message.num_signers) <= message.account_keys.len(), MsError::InvalidTransactionMessage);
+        require!(message.num_writable_signers <= message.num_signers, MsError::InvalidTransactionMessage);
+        require!(
+            usize::from(message.num_writable_non_signers) <= message.account_keys.len().saturating_sub(usize::from(message.num_signers)),
+            MsError::InvalidTransactionMessage
+        );
+
+        Ok(Self {
             num_signers: message.num_signers,
             num_writable_signers: message.num_writable_signers,
             num_writable_non_signers: message.num_writable_non_signers,
             account_keys: message.account_keys,
             instructions: message.instructions.into_iter().map(MsCompiledInstruction::from).collect(),
-            address_table_lookups: message.address_table_lookups.into_iter().map(MsMessageAddressTableLookup::from).collect()
-        }
+            address_table_lookups: message.address_table_lookups.into_iter().map(MsMessageAddressTableLookup::from).collect(),
+        })
     }
 }
 
@@ -540,7 +559,7 @@ impl MsTransactionV2 {
         self.rejected = Vec::new();
         self.cancelled = Vec::new();
         self.bump = bump;
-        self.message = message.into();
+        self.message = message.try_into()?;
         Ok(())
     }
 
@@ -555,13 +574,13 @@ impl MsTransactionV2 {
         (1 + 12) +                          // the enum size
         1;                                  // tx bump
 
-    pub fn size_from_members_and_transaction_message(members_len: usize, transaction_message: &[u8]) -> usize {
+    pub fn size_from_members_and_transaction_message(members_len: usize, transaction_message: &[u8]) -> Result<usize> {
         let vote_vecs_size = 3 * (4 + (members_len * 32));
 
-        let transaction_message: MsTransactionMessage = TransactionMessage::deserialize(&mut &transaction_message[..]).unwrap().into();
+        let transaction_message: MsTransactionMessage = TransactionMessage::deserialize(&mut &transaction_message[..])?.try_into()?;
         let message_size = get_instance_packed_len(&transaction_message).unwrap_or_default();
 
-        MsTransactionV2::MINIMUM_SIZE + vote_vecs_size + message_size
+        Ok(MsTransactionV2::MINIMUM_SIZE + vote_vecs_size + message_size)
     }
 
     // change status to Active

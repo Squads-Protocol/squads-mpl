@@ -18,4 +18,6 @@ pub enum MsError {
     #[msg("Number of instruction arguments does not match number of instruction accounts.")]
     InvalidInstructionCount,
     InvalidAccount,
+    #[msg("TransactionMessage is malformed.")]
+    InvalidTransactionMessage,
 }

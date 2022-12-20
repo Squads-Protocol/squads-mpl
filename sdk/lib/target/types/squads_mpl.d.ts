@@ -1082,6 +1082,11 @@ export declare type SquadsMpl = {
         {
             "code": 6014;
             "name": "InvalidAccount";
+        },
+        {
+            "code": 6015;
+            "name": "InvalidTransactionMessage";
+            "msg": "TransactionMessage is malformed.";
         }
     ];
 };
