@@ -43,8 +43,8 @@ pub mod program_manager {
         // generate the upgrade instruction
         let ix = upgrade(
             &managed_program.program_address,
-            &buffer, 
-            &authority, 
+            &buffer,
+            &authority,
             &spill
         );
         let uix = UpgradeInstruction::from(ix);
@@ -62,15 +62,13 @@ pub mod program_manager {
         Ok(())
     }
 
-    // TO DO
-    // pub fn close_managed_program_account() -> Result<()>{
-    //     Ok(())
-    // }
+    pub fn close_managed_program_account(_ctx: Context<RemoveManagedProgram>) -> Result<()>{
+        Ok(())
+    }
 
-    // TO DO
-    // pub fn close_upgrade_account()->Result<()>{
-    //     Ok(())
-    // }
+    pub fn close_upgrade_account(_ctx: Context<RemoveUpgrade>)->Result<()>{
+        Ok(())
+    }
 
     // a function to run after an upgrade instruction via squads-mpl that will update some data
     pub fn set_as_executed(ctx: Context<UpdateUpgrade>) -> Result<()>{
@@ -176,7 +174,7 @@ pub struct CreateProgramUpgrade<'info> {
         constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
-    
+
     #[account(
         seeds = [
             b"squad",
@@ -211,7 +209,7 @@ pub struct CreateProgramUpgrade<'info> {
         ], bump
     )]
     pub program_upgrade: Account<'info, ProgramUpgrade>,
-    
+
     #[account(mut)]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>
@@ -230,7 +228,7 @@ pub struct UpdateUpgrade<'info> {
         seeds::program = squads_mpl::ID,
     )]
     pub multisig: Account<'info, Ms>,
-    
+
     // derive the program manager from the multisig
     #[account(
         seeds = [
@@ -267,7 +265,7 @@ pub struct UpdateUpgrade<'info> {
         constraint = !program_upgrade.executed @MsError::InvalidInstructionAccount,
     )]
     pub program_upgrade: Account<'info, ProgramUpgrade>,
-    
+
     // check that the transaction is derived from the multisig
     #[account(
         owner = squads_mpl::ID,
@@ -296,6 +294,149 @@ pub struct UpdateUpgrade<'info> {
     pub instruction: Account<'info, MsInstruction>,
 
     #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.authority_index.to_le_bytes(),
+            b"authority"
+        ],
+        bump = transaction.authority_bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct RemoveManagedProgram<'info> {
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub multisig: Account<'info, Ms>,
+
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            b"pmanage"
+        ],
+        bump = program_manager.bump
+    )]
+    pub program_manager: Account<'info,ProgramManager>,
+
+    // derive the managed program from the program manager
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            program_manager.key().as_ref(),
+            &managed_program.managed_program_index.to_le_bytes(),
+            b"program"
+        ],
+        bump = managed_program.bump,
+        close = authority
+    )]
+    pub managed_program: Account<'info, ManagedProgram>,
+
+    // check that the transaction is derived from the multisig
+    #[account(
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ],
+        bump = transaction.bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub transaction: Account<'info, MsTransaction>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.authority_index.to_le_bytes(),
+            b"authority"
+        ],
+        bump = transaction.authority_bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct RemoveUpgrade<'info> {
+    // multisig account needs to come from squads-mpl
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub multisig: Account<'info, Ms>,
+
+    // derive the program manager from the multisig
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            b"pmanage"
+        ],
+        bump = program_manager.bump
+    )]
+    pub program_manager: Account<'info, ProgramManager>,
+
+    // derive the managed program from the program manager
+    #[account(
+        seeds = [
+            b"squad",
+            program_manager.key().as_ref(),
+            &managed_program.managed_program_index.to_le_bytes(),
+            b"program"
+        ],
+        bump = managed_program.bump,
+    )]
+    pub managed_program: Account<'info, ManagedProgram>,
+
+    // derive the upgrade from the managed program
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            managed_program.key().as_ref(),
+            &program_upgrade.upgrade_index.to_le_bytes(),
+            b"pupgrade"
+        ], bump = program_upgrade.bump,
+        close = authority
+    )]
+    pub program_upgrade: Account<'info, ProgramUpgrade>,
+
+    // check that the transaction is derived from the multisig
+    #[account(
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ],
+        bump = transaction.bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub transaction: Account<'info, MsTransaction>,
+
+    #[account(
+        mut,
         seeds = [
             b"squad",
             multisig.key().as_ref(),

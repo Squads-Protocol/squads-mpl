@@ -17,4 +17,5 @@ default = []
 
 [dependencies]
 anchor-lang = "0.25.0"
+spl-token = {version = "3.1.0", features = ["no-entrypoint"]}
 squads-mpl = { path = "../squads-mpl", features = ["cpi"] }
