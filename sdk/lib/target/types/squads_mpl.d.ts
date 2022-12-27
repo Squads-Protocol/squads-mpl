@@ -446,6 +446,140 @@ export declare type SquadsMpl = {
                 }
             ];
             "args": [];
+        },
+        {
+            "name": "createTransactionV2";
+            "accounts": [
+                {
+                    "name": "multisig";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "transaction";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "creator";
+                    "isMut": true;
+                    "isSigner": true;
+                },
+                {
+                    "name": "systemProgram";
+                    "isMut": false;
+                    "isSigner": false;
+                }
+            ];
+            "args": [
+                {
+                    "name": "authorityIndex";
+                    "type": "u8";
+                },
+                {
+                    "name": "transactionMessage";
+                    "type": "bytes";
+                }
+            ];
+        },
+        {
+            "name": "approveTransactionV2";
+            "accounts": [
+                {
+                    "name": "multisig";
+                    "isMut": false;
+                    "isSigner": false;
+                },
+                {
+                    "name": "transaction";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "member";
+                    "isMut": true;
+                    "isSigner": true;
+                },
+                {
+                    "name": "systemProgram";
+                    "isMut": false;
+                    "isSigner": false;
+                }
+            ];
+            "args": [];
+        },
+        {
+            "name": "rejectTransactionV2";
+            "accounts": [
+                {
+                    "name": "multisig";
+                    "isMut": false;
+                    "isSigner": false;
+                },
+                {
+                    "name": "transaction";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "member";
+                    "isMut": true;
+                    "isSigner": true;
+                },
+                {
+                    "name": "systemProgram";
+                    "isMut": false;
+                    "isSigner": false;
+                }
+            ];
+            "args": [];
+        },
+        {
+            "name": "cancelTransactionV2";
+            "accounts": [
+                {
+                    "name": "multisig";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "transaction";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "member";
+                    "isMut": true;
+                    "isSigner": true;
+                },
+                {
+                    "name": "systemProgram";
+                    "isMut": false;
+                    "isSigner": false;
+                }
+            ];
+            "args": [];
+        },
+        {
+            "name": "executeTransactionV2";
+            "accounts": [
+                {
+                    "name": "multisig";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "transaction";
+                    "isMut": true;
+                    "isSigner": false;
+                },
+                {
+                    "name": "member";
+                    "isMut": true;
+                    "isSigner": true;
+                }
+            ];
+            "args": [];
         }
     ];
     "accounts": [
@@ -590,6 +724,68 @@ export declare type SquadsMpl = {
                     }
                 ];
             };
+        },
+        {
+            "name": "msTransactionV2";
+            "type": {
+                "kind": "struct";
+                "fields": [
+                    {
+                        "name": "creator";
+                        "type": "publicKey";
+                    },
+                    {
+                        "name": "ms";
+                        "type": "publicKey";
+                    },
+                    {
+                        "name": "transactionIndex";
+                        "type": "u32";
+                    },
+                    {
+                        "name": "authorityIndex";
+                        "type": "u32";
+                    },
+                    {
+                        "name": "authorityBump";
+                        "type": "u8";
+                    },
+                    {
+                        "name": "status";
+                        "type": {
+                            "defined": "MsTransactionStatus";
+                        };
+                    },
+                    {
+                        "name": "bump";
+                        "type": "u8";
+                    },
+                    {
+                        "name": "approved";
+                        "type": {
+                            "vec": "publicKey";
+                        };
+                    },
+                    {
+                        "name": "rejected";
+                        "type": {
+                            "vec": "publicKey";
+                        };
+                    },
+                    {
+                        "name": "cancelled";
+                        "type": {
+                            "vec": "publicKey";
+                        };
+                    },
+                    {
+                        "name": "message";
+                        "type": {
+                            "defined": "MsTransactionMessage";
+                        };
+                    }
+                ];
+            };
         }
     ];
     "types": [
@@ -629,6 +825,88 @@ export declare type SquadsMpl = {
                                 "defined": "MsAccountMeta";
                             };
                         };
+                    },
+                    {
+                        "name": "data";
+                        "type": "bytes";
+                    }
+                ];
+            };
+        },
+        {
+            "name": "MsMessageAddressTableLookup";
+            "type": {
+                "kind": "struct";
+                "fields": [
+                    {
+                        "name": "accountKey";
+                        "type": "publicKey";
+                    },
+                    {
+                        "name": "writableIndexes";
+                        "type": "bytes";
+                    },
+                    {
+                        "name": "readonlyIndexes";
+                        "type": "bytes";
+                    }
+                ];
+            };
+        },
+        {
+            "name": "MsTransactionMessage";
+            "type": {
+                "kind": "struct";
+                "fields": [
+                    {
+                        "name": "numSigners";
+                        "type": "u8";
+                    },
+                    {
+                        "name": "numWritableSigners";
+                        "type": "u8";
+                    },
+                    {
+                        "name": "numWritableNonSigners";
+                        "type": "u8";
+                    },
+                    {
+                        "name": "accountKeys";
+                        "type": {
+                            "vec": "publicKey";
+                        };
+                    },
+                    {
+                        "name": "instructions";
+                        "type": {
+                            "vec": {
+                                "defined": "MsCompiledInstruction";
+                            };
+                        };
+                    },
+                    {
+                        "name": "addressTableLookups";
+                        "type": {
+                            "vec": {
+                                "defined": "MsMessageAddressTableLookup";
+                            };
+                        };
+                    }
+                ];
+            };
+        },
+        {
+            "name": "MsCompiledInstruction";
+            "type": {
+                "kind": "struct";
+                "fields": [
+                    {
+                        "name": "programIdIndex";
+                        "type": "u8";
+                    },
+                    {
+                        "name": "accountIndexes";
+                        "type": "bytes";
                     },
                     {
                         "name": "data";
@@ -716,6 +994,20 @@ export declare type SquadsMpl = {
         {
             "code": 6012;
             "name": "PartialExecution";
+        },
+        {
+            "code": 6013;
+            "name": "InvalidInstructionCount";
+            "msg": "Number of instruction arguments does not match number of instruction accounts.";
+        },
+        {
+            "code": 6014;
+            "name": "InvalidAccount";
+        },
+        {
+            "code": 6015;
+            "name": "InvalidTransactionMessage";
+            "msg": "TransactionMessage is malformed.";
         }
     ];
 };

@@ -317,9 +317,7 @@ class Squads {
       threshold: number,
       createKey: PublicKey,
       initialMembers: PublicKey[],
-      name: string,
-      description = "",
-      image = ""
+      metadata: string,
   ): [SquadsMethods, PublicKey] {
     if (
         !initialMembers.find((member) => member.equals(this.wallet.publicKey))
@@ -329,7 +327,7 @@ class Squads {
     const [multisigPDA] = getMsPDA(createKey, this.multisigProgramId);
     return [
       this.multisig.methods
-          .create(threshold, createKey, initialMembers, JSON.stringify({name, description, image}))
+          .create(threshold, createKey, initialMembers, metadata)
           .accounts({multisig: multisigPDA, creator: this.wallet.publicKey}),
       multisigPDA,
     ];
@@ -339,7 +337,7 @@ class Squads {
       threshold: number,
       createKey: PublicKey,
       initialMembers: PublicKey[],
-      name: string,
+      name = "",
       description = "",
       image = ""
   ): Promise<MultisigAccount> {
@@ -357,7 +355,7 @@ class Squads {
       threshold: number,
       createKey: PublicKey,
       initialMembers: PublicKey[],
-      name: string,
+      name = "",
       description = "",
       image = ""
   ): Promise<TransactionInstruction> {
