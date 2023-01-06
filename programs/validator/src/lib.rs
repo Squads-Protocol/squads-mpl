@@ -108,9 +108,15 @@ pub struct CreateManagedValidator<'info> {
 
 #[derive(Accounts)]
 pub struct RemoveValidator<'info> {
+    // multisig account needs to come from squads-mpl
     #[account(
-        owner = squads_mpl::ID,
-        constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
+        seeds = [
+            b"squad",
+            multisig.create_key.as_ref(),
+            b"multisig"
+        ],
+        bump = multisig.bump,
+        seeds::program = squads_mpl::ID,
     )]
     pub multisig: Account<'info, Ms>,
 
