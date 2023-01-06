@@ -34,7 +34,9 @@ pub mod validator {
         Ok(())
     }
 
-
+    pub fn close_validator_account(_ctx: Context<RemoveValidator>) -> Result<()>{
+        Ok(())
+    }
 
 }
 
@@ -102,4 +104,63 @@ pub struct CreateManagedValidator<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>
+}
+
+#[derive(Accounts)]
+pub struct RemoveValidator<'info> {
+    #[account(
+        owner = squads_mpl::ID,
+        constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
+    )]
+    pub multisig: Account<'info, Ms>,
+
+    #[account(
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            b"vmanage"
+        ],
+        bump = validator_manager.bump
+    )]
+    pub validator_manager: Account<'info, ValidatorManager>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            validator_manager.key().as_ref(),
+            &validator_manager.managed_validator_index.checked_add(1).unwrap().to_le_bytes(),
+            b"validator"
+        ],
+        bump,
+        close = authority
+    )]
+    pub managed_validator: Account<'info,ManagedValidator>,
+
+    // check that the transaction is derived from the multisig
+    #[account(
+        owner = squads_mpl::ID,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.transaction_index.to_le_bytes(),
+            b"transaction"
+        ],
+        bump = transaction.bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub transaction: Account<'info, MsTransaction>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"squad",
+            multisig.key().as_ref(),
+            &transaction.authority_index.to_le_bytes(),
+            b"authority"
+        ],
+        bump = transaction.authority_bump,
+        seeds::program = squads_mpl::ID,
+    )]
+    pub authority: Signer<'info>,
 }
