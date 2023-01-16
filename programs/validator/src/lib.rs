@@ -135,10 +135,10 @@ pub struct RemoveValidator<'info> {
         seeds = [
             b"squad",
             validator_manager.key().as_ref(),
-            &validator_manager.managed_validator_index.checked_add(1).unwrap().to_le_bytes(),
+            &managed_validator.managed_validator_index.to_le_bytes(),
             b"validator"
         ],
-        bump,
+        bump = managed_validator.bump,
         close = authority
     )]
     pub managed_validator: Account<'info,ManagedValidator>,
