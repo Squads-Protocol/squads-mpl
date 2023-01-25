@@ -481,6 +481,13 @@ pub mod squads_mpl {
                     if &ix.program_id != ctx.program_id {
                         return err!(MsError::InvalidAuthorityIndex);
                     }
+                    // Prevent recursive call on execute_transaction/instruction that could create issues
+                    let execute_transaction = Vec::from_hex("e7ad315beb184413").unwrap();
+                    let execute_instruction = Vec::from_hex("301228284b4a936e").unwrap();
+                    if Some(execute_transaction.as_slice()) == ix.data.get(0..8) ||
+                        Some(execute_instruction.as_slice()) == ix.data.get(0..8) {
+                        return err!(MsError::InvalidAuthorityIndex);
+                    }
                     // since the add member may need to pay realloc, switch the payer
                     if Some(add_member_discriminator.as_slice()) == ix.data.get(0..8)
                         || Some(add_member_and_change_threshold_discriminator.as_slice())
@@ -516,6 +523,11 @@ pub mod squads_mpl {
         let ms_key = &ctx.accounts.multisig.key();
         let ms_ix = &mut ctx.accounts.instruction;
         let tx = &mut ctx.accounts.transaction;
+
+        // To prevent potential failure with the Squad account auth 0 can't be executed in a specific instruction
+        if tx.authority_index == 0 {
+            return err!(MsError::InvalidAuthorityIndex);
+        }
 
         // setup the authority seeds
         let authority_seeds = [
