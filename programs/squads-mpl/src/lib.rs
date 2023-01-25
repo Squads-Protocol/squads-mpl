@@ -443,7 +443,12 @@ pub mod squads_mpl {
         let ms_key = &ctx.accounts.multisig.key();
         let ms_ix = &mut ctx.accounts.instruction;
         let tx = &mut ctx.accounts.transaction;
-        
+
+        // To prevent potential failure with the Squad account auth 0 can't be executed in a specific instruction
+        if tx.authority_index == 0 {
+            return err!(MsError::InvalidAuthorityIndex);
+        }
+
         // setup the authority seeds
         let authority_seeds = [
             b"squad",
