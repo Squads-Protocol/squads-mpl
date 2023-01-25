@@ -415,7 +415,7 @@ pub mod squads_mpl {
 
             // deserialize the msIx
             let mut ix_account_data: &[u8] = &ms_ix_account.try_borrow_mut_data()?;
-            let ms_ix: MsInstruction = MsInstruction::try_deserialize(&mut ix_account_data)?;
+            let mut ms_ix: MsInstruction = MsInstruction::try_deserialize(&mut ix_account_data)?;
 
             // get the instruction account pda - seeded from transaction account + the transaction accounts instruction index
             let (ix_pda, _) = Pubkey::find_program_address(
@@ -440,7 +440,7 @@ pub mod squads_mpl {
 
             let ix_keys = ms_ix.keys.clone();
             // create the instruction to invoke from the saved ms ix account
-            let mut ix: Instruction = Instruction::from(ms_ix);
+            let mut ix: Instruction = Instruction::from(ms_ix.clone());
             let mut ix_account_infos: Vec<AccountInfo> = Vec::<AccountInfo>::new();
 
             // add the program account needed for the ix
@@ -496,6 +496,8 @@ pub mod squads_mpl {
                     invoke_signed(&ix, &ix_account_infos, &[&authority_seeds])?;
                 }
             };
+            ms_ix.set_executed()?;
+
             Ok(())
         })?;
 
