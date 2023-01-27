@@ -208,6 +208,7 @@ pub mod squads_mpl {
         ctx.accounts.multisig.add_authority()
     }
 
+    // deprecated! constraint has been removed in favor of the roles program
     // instruction to change the external execute setting, which allows
     // non-members or programs to execute a transaction.
     pub fn set_external_execute(ctx: Context<MsAuth>, setting: bool) -> Result<()> {
@@ -794,8 +795,8 @@ pub struct ExecuteTransaction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
-        // only members can execute unless specified by the allow_external_execute setting
-        constraint = multisig.is_member(member.key()).is_some() || multisig.allow_external_execute @MsError::KeyNotInMultisig,
+        // only members can execute
+        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
     )]
     pub multisig: Box<Account<'info, Ms>>,
 
@@ -829,7 +830,7 @@ pub struct ExecuteInstruction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
-        constraint = multisig.is_member(member.key()).is_some() || multisig.allow_external_execute @MsError::KeyNotInMultisig,
+        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
     )]
     pub multisig: Box<Account<'info, Ms>>,
 
