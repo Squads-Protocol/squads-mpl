@@ -16,5 +16,5 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.25.0"
+anchor-lang = "0.26.0"
 squads-mpl = { path = "../squads-mpl", features =["cpi"] } 
