@@ -507,10 +507,6 @@ pub mod squads_mpl {
                     invoke_signed(&ix, &ix_account_infos, &[&authority_seeds])?;
                 }
             };
-            // set this instruction as executed
-            ms_ix.set_executed()?;
-            // write the new struct back to the data slice
-            ms_ix.serialize(&mut &mut ms_ix_account.try_borrow_mut_data()?[8..])?;
             Ok(())
         })?;
 
@@ -585,8 +581,6 @@ pub mod squads_mpl {
 
         invoke_signed(&ix, &ix_account_infos, &[&authority_seeds])?;
 
-        // set the instruction as executed
-        ms_ix.set_executed()?;
         // set the executed index to match
         tx.executed_index = ms_ix.instruction_index;
         // this is the last instruction - set the transaction as executed
@@ -860,7 +854,6 @@ pub struct ExecuteInstruction<'info> {
             &transaction.executed_index.checked_add(1).unwrap().to_le_bytes(),
             b"instruction"
         ], bump = instruction.bump,
-        constraint = !instruction.executed @MsError::InvalidInstructionAccount,
         // it should be the next expected instruction account to be executed
         constraint = instruction.instruction_index == transaction.executed_index.checked_add(1).unwrap() @MsError::InvalidInstructionAccount,
     )]

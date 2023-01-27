@@ -243,7 +243,7 @@ pub struct MsInstruction {
     pub data: Vec<u8>,
     pub instruction_index: u8,
     pub bump: u8,
-    pub executed: bool,
+    pub executed: bool, // deprecated in favor for executed index in the MsTransaction
 }
 
 // map the incoming instruction to internal instruction schema
@@ -260,6 +260,7 @@ impl MsInstruction {
         Ok(())
     }
 
+    // deprecated in favor for using the executed_index in the MsTransaction
     pub fn set_executed(&mut self) -> Result<()> {
         self.executed = true;
         Ok(())
