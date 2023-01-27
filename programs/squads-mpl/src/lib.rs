@@ -114,6 +114,7 @@ pub mod squads_mpl {
         ctx.accounts.multisig.reload()?;
         ctx.accounts.multisig.add_member(new_member)?;
         let new_index = ctx.accounts.multisig.transaction_index;
+        // set the change index, which will deprecate any active transactions
         ctx.accounts.multisig.set_change_index(new_index)
     }
 
@@ -131,6 +132,7 @@ pub mod squads_mpl {
             ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
         let new_index = ctx.accounts.multisig.transaction_index;
+        // update the change index to deprecate any active transactions
         ctx.accounts.multisig.set_change_index(new_index)
     }
 
@@ -179,6 +181,7 @@ pub mod squads_mpl {
             ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
         let new_index = ctx.accounts.multisig.transaction_index;
+        // update the change index to deprecate any active transactions
         ctx.accounts.multisig.set_change_index(new_index)
     }
 
@@ -194,6 +197,7 @@ pub mod squads_mpl {
             ctx.accounts.multisig.change_threshold(new_threshold)?;
         }
         let new_index = ctx.accounts.multisig.transaction_index;
+        // update the change index to deprecate any active transactions
         ctx.accounts.multisig.set_change_index(new_index)
     }
 
