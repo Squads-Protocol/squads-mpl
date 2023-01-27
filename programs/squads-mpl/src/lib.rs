@@ -212,8 +212,8 @@ pub mod squads_mpl {
     // deprecated! constraint has been removed in favor of the roles program
     // instruction to change the external execute setting, which allows
     // non-members or programs to execute a transaction.
-    pub fn set_external_execute(ctx: Context<MsAuth>, setting: bool) -> Result<()> {
-        let ms = &mut ctx.accounts.multisig;
+    pub fn set_external_execute(ctx: Context<MsAuth>, _setting: bool) -> Result<()> {
+        let _ms = &mut ctx.accounts.multisig;
         // ms.allow_external_execute = setting;  // no op
         Ok(())
     }
@@ -421,7 +421,7 @@ pub mod squads_mpl {
 
             // deserialize the msIx
             let mut ix_account_data: &[u8] = &ms_ix_account.try_borrow_mut_data()?;
-            let mut ms_ix: MsInstruction = MsInstruction::try_deserialize(&mut ix_account_data)?;
+            let ms_ix: MsInstruction = MsInstruction::try_deserialize(&mut ix_account_data)?;
 
             // get the instruction account pda - seeded from transaction account + the transaction accounts instruction index
             let (ix_pda, _) = Pubkey::find_program_address(
