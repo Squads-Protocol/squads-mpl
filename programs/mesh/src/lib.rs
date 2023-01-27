@@ -523,6 +523,8 @@ pub mod mesh {
         if ctx.accounts.instruction.instruction_index == ctx.accounts.transaction.instruction_index {
             ctx.accounts.transaction.set_executed()?;
         }
+        // reload any multisig changes
+        ctx.accounts.multisig.reload()?;
         Ok(())
     }
 
