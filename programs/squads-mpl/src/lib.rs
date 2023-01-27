@@ -503,8 +503,10 @@ pub mod squads_mpl {
                     invoke_signed(&ix, &ix_account_infos, &[&authority_seeds])?;
                 }
             };
+            // set this instruction as executed
             ms_ix.set_executed()?;
-
+            // write the new struct back to the data slice
+            ms_ix.serialize(&mut &mut ms_ix_account.try_borrow_mut_data()?[8..])?;
             Ok(())
         })?;
 
