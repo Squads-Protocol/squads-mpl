@@ -103,7 +103,7 @@ pub mod program_manager {
 pub struct CreateManager<'info> {
     #[account(
         owner = squads_mpl::ID,
-        constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
+        constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 
@@ -131,7 +131,7 @@ pub struct CreateManager<'info> {
 pub struct CreateManagedProgram<'info> {
     #[account(
         owner = squads_mpl::ID,
-        constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
+        constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 
@@ -171,7 +171,7 @@ pub struct CreateManagedProgram<'info> {
 pub struct CreateProgramUpgrade<'info> {
     #[account(
         owner = squads_mpl::ID,
-        constraint = matches!(multisig.is_member(creator.key()), Some(..)) || multisig.allow_external_execute @MsError::KeyNotInMultisig,
+        constraint = matches!(multisig.is_member(creator.key()), Some(..)) @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 
