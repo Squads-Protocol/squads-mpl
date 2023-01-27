@@ -5,14 +5,23 @@ use anchor_lang::solana_program::borsh::get_instance_packed_len;
 
 #[account]
 pub struct Ms {
-    pub threshold: u16,                 // threshold for signatures
-    pub authority_index: u16,           // index to seed other authorities under this multisig
-    pub transaction_index: u32,         // look up and seed reference for transactions
+    pub threshold: u16,                 // threshold for signatures to execute.
+
+    pub authority_index: u16,           // index to seed other authorities under this multisig.
+
+    pub transaction_index: u32,         // look up and seed reference for transactions.
+
     pub ms_change_index: u32,           // the last executed/closed transaction
-    pub bump: u8,                       // bump for the multisig seed
-    pub create_key: Pubkey,             // random key(or not) used to seed the multisig pda
-    pub allow_external_execute: bool,   // allow non-member keys to execute txs
-    pub keys: Vec<Pubkey>,              // keys of the members
+                                        // this is needed to deprecate any active transactions
+                                        // if the multisig is changed, helps prevent gaming.
+
+    pub bump: u8,                       // bump for the multisig seed.
+
+    pub create_key: Pubkey,             // random key(or not) used to seed the multisig pda.
+                                   
+    pub allow_external_execute: bool,   // allow non-member keys to execute txs (deprecated).
+
+    pub keys: Vec<Pubkey>,              // keys of the members/owners of the multisig.
 }
 
 impl Ms {
