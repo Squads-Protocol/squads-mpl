@@ -213,7 +213,7 @@ pub mod squads_mpl {
     // non-members or programs to execute a transaction.
     pub fn set_external_execute(ctx: Context<MsAuth>, setting: bool) -> Result<()> {
         let ms = &mut ctx.accounts.multisig;
-        ms.allow_external_execute = setting;
+        // ms.allow_external_execute = setting;  // no op
         Ok(())
     }
 
