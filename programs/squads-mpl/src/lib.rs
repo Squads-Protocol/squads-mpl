@@ -212,8 +212,8 @@ pub mod squads_mpl {
     // deprecated! constraint has been removed in favor of the roles program
     // instruction to change the external execute setting, which allows
     // non-members or programs to execute a transaction.
-    pub fn set_external_execute(ctx: Context<MsAuth>, setting: bool) -> Result<()> {
-        let ms = &mut ctx.accounts.multisig;
+    pub fn set_external_execute(ctx: Context<MsAuth>, _setting: bool) -> Result<()> {
+        // let ms = &mut ctx.accounts.multisig;
         // ms.allow_external_execute = setting;  // no op
         Ok(())
     }
@@ -876,32 +876,30 @@ pub struct ExecuteInstruction<'info> {
 
 #[derive(Accounts)]
 pub struct MsAuth<'info> {
-    #[account(mut)]
-    multisig: Box<Account<'info, Ms>>,
     #[account(
         mut,
         seeds = [
             b"squad",
             multisig.create_key.as_ref(),
             b"multisig"
-        ], bump = multisig.bump
+        ], bump = multisig.bump,
+        signer
     )]
-    pub multisig_auth: Signer<'info>,
+    pub multisig: Box<Account<'info, Ms>>,
 }
 
 #[derive(Accounts)]
 pub struct MsAuthRealloc<'info> {
-    #[account(mut)]
-    multisig: Box<Account<'info, Ms>>,
     #[account(
         mut,
         seeds = [
             b"squad",
             multisig.create_key.as_ref(),
             b"multisig"
-        ], bump = multisig.bump
+        ], bump = multisig.bump,
+        signer
     )]
-    pub multisig_auth: Signer<'info>,
+    pub multisig: Box<Account<'info, Ms>>,
     // needs to sign as well to transfer lamports if needed
     #[account(mut)]
     pub member: Signer<'info>,
