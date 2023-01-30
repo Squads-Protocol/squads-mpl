@@ -248,7 +248,7 @@ pub struct MsInstruction {
 
 // map the incoming instruction to internal instruction schema
 impl MsInstruction {
-    pub const MAXIMUM_SIZE: usize = 1280;
+    pub const MAXIMUM_SIZE: usize = 1280;   // no longer used but kept for reference, was previously a client side limitation for sizing.
 
     pub fn init(&mut self, instruction_index: u8, incoming_instruction: IncomingInstruction, bump: u8) -> Result<()> {
         self.bump = bump;
