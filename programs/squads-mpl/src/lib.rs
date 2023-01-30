@@ -521,6 +521,15 @@ pub mod squads_mpl {
 
     // instruction to sequentially execute parts of a transaction
     // instructions executed in this matter must be executed in order
+    // this may be helpful for processing large batch transfers.
+    // 
+    // NOTE - do not use this instruction if there is not total clarity around
+    // potential side effects, as this instruction implies that the approved
+    // transaction will be executed partially, and potentially spread out over
+    // a period of time. This could introduce problems with state and failed
+    // transactions. For example: a program invoked in one of these instructions
+    // may be upgraded between executions and potentially make one of the 
+    // necessary accounts invalid.
     pub fn execute_instruction<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteInstruction<'info>>,
     ) -> Result<()> {
