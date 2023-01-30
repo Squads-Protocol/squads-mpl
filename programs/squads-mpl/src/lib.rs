@@ -464,7 +464,7 @@ pub mod squads_mpl {
                     && (Some(add_member_discriminator.as_slice()) == ix.data.get(0..8)
                         || Some(add_member_and_change_threshold_discriminator.as_slice())
                             == ix.data.get(0..8))
-                    && account_index == 2
+                    && account_index == 1
                 {
                     // check that the ix account keys match the submitted account keys
                     if *ix_account_info.key != *ctx.accounts.member.key {
@@ -499,8 +499,8 @@ pub mod squads_mpl {
                         || Some(add_member_and_change_threshold_discriminator.as_slice())
                             == ix.data.get(0..8)
                     {
-                        ix.accounts[2] = AccountMeta::new(*ctx.accounts.member.key, true);
-                        ix_account_infos[3] = ctx.accounts.member.to_account_info();
+                        ix.accounts[1] = AccountMeta::new(*ctx.accounts.member.key, true);
+                        ix_account_infos[2] = ctx.accounts.member.to_account_info();
                     }
                     invoke_signed(&ix, &ix_account_infos, &[&ms_authority_seeds])?;
                 }
