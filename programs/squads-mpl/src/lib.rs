@@ -37,10 +37,10 @@ pub mod squads_mpl {
     // instruction to create a multisig
     pub fn create(
         ctx: Context<Create>,
-        threshold: u16,
-        create_key: Pubkey,
-        members: Vec<Pubkey>,
-        _meta: String,
+        threshold: u16,       // threshold of members required to sign
+        create_key: Pubkey,   // the public key used to seed the original multisig creation
+        members: Vec<Pubkey>, // a list of members (Public Keys) to use for the multisig
+        _meta: String,        // a string of metadata that can be used to describe the multisig on-chain as a memo ie. '{"name":"My Multisig","description":"This is a my multisig"}'
     ) -> Result<()> {
         // sort the members and remove duplicates
         let mut members = members;
