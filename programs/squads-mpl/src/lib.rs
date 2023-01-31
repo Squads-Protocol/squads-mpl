@@ -1,4 +1,11 @@
-use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
+use anchor_lang::{
+    prelude::*,
+    solana_program::{
+        instruction::Instruction,
+        program::invoke_signed
+    }
+};
+
 use hex::FromHex;
 
 use state::ms::*;
@@ -26,11 +33,6 @@ declare_id!("SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu");
 pub mod squads_mpl {
 
     use std::convert::TryInto;
-
-    use anchor_lang::solana_program::{
-        program::{invoke, invoke_signed},
-        system_instruction::transfer,
-    };
 
     use super::*;
 
@@ -98,18 +100,7 @@ pub mod squads_mpl {
             let top_up_lamports = rent_exempt_lamports
                 .saturating_sub(ctx.accounts.multisig.to_account_info().lamports());
             if top_up_lamports > 0 {
-                invoke(
-                    &transfer(
-                        ctx.accounts.member.key,
-                        &ctx.accounts.multisig.key(),
-                        top_up_lamports,
-                    ),
-                    &[
-                        ctx.accounts.member.to_account_info().clone(),
-                        multisig_account_info.clone(),
-                        ctx.accounts.system_program.to_account_info().clone(),
-                    ],
-                )?;
+                return err!(MsError::NotEnoughLamports);
             }
         }
         ctx.accounts.multisig.reload()?;
@@ -446,35 +437,19 @@ pub mod squads_mpl {
 
             let ix_keys = ms_ix.keys.clone();
             // create the instruction to invoke from the saved ms ix account
-            let mut ix: Instruction = Instruction::from(ms_ix.clone());
+            let ix: Instruction = Instruction::from(ms_ix.clone());
             let mut ix_account_infos: Vec<AccountInfo> = Vec::<AccountInfo>::new();
 
             // add the program account needed for the ix
             ix_account_infos.push(ix_program_info.clone());
 
-            let add_member_discriminator = Vec::from_hex("0d747b827ec63922").unwrap();
-            let add_member_and_change_threshold_discriminator =
-                Vec::from_hex("72d53b2fd69d96aa").unwrap();
             // loop through the provided remaining accounts
             for account_index in 0..ix_keys.len() {
                 let ix_account_info = next_account_info(ix_iter)?.clone();
 
-                // check if this data has length of 8 or greater, and is our discriminator
-                if ctx.program_id == ix_program_info.key
-                    && (Some(add_member_discriminator.as_slice()) == ix.data.get(0..8)
-                        || Some(add_member_and_change_threshold_discriminator.as_slice())
-                            == ix.data.get(0..8))
-                    && account_index == 1
-                {
-                    // check that the ix account keys match the submitted account keys
-                    if *ix_account_info.key != *ctx.accounts.member.key {
-                        return err!(MsError::InvalidInstructionAccount);
-                    }
-                } else {
-                    // check that the ix account keys match the submitted account keys
-                    if *ix_account_info.key != ix_keys[account_index].pubkey {
-                        return err!(MsError::InvalidInstructionAccount);
-                    }
+                // check that the ix account keys match the submitted account keys
+                if *ix_account_info.key != ix_keys[account_index].pubkey {
+                    return err!(MsError::InvalidInstructionAccount);
                 }
 
                 ix_account_infos.push(ix_account_info.clone());
@@ -494,14 +469,7 @@ pub mod squads_mpl {
                         Some(execute_instruction.as_slice()) == ix.data.get(0..8) {
                         return err!(MsError::InvalidAuthorityIndex);
                     }
-                    // since the add member may need to pay realloc, switch the payer
-                    if Some(add_member_discriminator.as_slice()) == ix.data.get(0..8)
-                        || Some(add_member_and_change_threshold_discriminator.as_slice())
-                            == ix.data.get(0..8)
-                    {
-                        ix.accounts[1] = AccountMeta::new(*ctx.accounts.member.key, true);
-                        ix_account_infos[2] = ctx.accounts.member.to_account_info();
-                    }
+
                     invoke_signed(&ix, &ix_account_infos, &[&ms_authority_seeds])?;
                 }
                 // if its > 1 authority, use the derived authority seeds
@@ -913,9 +881,7 @@ pub struct MsAuthRealloc<'info> {
         signer
     )]
     pub multisig: Box<Account<'info, Ms>>,
-    // needs to sign as well to transfer lamports if needed
-    #[account(mut)]
-    pub member: Signer<'info>,
+
     pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>,
 }

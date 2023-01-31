@@ -93,8 +93,6 @@ export class TransactionBuilder {
       .addMember(member)
       .accounts({
         multisig: this.multisig.publicKey,
-        multisigAuth: this.multisig.publicKey,
-        member,
       })
       .instruction();
     return this.withInstruction(instruction);
@@ -107,8 +105,6 @@ export class TransactionBuilder {
       .addMemberAndChangeThreshold(member, threshold)
       .accounts({
         multisig: this.multisig.publicKey,
-        multisigAuth: this.multisig.publicKey,
-        member,
       })
       .instruction();
     return this.withInstruction(instruction);
@@ -118,7 +114,6 @@ export class TransactionBuilder {
       .removeMember(member)
       .accounts({
         multisig: this.multisig.publicKey,
-        multisigAuth: this.multisig.publicKey,
       })
       .instruction();
     return this.withInstruction(instruction);
@@ -131,7 +126,6 @@ export class TransactionBuilder {
       .removeMemberAndChangeThreshold(member, threshold)
       .accounts({
         multisig: this.multisig.publicKey,
-        multisigAuth: this.multisig.publicKey,
       })
       .instruction();
     return this.withInstruction(instruction);
@@ -141,7 +135,6 @@ export class TransactionBuilder {
       .changeThreshold(threshold)
       .accounts({
         multisig: this.multisig.publicKey,
-        multisigAuth: this.multisig.publicKey,
       })
       .instruction();
     return this.withInstruction(instruction);

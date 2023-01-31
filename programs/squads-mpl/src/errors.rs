@@ -15,4 +15,5 @@ pub enum MsError {
     MaxMembersReached,
     EmptyMembers,
     PartialExecution,
+    NotEnoughLamports,
 }

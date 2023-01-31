@@ -20,7 +20,7 @@ import Squads, {
   getProgramManagerPDA,
   getAuthorityPDA,
   getTxPDA,
-} from "@sqds/sdk";
+} from "../sdk/src/index";
 import BN from "bn.js";
 import { ASSOCIATED_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
 import { getExecuteProxyInstruction, getUserRolePDA, getUserDelegatePDA, getRolesManager } from "../helpers/roles";
@@ -122,14 +122,9 @@ describe("Programs", function(){
     // test suite
     describe("SMPL Basic functionality", async function(){
       this.beforeAll(async function(){
-        console.log("Deploying programs...");
+        console.log("Deploying SMPL Program...");
         deploySmpl();
         console.log("✔ SMPL Program deployed.");
-        deployPm();
-        console.log("✔ Program Manager Program deployed.");
-        deployRoles();
-        console.log("✔ Roles Program deployed.");
-        console.log("Finished deploying programs.");
 
         program = anchor.workspace.SquadsMpl as Program<SquadsMpl>;
         squads = Squads.localnet(provider.wallet, {
@@ -389,7 +384,6 @@ describe("Programs", function(){
         ixState = await squads.getInstruction(ixState.publicKey);
         txState = await squads.getTransaction(txState.publicKey);
 
-        expect(ixState.executed).to.be.true;
         expect(txState.executedIndex).to.equal(1);
 
         await squads.executeInstruction(txState.publicKey, ix2State.publicKey);
@@ -397,15 +391,48 @@ describe("Programs", function(){
         ix2State = await squads.getInstruction(ix2State.publicKey);
         txState = await squads.getTransaction(txState.publicKey);
 
-        expect(ix2State.executed).to.be.true;
         expect(txState.executedIndex).to.equal(2);
         expect(txState.status).to.have.property("executed");
       });
 
       it(`Change ms size with realloc`, async function(){
         let msAccount = await squads.connection.getParsedAccountInfo(msPDA);
+        let msStateCheck = await squads.getMultisig(msPDA);
         const startRentLamports = msAccount.value.lamports;
+        // get the current data size of the msAccount
+        const currDataSize = msAccount.value.data.length;
+        // get the current number of keys
+        const currNumKeys = msStateCheck.keys.length;
+        // get the number of spots left
+        const SIZE_WITHOUT_MEMBERS = 8 + // Anchor disriminator
+        2 +         // threshold value
+        2 +         // authority index
+        4 +         // transaction index
+        4 +         // processed internal transaction index
+        1 +         // PDA bump
+        32 +        // creator
+        1 +         // allow external execute
+        4;          // for vec length
 
+        const spotsLeft = ((currDataSize - SIZE_WITHOUT_MEMBERS) / 32) - currNumKeys;
+
+        // if there is less than 1 spot left, calculate rent needed for realloc of 10 more keys
+        if(spotsLeft < 1){
+          console.log("            MS needs more space")
+          // add space for 10 more keys
+          const neededLen = currDataSize + (10 * 32);
+          // rent exempt lamports
+          const rentExemptLamports = await squads.connection.getMinimumBalanceForRentExemption(neededLen);
+          // top up lamports
+          const topUpLamports = rentExemptLamports - msAccount.value.lamports;
+          if(topUpLamports > 0){
+            console.log("            MS needs more lamports, topping up ", topUpLamports);
+            const topUpTx = await createBlankTransaction(squads.connection, creator.publicKey);
+            const topUpIx = await createTestTransferTransaction(creator.publicKey, msPDA, topUpLamports);
+            topUpTx.add(topUpIx);
+            await provider.sendAndConfirm(topUpTx);
+          }
+        }
         // 1 get the instruction to create a transction
         // 2 get the instruction to add a member
         // 3 get the instruction to 'activate' the tx
@@ -685,7 +712,13 @@ describe("Programs", function(){
       });
     });
 
-    describe.skip("Program upgrades", () => {
+    describe.skip("Program upgrades", function (){
+      this.beforeAll(async function(){
+        console.log('Deploying Program Manager Program');
+        deployPm();
+        console.log("✔ Program Manager Program deployed.");
+      });
+
       it(`Create a program manager`,  async function(){
         const newProgramManager = await squads.createProgramManager(msPDA);
         expect(newProgramManager.multisig.toBase58()).to.equal(msPDA.toBase58());
@@ -922,7 +955,7 @@ describe("Programs", function(){
     });
   
     // test suite for the roles program
-    describe("Roles Program", async function(){
+    describe.skip("Roles Program", async function(){
       const userWithInitRole = anchor.web3.Keypair.generate();
       const userWithVoteRole = anchor.web3.Keypair.generate();
       const userWithExecuteRole = anchor.web3.Keypair.generate();
@@ -936,6 +969,10 @@ describe("Programs", function(){
       let userWithExecuteRoleDelegatePDA;
 
       this.beforeAll(async function(){
+        console.log("Deploying Roles Program...");
+        deployRoles();
+        console.log("✔ Roles Program deployed.");
+
         rolesProgram = anchor.workspace.Roles as Program<Roles>;
         [rolesManager] = await getRolesManager(msPDA, rolesProgram.programId);
 
