@@ -629,7 +629,6 @@ pub struct CreateTransaction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
-        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 
@@ -646,7 +645,10 @@ pub struct CreateTransaction<'info> {
     )]
     pub transaction: Account<'info, MsTransaction>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -661,7 +663,6 @@ pub struct AddInstruction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
-        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 
@@ -673,7 +674,7 @@ pub struct AddInstruction<'info> {
             &transaction.transaction_index.to_le_bytes(),
             b"transaction"
         ], bump = transaction.bump,
-        constraint = creator.key() == transaction.creator,
+        constraint = transaction.creator == creator.key(),
         constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
     )]
@@ -693,7 +694,10 @@ pub struct AddInstruction<'info> {
     )]
     pub instruction: Account<'info, MsInstruction>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -707,7 +711,6 @@ pub struct ActivateTransaction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
-        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 
@@ -719,14 +722,17 @@ pub struct ActivateTransaction<'info> {
             &transaction.transaction_index.to_le_bytes(),
             b"transaction"
         ], bump = transaction.bump,
-        constraint = creator.key() == transaction.creator,
+        constraint = transaction.creator == creator.key(),
         constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
         constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
         constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
     )]
     pub transaction: Account<'info, MsTransaction>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
     pub creator: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -740,7 +746,6 @@ pub struct VoteTransaction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
-        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 
@@ -758,7 +763,10 @@ pub struct VoteTransaction<'info> {
     )]
     pub transaction: Account<'info, MsTransaction>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
     pub member: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -773,7 +781,6 @@ pub struct CancelTransaction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
-        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
     )]
     pub multisig: Account<'info, Ms>,
 
@@ -790,7 +797,10 @@ pub struct CancelTransaction<'info> {
     )]
     pub transaction: Account<'info, MsTransaction>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
     pub member: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -805,8 +815,6 @@ pub struct ExecuteTransaction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
-        // only members can execute
-        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
     )]
     pub multisig: Box<Account<'info, Ms>>,
 
@@ -825,7 +833,10 @@ pub struct ExecuteTransaction<'info> {
     )]
     pub transaction: Account<'info, MsTransaction>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
     pub member: Signer<'info>,
 }
 
@@ -840,7 +851,6 @@ pub struct ExecuteInstruction<'info> {
             b"multisig"
         ],
         bump = multisig.bump,
-        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
     )]
     pub multisig: Box<Account<'info, Ms>>,
 
@@ -870,7 +880,10 @@ pub struct ExecuteInstruction<'info> {
     )]
     pub instruction: Account<'info, MsInstruction>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
+    )]
     pub member: Signer<'info>,
 }
 
