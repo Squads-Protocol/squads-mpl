@@ -1,3 +1,8 @@
+/*
+    Squads Multisig Program - Program & Instructions
+    https://github.com/squads-protocol/squads-mpl
+*/
+
 use anchor_lang::{
     prelude::*,
     solana_program::{
@@ -8,13 +13,16 @@ use anchor_lang::{
 
 use hex::FromHex;
 
-use state::ms::*;
-pub mod state;
-
+use state::*;
 use errors::*;
+use account::*;
+
+pub mod state;
+pub mod account;
 pub mod errors;
 
-use solana_security_txt::security_txt;
+#[cfg(not(feature = "no-entrypoint"))]
+use {default_env::default_env, solana_security_txt::security_txt};
 
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
@@ -24,6 +32,7 @@ security_txt! {
     policy: "https://github.com/Squads-Protocol/squads-mpl/blob/main/SECURITY.md",
     preferred_languages: "en",
     source_code: "https://github.com/squads-protocol/squads-mpl",
+    source_revision: default_env!("GITHUB_SHA", ""),
     auditors: "OtterSec"
 }
 
@@ -36,6 +45,7 @@ pub mod squads_mpl {
 
     use super::*;
 
+    /// Creates a new multisig account
     // instruction to create a multisig
     pub fn create(
         ctx: Context<Create>,
@@ -73,7 +83,10 @@ pub mod squads_mpl {
         )
     }
 
-    // instruction to add a member/key to the multisig and reallocate space if neccessary
+    /// The instruction to add a new member to the multisig.
+    /// Adds member/key to the multisig and reallocates space if neccessary
+    /// If the multisig needs to be reallocated, it must be prefunded with
+    /// enough lamports to cover the new size.
     pub fn add_member(ctx: Context<MsAuthRealloc>, new_member: Pubkey) -> Result<()> {
         // if max is already reached, we can't have more members
         if ctx.accounts.multisig.keys.len() >= usize::from(u16::MAX) {
@@ -110,7 +123,7 @@ pub mod squads_mpl {
         ctx.accounts.multisig.set_change_index(new_index)
     }
 
-    // instruction to remove a member/key from the multisig
+    /// The instruction to remove a member from the multisig
     pub fn remove_member(ctx: Context<MsAuth>, old_member: Pubkey) -> Result<()> {
         // if there is only one key in this multisig, reject the removal
         if ctx.accounts.multisig.keys.len() == 1 {
@@ -128,7 +141,7 @@ pub mod squads_mpl {
         ctx.accounts.multisig.set_change_index(new_index)
     }
 
-    // instruction to remove a member/key from the multisig and change the threshold
+    /// The instruction to change the threshold of the multisig and simultaneously remove a member
     pub fn remove_member_and_change_threshold<'info>(
         ctx: Context<'_, '_, '_, 'info, MsAuth<'info>>,
         old_member: Pubkey,
@@ -146,7 +159,7 @@ pub mod squads_mpl {
         change_threshold(ctx, new_threshold)
     }
 
-    // instruction to add a member/key from the multisig and change the threshold
+    /// The instruction to change the threshold of the multisig and simultaneously add a member
     pub fn add_member_and_change_threshold<'info>(
         ctx: Context<'_, '_, '_, 'info, MsAuthRealloc<'info>>,
         new_member: Pubkey,
@@ -177,7 +190,7 @@ pub mod squads_mpl {
         ctx.accounts.multisig.set_change_index(new_index)
     }
 
-    // instruction to change the threshold
+    /// The instruction to change the threshold of the multisig
     pub fn change_threshold(ctx: Context<MsAuth>, new_threshold: u16) -> Result<()> {
         // if the new threshold value is valid
         if ctx.accounts.multisig.keys.len() < usize::from(new_threshold) {
@@ -193,27 +206,29 @@ pub mod squads_mpl {
         ctx.accounts.multisig.set_change_index(new_index)
     }
 
-    // instruction to increase the authority value tracked in the multisig
-    // This is optional, as authorities are simply PDAs, however it may be helpful
-    // to keep track of commonly used authorities in a UI.
+    /// instruction to increase the authority value tracked in the multisig
+    /// This is optional, as authorities are simply PDAs, however it may be helpful
+    /// to keep track of commonly used authorities in a UI.
+    /// This has no functional impact on the multisig or its functionality, but
+    /// can be used to track commonly used authorities (ie, vault 1, vault 2, etc.)
     pub fn add_authority(ctx: Context<MsAuth>) -> Result<()> {
         ctx.accounts.multisig.add_authority()
     }
 
-    // deprecated! constraint has been removed in favor of the roles program
+    /// DEPRECATED - constraint has been removed in favor of the roles program
     // instruction to change the external execute setting, which allows
     // non-members or programs to execute a transaction.
-    pub fn set_external_execute(ctx: Context<MsAuth>, _setting: bool) -> Result<()> {
-        let _ms = &mut ctx.accounts.multisig;
+    pub fn set_external_execute(_ctx: Context<MsAuth>, _setting: bool) -> Result<()> {
+        // let _ms = &mut ctx.accounts.multisig;
         // ms.allow_external_execute = setting;  // no op
         Ok(())
     }
 
-    // instruction to create a transaction
-    // each transaction is tied to a single authority, and must be specified when
-    // creating the instruction below. authority 0 is reserved for internal
-    // instructions, whereas authorities 1 or greater refer to a vault,
-    // upgrade authority, or other.
+    /// Instruction to create a multisig transaction.
+    /// Each transaction is tied to a single authority, and must be specified when
+    /// creating the instruction below. authority 0 is reserved for internal
+    /// instructions, whereas authorities 1 or greater refer to a vault,
+    /// upgrade authority, or other.
     pub fn create_transaction(ctx: Context<CreateTransaction>, authority_index: u32) -> Result<()> {
         let ms = &mut ctx.accounts.multisig;
         let authority_bump = match authority_index {
@@ -243,16 +258,16 @@ pub mod squads_mpl {
         )
     }
 
-    // instruction to set the state of a transaction "active"
-    // "active" transactions can then be signed off by multisig members
+    /// Instruction to set the state of a transaction "active".
+    /// "active" transactions can then be signed off by multisig members
     pub fn activate_transaction(ctx: Context<ActivateTransaction>) -> Result<()> {
         ctx.accounts.transaction.activate()
     }
 
-    // instruction to attach an instruction to a transaction
-    // transactions must be in the "draft" status, and any
-    // signer (aside from execution payer) must math the
-    // authority specified during the transaction creation
+    /// Instruction to attach an instruction to a transaction.
+    /// Transactions must be in the "draft" status, and any
+    /// signer (aside from execution payer) must match the
+    /// authority specified during the transaction creation.
     pub fn add_instruction(
         ctx: Context<AddInstruction>,
         incoming_instruction: IncomingInstruction,
@@ -270,8 +285,8 @@ pub mod squads_mpl {
         )
     }
 
-    // instruction to approve a transaction on behalf of a member
-    // the transaction must have an "active" status
+    /// Instruction to approve a transaction on behalf of a member.
+    /// The transaction must have an "active" status
     pub fn approve_transaction(ctx: Context<VoteTransaction>) -> Result<()> {
         // if they have previously voted to reject, remove that item (change vote check)
         if let Some(ind) = ctx
@@ -299,8 +314,8 @@ pub mod squads_mpl {
         Ok(())
     }
 
-    // instruction to reject a transaction
-    // the transaction must have an "active" status
+    /// Instruction to reject a transaction.
+    /// The transaction must have an "active" status.
     pub fn reject_transaction(ctx: Context<VoteTransaction>) -> Result<()> {
         // if they have previously voted to approve, remove that item (change vote check)
         if let Some(ind) = ctx
@@ -336,8 +351,10 @@ pub mod squads_mpl {
         Ok(())
     }
 
-    // instruction to cancel a transaction
-    // transactions must be in the "executeReady" status
+    /// Instruction to cancel a transaction.
+    /// Transactions must be in the "executeReady" status.
+    /// Transaction will only be cancelled if the number of
+    /// cancellations reaches the threshold.
     pub fn cancel_transaction(ctx: Context<CancelTransaction>) -> Result<()> {
         // check if they haven't cancelled yet
         if ctx
@@ -357,8 +374,12 @@ pub mod squads_mpl {
         Ok(())
     }
 
-    // instruction to execute a transaction
-    // transaction status must be "executeReady"
+    /// Instruction to execute a transaction.
+    /// Transaction status must be "executeReady", and the account list must match
+    /// the unique indexed accounts in the following manner: 
+    /// [ix_1_account, ix_1_program_account, ix_1_remaining_account_1, ix_1_remaining_account_2, ...]
+    /// 
+    /// Refer to the README for more information on how to construct the account list.
     pub fn execute_transaction<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteTransaction<'info>>,
         account_list: Vec<u8>,
@@ -401,7 +422,7 @@ pub mod squads_mpl {
         // iterator for remaining accounts
         let ix_iter = &mut mapped_remaining_accounts.iter();
 
-        (1..=ctx.accounts.transaction.instruction_index).try_for_each(|i| {
+        (1..=ctx.accounts.transaction.instruction_index).try_for_each(|i: u8| {
             // each ix block starts with the ms_ix account
             let ms_ix_account: &AccountInfo = next_account_info(ix_iter)?;
 
@@ -437,11 +458,11 @@ pub mod squads_mpl {
 
             let ix_keys = ms_ix.keys.clone();
             // create the instruction to invoke from the saved ms ix account
-            let ix: Instruction = Instruction::from(ms_ix.clone());
-            let mut ix_account_infos: Vec<AccountInfo> = Vec::<AccountInfo>::new();
+            let ix: Instruction = Instruction::from(ms_ix);
+            let mut ix_account_infos: Vec<AccountInfo> = vec![ix_program_info.clone()];
 
             // add the program account needed for the ix
-            ix_account_infos.push(ix_program_info.clone());
+            // ix_account_infos.push(ix_program_info.clone());
 
             // loop through the provided remaining accounts
             for account_index in 0..ix_keys.len() {
@@ -479,7 +500,8 @@ pub mod squads_mpl {
             };
             Ok(())
         })?;
-
+        // set the executed index
+        ctx.accounts.transaction.executed_index = ctx.accounts.transaction.instruction_index;
         // mark it as executed
         ctx.accounts.transaction.set_executed()?;
         // reload any multisig changes
@@ -487,17 +509,17 @@ pub mod squads_mpl {
         Ok(())
     }
 
-    // instruction to sequentially execute parts of a transaction
-    // instructions executed in this matter must be executed in order
-    // this may be helpful for processing large batch transfers.
-    // 
-    // NOTE - do not use this instruction if there is not total clarity around
-    // potential side effects, as this instruction implies that the approved
-    // transaction will be executed partially, and potentially spread out over
-    // a period of time. This could introduce problems with state and failed
-    // transactions. For example: a program invoked in one of these instructions
-    // may be upgraded between executions and potentially make one of the 
-    // necessary accounts invalid.
+    /// instruction to sequentially execute parts of a transaction
+    /// instructions executed in this matter must be executed in order
+    /// this may be helpful for processing large batch transfers.
+    /// 
+    /// NOTE - do not use this instruction if there is not total clarity around
+    /// potential side effects, as this instruction implies that the approved
+    /// transaction will be executed partially, and potentially spread out over
+    /// a period of time. This could introduce problems with state and failed
+    /// transactions. For example: a program invoked in one of these instructions
+    /// may be upgraded between executions and potentially make one of the 
+    /// necessary accounts invalid.
     pub fn execute_instruction<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteInstruction<'info>>,
     ) -> Result<()> {
@@ -569,319 +591,4 @@ pub mod squads_mpl {
         }
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-#[instruction(threshold: u16, create_key: Pubkey, members: Vec<Pubkey>, meta: String)]
-pub struct Create<'info> {
-    #[account(
-        init,
-        payer = creator,
-        space = Ms::SIZE_WITHOUT_MEMBERS + (members.len() * 32),
-        seeds = [b"squad", create_key.as_ref(), b"multisig"], bump
-    )]
-    pub multisig: Account<'info, Ms>,
-
-    #[account(mut)]
-    pub creator: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct CreateTransaction<'info> {
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ],
-        bump = multisig.bump,
-    )]
-    pub multisig: Account<'info, Ms>,
-
-    #[account(
-        init,
-        payer = creator,
-        space = 8 + MsTransaction::initial_size_with_members(multisig.keys.len()),
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &multisig.transaction_index.checked_add(1).unwrap().to_le_bytes(),
-            b"transaction"
-        ], bump
-    )]
-    pub transaction: Account<'info, MsTransaction>,
-
-    #[account(
-        mut,
-        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
-    )]
-    pub creator: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(instruction_data: IncomingInstruction)]
-pub struct AddInstruction<'info> {
-    #[account(
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ],
-        bump = multisig.bump,
-    )]
-    pub multisig: Account<'info, Ms>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &transaction.transaction_index.to_le_bytes(),
-            b"transaction"
-        ], bump = transaction.bump,
-        constraint = transaction.creator == creator.key(),
-        constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-    )]
-    pub transaction: Account<'info, MsTransaction>,
-
-    #[account(
-        init,
-        payer = creator,
-        space = 8 + instruction_data.get_max_size(),
-        seeds = [
-            b"squad",
-            transaction.key().as_ref(),
-            &transaction.instruction_index.checked_add(1).unwrap().to_le_bytes(),
-            b"instruction"
-        ],
-        bump
-    )]
-    pub instruction: Account<'info, MsInstruction>,
-
-    #[account(
-        mut,
-        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
-    )]
-    pub creator: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct ActivateTransaction<'info> {
-    #[account(
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ],
-        bump = multisig.bump,
-    )]
-    pub multisig: Account<'info, Ms>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &transaction.transaction_index.to_le_bytes(),
-            b"transaction"
-        ], bump = transaction.bump,
-        constraint = transaction.creator == creator.key(),
-        constraint = transaction.status == MsTransactionStatus::Draft @MsError::InvalidTransactionState,
-        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-    )]
-    pub transaction: Account<'info, MsTransaction>,
-
-    #[account(
-        mut,
-        constraint = multisig.is_member(creator.key()).is_some() @MsError::KeyNotInMultisig,
-    )]
-    pub creator: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct VoteTransaction<'info> {
-    #[account(
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ],
-        bump = multisig.bump,
-    )]
-    pub multisig: Account<'info, Ms>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &transaction.transaction_index.to_le_bytes(),
-            b"transaction"
-        ], bump = transaction.bump,
-        constraint = transaction.status == MsTransactionStatus::Active @MsError::InvalidTransactionState,
-        constraint = transaction.transaction_index > multisig.ms_change_index @MsError::DeprecatedTransaction,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-    )]
-    pub transaction: Account<'info, MsTransaction>,
-
-    #[account(
-        mut,
-        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
-    )]
-    pub member: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct CancelTransaction<'info> {
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ],
-        bump = multisig.bump,
-    )]
-    pub multisig: Account<'info, Ms>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &transaction.transaction_index.to_le_bytes(),
-            b"transaction"
-        ], bump = transaction.bump,
-        constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-    )]
-    pub transaction: Account<'info, MsTransaction>,
-
-    #[account(
-        mut,
-        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
-    )]
-    pub member: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct ExecuteTransaction<'info> {
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ],
-        bump = multisig.bump,
-    )]
-    pub multisig: Box<Account<'info, Ms>>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &transaction.transaction_index.to_le_bytes(),
-            b"transaction"
-        ], bump = transaction.bump,
-        constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-        // if they've already started sequential execution, they must continue
-        constraint = transaction.executed_index < 1 @MsError::PartialExecution,
-    )]
-    pub transaction: Account<'info, MsTransaction>,
-
-    #[account(
-        mut,
-        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
-    )]
-    pub member: Signer<'info>,
-}
-
-// executes the the next instruction sequentially if a tx is executeReady
-#[derive(Accounts)]
-pub struct ExecuteInstruction<'info> {
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ],
-        bump = multisig.bump,
-    )]
-    pub multisig: Box<Account<'info, Ms>>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.key().as_ref(),
-            &transaction.transaction_index.to_le_bytes(),
-            b"transaction"
-        ], bump = transaction.bump,
-        constraint = transaction.status == MsTransactionStatus::ExecuteReady @MsError::InvalidTransactionState,
-        constraint = transaction.ms == multisig.key() @MsError::InvalidInstructionAccount,
-    )]
-    pub transaction: Account<'info, MsTransaction>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            transaction.key().as_ref(),
-            &transaction.executed_index.checked_add(1).unwrap().to_le_bytes(),
-            b"instruction"
-        ], bump = instruction.bump,
-        // it should be the next expected instruction account to be executed
-        constraint = instruction.instruction_index == transaction.executed_index.checked_add(1).unwrap() @MsError::InvalidInstructionAccount,
-    )]
-    pub instruction: Account<'info, MsInstruction>,
-
-    #[account(
-        mut,
-        constraint = multisig.is_member(member.key()).is_some() @MsError::KeyNotInMultisig,
-    )]
-    pub member: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct MsAuth<'info> {
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ], bump = multisig.bump,
-        signer
-    )]
-    pub multisig: Box<Account<'info, Ms>>,
-}
-
-#[derive(Accounts)]
-pub struct MsAuthRealloc<'info> {
-    #[account(
-        mut,
-        seeds = [
-            b"squad",
-            multisig.create_key.as_ref(),
-            b"multisig"
-        ], bump = multisig.bump,
-        signer
-    )]
-    pub multisig: Box<Account<'info, Ms>>,
-
-    pub rent: Sysvar<'info, Rent>,
-    pub system_program: Program<'info, System>,
 }

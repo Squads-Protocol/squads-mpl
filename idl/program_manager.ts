@@ -122,6 +122,73 @@ export type ProgramManager = {
       ]
     },
     {
+      "name": "closeManagedProgramAccount",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programManager",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "managedProgram",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "transaction",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "closeUpgradeAccount",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programManager",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "managedProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programUpgrade",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "transaction",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "setAsExecuted",
       "accounts": [
         {
@@ -437,6 +504,73 @@ export const IDL: ProgramManager = {
           "type": "string"
         }
       ]
+    },
+    {
+      "name": "closeManagedProgramAccount",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programManager",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "managedProgram",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "transaction",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "closeUpgradeAccount",
+      "accounts": [
+        {
+          "name": "multisig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programManager",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "managedProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programUpgrade",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "transaction",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
     },
     {
       "name": "setAsExecuted",

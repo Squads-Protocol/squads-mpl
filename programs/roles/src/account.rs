@@ -371,7 +371,6 @@ impl<'info> ActivateProxy<'info> {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
             creator: self.delegate.to_account_info(),
-            system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
     }
@@ -436,7 +435,6 @@ impl<'info> VoteProxy<'info> {
             multisig: self.multisig.to_account_info(),
             transaction: self.transaction.to_account_info(),
             member: self.delegate.to_account_info(),
-            system_program: self.system_program.to_account_info(),
         };
         CpiContext::new(cpi_program, cpi_accounts)
     }

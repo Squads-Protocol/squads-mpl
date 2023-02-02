@@ -1,13 +1,19 @@
+/*
+    Squads Multisig Program - State accounts
+    https://github.com/squads-protocol/squads-mpl
+*/
+
 use std::convert::TryInto;
 
 use anchor_lang::{prelude::*, solana_program::instruction::Instruction};
 use anchor_lang::solana_program::borsh::get_instance_packed_len;
 
+/// Ms is the basic state account for a multisig.
 #[account]
 pub struct Ms {
     pub threshold: u16,                 // threshold for signatures to execute.
 
-    pub authority_index: u16,           // index to seed other authorities under this multisig.
+    pub authority_index: u16,           // luxury field to help track how many authorities are currently used.
 
     pub transaction_index: u32,         // look up and seed reference for transactions.
 
@@ -19,7 +25,7 @@ pub struct Ms {
 
     pub create_key: Pubkey,             // random key(or not) used to seed the multisig pda.
                                    
-    pub allow_external_execute: bool,   // allow non-member keys to execute txs (deprecated).
+    pub allow_external_execute: bool,   // DEPRECATED - allow non-member keys to execute txs
 
     pub keys: Vec<Pubkey>,              // keys of the members/owners of the multisig.
 }
@@ -35,6 +41,7 @@ impl Ms {
     1 +         // allow external execute
     4;          // for vec length
 
+    /// Initializes the new multisig account
     pub fn init (&mut self, threshold: u16, create_key: Pubkey, members: Vec<Pubkey>, bump: u8) -> Result<()> {
         self.threshold = threshold;
         self.keys = members;
@@ -47,6 +54,7 @@ impl Ms {
         Ok(())
     }
 
+    /// Checks to see if the key is a member of the multisig
     pub fn is_member(&self, member: Pubkey) -> Option<usize> {
         match self.keys.binary_search(&member) {
             Ok(ind)=> Some(ind),
@@ -54,17 +62,22 @@ impl Ms {
         }
     }
 
+    /// Updates the change index, deprecating any active/draft transactions
+    /// that have an index lower than the change index
     pub fn set_change_index(&mut self, index: u32) -> Result<()>{
         self.ms_change_index = index;
         Ok(())
     }
 
-    // bumps up the authority tracking index for easy use
+    /// bumps up the authority tracking index for the multisig.
+    /// This has no effect on the multisig functionality, but is used
+    /// to track authorities for clients to use (ie, vault 1, vault 2, program authority 3, etc).
     pub fn add_authority(&mut self) -> Result<()>{
         self.authority_index = self.authority_index.checked_add(1).unwrap();
         Ok(())
     }
 
+    /// Adds a member to the multisig. Is a no-op if the member is already in the multisig.
     pub fn add_member(&mut self, member: Pubkey) -> Result<()>{
         if matches!(self.is_member(member), None) {
             self.keys.push(member);
@@ -73,6 +86,7 @@ impl Ms {
         Ok(())
     }
 
+    /// Removes a member from the multisig. Is a no-op if the member is not in the multisig.
     pub fn remove_member(&mut self, member: Pubkey) -> Result<()>{
         if let Some(ind) = self.is_member(member) {
             self.keys.remove(ind);
@@ -83,6 +97,7 @@ impl Ms {
         Ok(())
     }
 
+    /// sets the threshold for the multisig.
     pub fn change_threshold(&mut self, threshold: u16) -> Result<()>{
         self.threshold = threshold;
         Ok(())
@@ -90,7 +105,7 @@ impl Ms {
 
 }
 
-
+/// MsTransactionStatus enum of the current status of the Multisig Transaction.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum MsTransactionStatus {
     Draft,          // Transaction default state
@@ -101,7 +116,7 @@ pub enum MsTransactionStatus {
     Cancelled,      // Transaction has been cancelled
 }
 
-
+/// The MsTransaction is the state account for a multisig transaction
 #[account]
 pub struct MsTransaction {
     pub creator: Pubkey,                // creator, used to seed pda
@@ -134,6 +149,7 @@ impl MsTransaction {
         MsTransaction::MINIMUM_SIZE + (3 * (4 + (members_len * 32) ) )
     }
 
+    /// initializes the transaction account
     pub fn init(&mut self, creator: Pubkey, multisig: Pubkey, transaction_index: u32, bump: u8, authority_index: u32, authority_bump: u8) -> Result<()>{
         self.creator = creator;
         self.ms = multisig;
@@ -150,50 +166,51 @@ impl MsTransaction {
         Ok(())
     }
 
-    // change status to Active
+    /// change status to Active
     pub fn activate(&mut self)-> Result<()>{
         self.status = MsTransactionStatus::Active;
         Ok(())
     }
 
-    // change status to ExecuteReady
+    /// change status to ExecuteReady
     pub fn ready_to_execute(&mut self)-> Result<()>{
         self.status = MsTransactionStatus::ExecuteReady;
         Ok(())
     }
 
-    // set status to Rejected
+    /// set status to Rejected
     pub fn set_rejected(&mut self) -> Result<()>{
         self.status = MsTransactionStatus::Rejected;
         Ok(())
     }
 
+    /// set status to Cancelled
     pub fn set_cancelled(&mut self) -> Result<()>{
         self.status = MsTransactionStatus::Cancelled;
         Ok(())
     }
 
-    // set status to executed
+    /// set status to executed
     pub fn set_executed(&mut self) -> Result<()>{
         self.status = MsTransactionStatus::Executed;
         Ok(())
     }
 
-    // sign to approve a transaction
+    /// sign to approve a transaction
     pub fn sign(&mut self, member: Pubkey) -> Result<()>{
         self.approved.push(member);
         self.approved.sort();
         Ok(())
     }
 
-    // sign to reject the transaction
+    /// sign to reject the transaction
     pub fn reject(&mut self, member: Pubkey) -> Result<()> {
         self.rejected.push(member);
         self.rejected.sort();
         Ok(())
     }
 
-    // sign to cancel the transaction if execute_ready
+    /// sign to cancel the transaction if execute_ready
     pub fn cancel(&mut self, member: Pubkey) -> Result<()> {
         self.cancelled.push(member);
         self.cancelled.sort();
@@ -201,33 +218,37 @@ impl MsTransaction {
     }
 
 
-    // check if a user has voted already
+    /// check if a user has voted already
     pub fn has_voted(&self, member: Pubkey) -> bool {
         let approved = self.approved.binary_search(&member).is_ok();
         let rejected = self.rejected.binary_search(&member).is_ok();
         approved || rejected
     }
 
-    // check if a user has signed to approve
+    /// check if a user has signed to approve
     pub fn has_voted_approve(&self, member: Pubkey) -> Option<usize> {
         self.approved.binary_search(&member).ok()
     }
 
-    // check if a use has signed to reject
+    /// check if a use has signed to reject
     pub fn has_voted_reject(&self, member: Pubkey) -> Option<usize> {
         self.rejected.binary_search(&member).ok()
     }
 
-    // check if a user has signed to cancel
+    /// check if a user has signed to cancel
     pub fn has_cancelled(&self, member: Pubkey) -> Option<usize> {
         self.cancelled.binary_search(&member).ok()
     }
 
+    /// removes the key from the rejected vec based on index.
+    /// used when changing from rejected to approved
     pub fn remove_reject(&mut self, index: usize) -> Result<()>{
         self.rejected.remove(index);
         Ok(())
     }
 
+    /// removes the key from the approved vec based on index
+    /// used when changing from approved to rejected
     pub fn remove_approve(&mut self, index: usize) -> Result<()>{
         self.approved.remove(index);
         Ok(())
@@ -235,7 +256,9 @@ impl MsTransaction {
 
 }
 
-// the internal instruction schema, similar to Instruction but with extra metadata
+/// The state account for an instruction that is attached to an instruction.
+/// Almost analagous to the native Instruction struct for solana, but with extra
+/// field for the bump.
 #[account]
 pub struct MsInstruction {
     pub program_id: Pubkey,
@@ -246,10 +269,10 @@ pub struct MsInstruction {
     pub executed: bool, // deprecated in favor for executed index in the MsTransaction
 }
 
-// map the incoming instruction to internal instruction schema
 impl MsInstruction {
     pub const MAXIMUM_SIZE: usize = 1280;   // no longer used but kept for reference, was previously a client side limitation for sizing.
 
+    /// Initializes the instruction account
     pub fn init(&mut self, instruction_index: u8, incoming_instruction: IncomingInstruction, bump: u8) -> Result<()> {
         self.bump = bump;
         self.instruction_index = instruction_index;
@@ -260,24 +283,15 @@ impl MsInstruction {
         Ok(())
     }
 
-    // deprecated in favor for using the executed_index in the MsTransaction
+    /// DEPRECATED: sequential execution now relies on the executed_index in the MsTransaction
     pub fn set_executed(&mut self) -> Result<()> {
         self.executed = true;
         Ok(())
     }
 }
 
-impl IncomingInstruction {
-    pub fn get_max_size(&self) -> usize {
-        // add three the size to correlate with the saved instruction account
-        // there are 3 extra bytes in a saved instruction account: index, bump, executed
-        // this is used to determine how much space the incoming instruction
-        // will used when saved
-        return get_instance_packed_len(&self).unwrap_or_default().checked_add(3).unwrap_or_default();
-    }
-}
-
 impl From<MsInstruction> for Instruction {
+    /// Converts the MsInstruction to a native Instruction
     fn from(instruction: MsInstruction) -> Self {
         Instruction {
             program_id: instruction.program_id,
@@ -295,6 +309,7 @@ impl From<MsInstruction> for Instruction {
     }
 }
 
+/// Wrapper for our internal MsInstruction key serialization schema
 // internal AccountMeta serialization schema
 #[derive(AnchorSerialize,AnchorDeserialize, Copy, Clone)]
 pub struct MsAccountMeta {
@@ -303,10 +318,23 @@ pub struct MsAccountMeta {
     pub is_writable: bool
 }
 
+/// Incoming instruction schema, used as an argument in the attach_instruction.
 // serialization schema for incoming instructions to be attached to transaction
 #[derive(AnchorSerialize,AnchorDeserialize, Clone)]
 pub struct IncomingInstruction {
     pub program_id: Pubkey,
     pub keys: Vec<MsAccountMeta>,
     pub data: Vec<u8>
+}
+
+impl IncomingInstruction {
+    /// Calculates how much space will be needed to allocate to the instruction
+    /// to be attached to the transaction.
+    pub fn get_max_size(&self) -> usize {
+        // add three the size to correlate with the saved instruction account
+        // there are 3 extra bytes in a saved instruction account: index, bump, executed
+        // this is used to determine how much space the incoming instruction
+        // will used when saved
+        get_instance_packed_len(&self).unwrap_or_default().checked_add(3).unwrap_or_default()
+    }
 }

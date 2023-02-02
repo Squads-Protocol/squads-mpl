@@ -1,9 +1,12 @@
 export type SquadsMpl = {
-  "version": "0.1.1",
+  "version": "1.3.0",
   "name": "squads_mpl",
   "instructions": [
     {
       "name": "create",
+      "docs": [
+        "Creates a new multisig account"
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -44,19 +47,15 @@ export type SquadsMpl = {
     },
     {
       "name": "addMember",
+      "docs": [
+        "The instruction to add a new member to the multisig.",
+        "Adds member/key to the multisig and reallocates space if neccessary",
+        "If the multisig needs to be reallocated, it must be prefunded with",
+        "enough lamports to cover the new size."
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "member",
           "isMut": true,
           "isSigner": true
         },
@@ -80,14 +79,12 @@ export type SquadsMpl = {
     },
     {
       "name": "removeMember",
+      "docs": [
+        "The instruction to remove a member from the multisig"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -101,14 +98,12 @@ export type SquadsMpl = {
     },
     {
       "name": "removeMemberAndChangeThreshold",
+      "docs": [
+        "The instruction to change the threshold of the multisig and simultaneously remove a member"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -126,19 +121,12 @@ export type SquadsMpl = {
     },
     {
       "name": "addMemberAndChangeThreshold",
+      "docs": [
+        "The instruction to change the threshold of the multisig and simultaneously add a member"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "member",
           "isMut": true,
           "isSigner": true
         },
@@ -166,14 +154,12 @@ export type SquadsMpl = {
     },
     {
       "name": "changeThreshold",
+      "docs": [
+        "The instruction to change the threshold of the multisig"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -187,14 +173,16 @@ export type SquadsMpl = {
     },
     {
       "name": "addAuthority",
+      "docs": [
+        "instruction to increase the authority value tracked in the multisig",
+        "This is optional, as authorities are simply PDAs, however it may be helpful",
+        "to keep track of commonly used authorities in a UI.",
+        "This has no functional impact on the multisig or its functionality, but",
+        "can be used to track commonly used authorities (ie, vault 1, vault 2, etc.)"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -203,14 +191,12 @@ export type SquadsMpl = {
     },
     {
       "name": "setExternalExecute",
+      "docs": [
+        "DEPRECATED - constraint has been removed in favor of the roles program"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -224,6 +210,13 @@ export type SquadsMpl = {
     },
     {
       "name": "createTransaction",
+      "docs": [
+        "Instruction to create a multisig transaction.",
+        "Each transaction is tied to a single authority, and must be specified when",
+        "creating the instruction below. authority 0 is reserved for internal",
+        "instructions, whereas authorities 1 or greater refer to a vault,",
+        "upgrade authority, or other."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -255,6 +248,10 @@ export type SquadsMpl = {
     },
     {
       "name": "activateTransaction",
+      "docs": [
+        "Instruction to set the state of a transaction \"active\".",
+        "\"active\" transactions can then be signed off by multisig members"
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -270,17 +267,18 @@ export type SquadsMpl = {
           "name": "creator",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": []
     },
     {
       "name": "addInstruction",
+      "docs": [
+        "Instruction to attach an instruction to a transaction.",
+        "Transactions must be in the \"draft\" status, and any",
+        "signer (aside from execution payer) must match the",
+        "authority specified during the transaction creation."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -319,6 +317,10 @@ export type SquadsMpl = {
     },
     {
       "name": "approveTransaction",
+      "docs": [
+        "Instruction to approve a transaction on behalf of a member.",
+        "The transaction must have an \"active\" status"
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -334,17 +336,16 @@ export type SquadsMpl = {
           "name": "member",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": []
     },
     {
       "name": "rejectTransaction",
+      "docs": [
+        "Instruction to reject a transaction.",
+        "The transaction must have an \"active\" status."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -360,17 +361,18 @@ export type SquadsMpl = {
           "name": "member",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": []
     },
     {
       "name": "cancelTransaction",
+      "docs": [
+        "Instruction to cancel a transaction.",
+        "Transactions must be in the \"executeReady\" status.",
+        "Transaction will only be cancelled if the number of",
+        "cancellations reaches the threshold."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -397,6 +399,14 @@ export type SquadsMpl = {
     },
     {
       "name": "executeTransaction",
+      "docs": [
+        "Instruction to execute a transaction.",
+        "Transaction status must be \"executeReady\", and the account list must match",
+        "the unique indexed accounts in the following manner:",
+        "[ix_1_account, ix_1_program_account, ix_1_remaining_account_1, ix_1_remaining_account_2, ...]",
+        "",
+        "Refer to the README for more information on how to construct the account list."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -423,6 +433,19 @@ export type SquadsMpl = {
     },
     {
       "name": "executeInstruction",
+      "docs": [
+        "instruction to sequentially execute parts of a transaction",
+        "instructions executed in this matter must be executed in order",
+        "this may be helpful for processing large batch transfers.",
+        "",
+        "NOTE - do not use this instruction if there is not total clarity around",
+        "potential side effects, as this instruction implies that the approved",
+        "transaction will be executed partially, and potentially spread out over",
+        "a period of time. This could introduce problems with state and failed",
+        "transactions. For example: a program invoked in one of these instructions",
+        "may be upgraded between executions and potentially make one of the",
+        "necessary accounts invalid."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -451,6 +474,9 @@ export type SquadsMpl = {
   "accounts": [
     {
       "name": "ms",
+      "docs": [
+        "Ms is the basic state account for a multisig."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -493,6 +519,9 @@ export type SquadsMpl = {
     },
     {
       "name": "msTransaction",
+      "docs": [
+        "The MsTransaction is the state account for a multisig transaction"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -557,6 +586,11 @@ export type SquadsMpl = {
     },
     {
       "name": "msInstruction",
+      "docs": [
+        "The state account for an instruction that is attached to an instruction.",
+        "Almost analagous to the native Instruction struct for solana, but with extra",
+        "field for the bump."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -595,6 +629,9 @@ export type SquadsMpl = {
   "types": [
     {
       "name": "MsAccountMeta",
+      "docs": [
+        "Wrapper for our internal MsInstruction key serialization schema"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -615,6 +652,9 @@ export type SquadsMpl = {
     },
     {
       "name": "IncomingInstruction",
+      "docs": [
+        "Incoming instruction schema, used as an argument in the attach_instruction."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -639,6 +679,9 @@ export type SquadsMpl = {
     },
     {
       "name": "MsTransactionStatus",
+      "docs": [
+        "MsTransactionStatus enum of the current status of the Multisig Transaction."
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -716,16 +759,23 @@ export type SquadsMpl = {
     {
       "code": 6012,
       "name": "PartialExecution"
+    },
+    {
+      "code": 6013,
+      "name": "NotEnoughLamports"
     }
   ]
 };
 
 export const IDL: SquadsMpl = {
-  "version": "0.1.1",
+  "version": "1.3.0",
   "name": "squads_mpl",
   "instructions": [
     {
       "name": "create",
+      "docs": [
+        "Creates a new multisig account"
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -766,19 +816,15 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "addMember",
+      "docs": [
+        "The instruction to add a new member to the multisig.",
+        "Adds member/key to the multisig and reallocates space if neccessary",
+        "If the multisig needs to be reallocated, it must be prefunded with",
+        "enough lamports to cover the new size."
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "member",
           "isMut": true,
           "isSigner": true
         },
@@ -802,14 +848,12 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "removeMember",
+      "docs": [
+        "The instruction to remove a member from the multisig"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -823,14 +867,12 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "removeMemberAndChangeThreshold",
+      "docs": [
+        "The instruction to change the threshold of the multisig and simultaneously remove a member"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -848,19 +890,12 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "addMemberAndChangeThreshold",
+      "docs": [
+        "The instruction to change the threshold of the multisig and simultaneously add a member"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "member",
           "isMut": true,
           "isSigner": true
         },
@@ -888,14 +923,12 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "changeThreshold",
+      "docs": [
+        "The instruction to change the threshold of the multisig"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -909,14 +942,16 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "addAuthority",
+      "docs": [
+        "instruction to increase the authority value tracked in the multisig",
+        "This is optional, as authorities are simply PDAs, however it may be helpful",
+        "to keep track of commonly used authorities in a UI.",
+        "This has no functional impact on the multisig or its functionality, but",
+        "can be used to track commonly used authorities (ie, vault 1, vault 2, etc.)"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -925,14 +960,12 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "setExternalExecute",
+      "docs": [
+        "DEPRECATED - constraint has been removed in favor of the roles program"
+      ],
       "accounts": [
         {
           "name": "multisig",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "multisigAuth",
           "isMut": true,
           "isSigner": true
         }
@@ -946,6 +979,13 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "createTransaction",
+      "docs": [
+        "Instruction to create a multisig transaction.",
+        "Each transaction is tied to a single authority, and must be specified when",
+        "creating the instruction below. authority 0 is reserved for internal",
+        "instructions, whereas authorities 1 or greater refer to a vault,",
+        "upgrade authority, or other."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -977,6 +1017,10 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "activateTransaction",
+      "docs": [
+        "Instruction to set the state of a transaction \"active\".",
+        "\"active\" transactions can then be signed off by multisig members"
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -992,17 +1036,18 @@ export const IDL: SquadsMpl = {
           "name": "creator",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": []
     },
     {
       "name": "addInstruction",
+      "docs": [
+        "Instruction to attach an instruction to a transaction.",
+        "Transactions must be in the \"draft\" status, and any",
+        "signer (aside from execution payer) must match the",
+        "authority specified during the transaction creation."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -1041,6 +1086,10 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "approveTransaction",
+      "docs": [
+        "Instruction to approve a transaction on behalf of a member.",
+        "The transaction must have an \"active\" status"
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -1056,17 +1105,16 @@ export const IDL: SquadsMpl = {
           "name": "member",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": []
     },
     {
       "name": "rejectTransaction",
+      "docs": [
+        "Instruction to reject a transaction.",
+        "The transaction must have an \"active\" status."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -1082,17 +1130,18 @@ export const IDL: SquadsMpl = {
           "name": "member",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": []
     },
     {
       "name": "cancelTransaction",
+      "docs": [
+        "Instruction to cancel a transaction.",
+        "Transactions must be in the \"executeReady\" status.",
+        "Transaction will only be cancelled if the number of",
+        "cancellations reaches the threshold."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -1119,6 +1168,14 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "executeTransaction",
+      "docs": [
+        "Instruction to execute a transaction.",
+        "Transaction status must be \"executeReady\", and the account list must match",
+        "the unique indexed accounts in the following manner:",
+        "[ix_1_account, ix_1_program_account, ix_1_remaining_account_1, ix_1_remaining_account_2, ...]",
+        "",
+        "Refer to the README for more information on how to construct the account list."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -1145,6 +1202,19 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "executeInstruction",
+      "docs": [
+        "instruction to sequentially execute parts of a transaction",
+        "instructions executed in this matter must be executed in order",
+        "this may be helpful for processing large batch transfers.",
+        "",
+        "NOTE - do not use this instruction if there is not total clarity around",
+        "potential side effects, as this instruction implies that the approved",
+        "transaction will be executed partially, and potentially spread out over",
+        "a period of time. This could introduce problems with state and failed",
+        "transactions. For example: a program invoked in one of these instructions",
+        "may be upgraded between executions and potentially make one of the",
+        "necessary accounts invalid."
+      ],
       "accounts": [
         {
           "name": "multisig",
@@ -1173,6 +1243,9 @@ export const IDL: SquadsMpl = {
   "accounts": [
     {
       "name": "ms",
+      "docs": [
+        "Ms is the basic state account for a multisig."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1215,6 +1288,9 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "msTransaction",
+      "docs": [
+        "The MsTransaction is the state account for a multisig transaction"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1279,6 +1355,11 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "msInstruction",
+      "docs": [
+        "The state account for an instruction that is attached to an instruction.",
+        "Almost analagous to the native Instruction struct for solana, but with extra",
+        "field for the bump."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1317,6 +1398,9 @@ export const IDL: SquadsMpl = {
   "types": [
     {
       "name": "MsAccountMeta",
+      "docs": [
+        "Wrapper for our internal MsInstruction key serialization schema"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1337,6 +1421,9 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "IncomingInstruction",
+      "docs": [
+        "Incoming instruction schema, used as an argument in the attach_instruction."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -1361,6 +1448,9 @@ export const IDL: SquadsMpl = {
     },
     {
       "name": "MsTransactionStatus",
+      "docs": [
+        "MsTransactionStatus enum of the current status of the Multisig Transaction."
+      ],
       "type": {
         "kind": "enum",
         "variants": [
@@ -1438,6 +1528,10 @@ export const IDL: SquadsMpl = {
     {
       "code": 6012,
       "name": "PartialExecution"
+    },
+    {
+      "code": 6013,
+      "name": "NotEnoughLamports"
     }
   ]
 };

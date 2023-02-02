@@ -712,7 +712,7 @@ describe("Programs", function(){
       });
     });
 
-    describe.skip("Program upgrades", function (){
+    describe("Program upgrades", function (){
       this.beforeAll(async function(){
         console.log('Deploying Program Manager Program');
         deployPm();
@@ -955,7 +955,7 @@ describe("Programs", function(){
     });
   
     // test suite for the roles program
-    describe.skip("Roles Program", async function(){
+    describe("Roles Program", async function(){
       const userWithInitRole = anchor.web3.Keypair.generate();
       const userWithVoteRole = anchor.web3.Keypair.generate();
       const userWithExecuteRole = anchor.web3.Keypair.generate();

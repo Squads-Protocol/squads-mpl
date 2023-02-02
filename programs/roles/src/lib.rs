@@ -3,7 +3,7 @@ use squads_mpl::errors::MsError;
 
 use state::roles::*;
 pub mod errors;
-pub use squads_mpl::state::ms::{Ms, MsInstruction, MsTransaction};
+pub use squads_mpl::state::{Ms, MsInstruction, MsTransaction};
 use account::*;
 pub mod account;
 pub mod state;
