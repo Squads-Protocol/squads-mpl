@@ -266,8 +266,8 @@ pub mod squads_mpl {
 
     /// Instruction to attach an instruction to a transaction.
     /// Transactions must be in the "draft" status, and any
-    /// signer (aside from execution payer) must match the
-    /// authority specified during the transaction creation.
+    /// signer (aside from execution payer) specified in an instruction 
+    /// must match the authority PDA specified during the transaction creation.
     pub fn add_instruction(
         ctx: Context<AddInstruction>,
         incoming_instruction: IncomingInstruction,
@@ -354,7 +354,8 @@ pub mod squads_mpl {
     /// Instruction to cancel a transaction.
     /// Transactions must be in the "executeReady" status.
     /// Transaction will only be cancelled if the number of
-    /// cancellations reaches the threshold.
+    /// cancellations reaches the threshold. A cancelled
+    /// transaction will no longer be able to be executed.
     pub fn cancel_transaction(ctx: Context<CancelTransaction>) -> Result<()> {
         // check if they haven't cancelled yet
         if ctx
@@ -509,17 +510,19 @@ pub mod squads_mpl {
         Ok(())
     }
 
-    /// instruction to sequentially execute parts of a transaction
-    /// instructions executed in this matter must be executed in order
+    /// Instruction to sequentially execute attached instructions.
+    /// Instructions executed in this matter must be executed in order,
     /// this may be helpful for processing large batch transfers.
+    /// This instruction can only be used for transactions with an authority
+    /// index of 1 or greater.
     /// 
     /// NOTE - do not use this instruction if there is not total clarity around
     /// potential side effects, as this instruction implies that the approved
     /// transaction will be executed partially, and potentially spread out over
     /// a period of time. This could introduce problems with state and failed
     /// transactions. For example: a program invoked in one of these instructions
-    /// may be upgraded between executions and potentially make one of the 
-    /// necessary accounts invalid.
+    /// may be upgraded between executions and potentially leave one of the 
+    /// necessary accounts in an invalid state.
     pub fn execute_instruction<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteInstruction<'info>>,
     ) -> Result<()> {
