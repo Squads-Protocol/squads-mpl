@@ -1,4 +1,4 @@
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { Connection } from "@solana/web3.js";
 import { getIxPDA } from "@sqds/sdk";
 import { Mesh } from "../target/types/mesh";
@@ -53,29 +53,8 @@ async function _executeTransaction(
     .map(({ pubkey, ixItem }) => {
       const ixKeys: anchor.web3.AccountMeta[] =
         ixItem.keys as anchor.web3.AccountMeta[];
-      const addSig = anchor.utils.sha256.hash("global:add_member");
-      const ixDiscriminator = Buffer.from(addSig, "hex");
-      const addData = Buffer.concat([ixDiscriminator.slice(0, 8)]);
-      const addAndThreshSig = anchor.utils.sha256.hash(
-        "global:add_member_and_change_threshold"
-      );
-      const ixAndThreshDiscriminator = Buffer.from(addAndThreshSig, "hex");
-      const addAndThreshData = Buffer.concat([
-        ixAndThreshDiscriminator.slice(0, 8),
-      ]);
-      const ixData = ixItem.data as any;
 
       const formattedKeys = ixKeys.map((ixKey, keyInd) => {
-        if (
-          (ixData.includes(addData) || ixData.includes(addAndThreshData)) &&
-          keyInd === 2
-        ) {
-          return {
-            pubkey: feePayer,
-            isSigner: false,
-            isWritable: ixKey.isWritable,
-          };
-        }
         return {
           pubkey: ixKey.pubkey,
           isSigner: false,

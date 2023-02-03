@@ -1,7 +1,8 @@
 {
   "private": true,
   "dependencies": {
-    "@project-serum/anchor": "^0.25.0",
+    "@coral-xyz/anchor": "^0.26.0",
+    "@solana/spl-token": "^0.3.7",
     "@sqds/sdk": "^1.0.4",
     "bn.js": "^5.2.1"
   },

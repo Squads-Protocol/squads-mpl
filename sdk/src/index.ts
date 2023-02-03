@@ -11,11 +11,11 @@ import {
   DEFAULT_PROGRAM_MANAGER_PROGRAM_ID,
 } from "./constants";
 import squadsMplJSON from "../../target/idl/squads_mpl.json";
-import {SquadsMpl} from "../../target/types/squads_mpl";
+import {SquadsMpl} from "../../idl/squads_mpl";
 import programManagerJSON from "../../target/idl/program_manager.json";
-import {ProgramManager} from "../../target/types/program_manager";
-import {Wallet} from "@project-serum/anchor/dist/cjs/provider";
-import {AnchorProvider, Program} from "@project-serum/anchor";
+import {ProgramManager} from "../../idl/program_manager";
+import {Wallet} from "@coral-xyz/anchor/dist/cjs/provider";
+import {AnchorProvider, Program} from "@coral-xyz/anchor";
 import {
   InstructionAccount,
   ManagedProgramAccount,
@@ -35,8 +35,9 @@ import {
   getTxPDA,
 } from "./address";
 import BN from "bn.js";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {TransactionBuilder} from "./tx_builder";
+import { program } from "@coral-xyz/anchor/dist/cjs/native/system";
 
 class Squads {
   readonly connection: Connection;
@@ -171,25 +172,26 @@ class Squads {
     );
   }
 
-  async getMultisig(address: PublicKey): Promise<MultisigAccount> {
-    const accountData = await this.multisig.account.ms.fetch(address, "processed");
+  async getMultisig(address: PublicKey, commitment = "processed"): Promise<MultisigAccount> {
+    const accountData = await this.multisig.account.ms.fetch(address, commitment as Commitment);
     return {...accountData, publicKey: address} as MultisigAccount;
   }
 
   async getMultisigs(
-      addresses: PublicKey[]
+      addresses: PublicKey[],
+      commitment = "processed"
   ): Promise<(MultisigAccount | null)[]> {
-    const accountData = await this.multisig.account.ms.fetchMultiple(addresses, "processed");
+    const accountData = await this.multisig.account.ms.fetchMultiple(addresses, commitment as Commitment);
     return this._addPublicKeys(
         accountData,
         addresses
     ) as (MultisigAccount | null)[];
   }
 
-  async getTransaction(address: PublicKey): Promise<TransactionAccount> {
+  async getTransaction(address: PublicKey, commitment = "processed"): Promise<TransactionAccount> {
     const accountData = await this.multisig.account.msTransaction.fetch(
         address,
-        "processed"
+        commitment as Commitment
     );
     return {...accountData, publicKey: address};
   }
@@ -212,7 +214,7 @@ class Squads {
         address,
         "processed"
     );
-    return {...accountData, publicKey: address};
+    return {...accountData, publicKey: address} as unknown as InstructionAccount;
   }
 
   async getInstructions(

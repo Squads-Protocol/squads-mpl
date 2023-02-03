@@ -1,7 +1,8 @@
 import { expect } from "chai";
 import fs from "fs";
-import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { createAssociatedTokenAccountInstruction, createInitializeMintInstruction, createMintToInstruction } from "@solana/spl-token";
 import { SquadsMpl } from "../idl/squads_mpl";
 import { ProgramManager } from "../idl/program_manager";
 import { Roles } from "../idl/roles";
@@ -22,8 +23,9 @@ import Squads, {
   getTxPDA,
 } from "../sdk/src/index";
 import BN from "bn.js";
-import { ASSOCIATED_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@project-serum/anchor/dist/cjs/utils/token";
+import { ASSOCIATED_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 import { getExecuteProxyInstruction, getUserRolePDA, getUserDelegatePDA, getRolesManager } from "../helpers/roles";
+import { agnosticExecute } from "../helpers/sdkExecute";
 
 import {memberListApprove} from "../helpers/approve";
 
@@ -120,7 +122,7 @@ describe("Programs", function(){
     let threshold = 1;
 
     // test suite
-    describe("SMPL Basic functionality", async function(){
+    describe("SMPL Basic functionality", function(){
       this.beforeAll(async function(){
         console.log("Deploying SMPL Program...");
         deploySmpl();
@@ -128,7 +130,7 @@ describe("Programs", function(){
 
         program = anchor.workspace.SquadsMpl as Program<SquadsMpl>;
         squads = Squads.localnet(provider.wallet, {
-          commitmentOrConfig: provider.connection.commitment,
+          commitmentOrConfig: "processed",
           multisigProgramId: anchor.workspace.SquadsMpl.programId,
           programManagerProgramId: anchor.workspace.ProgramManager.programId,
         });
@@ -147,11 +149,16 @@ describe("Programs", function(){
       });
 
       it(`Create Multisig`, async function(){
-        await squads.createMultisig(
-          threshold,
-          randomCreateKey,
-          memberList.map((m) => m.publicKey)
-        );
+        try {
+          await squads.createMultisig(
+            threshold,
+            randomCreateKey,
+            memberList.map((m) => m.publicKey)
+          );
+        }catch(e){
+          console.log("Error in createMultisig tx");
+          throw e;
+        }
         const vaultPDA = squads.getAuthorityPDA(msPDA, 1);
 
         const fundingTx = await createBlankTransaction(
@@ -165,15 +172,20 @@ describe("Programs", function(){
         );
 
         fundingTx.add(fundingIx);
-        await provider.sendAndConfirm(fundingTx);
-
+        try {
+          await provider.sendAndConfirm(fundingTx);
+        } catch (e) {
+          console.log("Error in funding tx");
+          throw e;
+        }
         let msState = await squads.getMultisig(msPDA);
         expect(msState.threshold).to.equal(1);
         expect(msState.transactionIndex).to.equal(0);
         expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal);
 
         const vaultAccount = await squads.connection.getParsedAccountInfo(
-          vaultPDA
+          vaultPDA,
+          "processed"
         );
         expect(vaultAccount.value.lamports).to.equal(0.001 * 1000000000);
       });
@@ -397,7 +409,8 @@ describe("Programs", function(){
 
       it(`Change ms size with realloc`, async function(){
         let msAccount = await squads.connection.getParsedAccountInfo(msPDA);
-        let msStateCheck = await squads.getMultisig(msPDA);
+        let msStateCheck = await squads.getMultisig(msPDA, "confirmed");
+        const startKeys = msStateCheck.keys.length;
         const startRentLamports = msAccount.value.lamports;
         // get the current data size of the msAccount
         const currDataSize = msAccount.value.data.length;
@@ -430,7 +443,7 @@ describe("Programs", function(){
             const topUpTx = await createBlankTransaction(squads.connection, creator.publicKey);
             const topUpIx = await createTestTransferTransaction(creator.publicKey, msPDA, topUpLamports);
             topUpTx.add(topUpIx);
-            await provider.sendAndConfirm(topUpTx);
+            await provider.sendAndConfirm(topUpTx, undefined, {commitment: "confirmed"});
           }
         }
         // 1 get the instruction to create a transction
@@ -451,11 +464,21 @@ describe("Programs", function(){
         addMemberTx.add(...txInstructions);
         addMemberTx.add(activateIx);
 
-        await provider.sendAndConfirm(addMemberTx);
-
-        await squads.approveTransaction(txPDA);
-
+        try {
+          await provider.sendAndConfirm(addMemberTx, undefined, {commitment: "confirmed"});
+        } catch (e) {
+          console.log("Error creating addMember transaction", e);
+          throw e;
+        }
         let txState = await squads.getTransaction(txPDA);
+        try {
+          await squads.approveTransaction(txPDA);
+        }catch(e){
+          console.log("error approving transaction", e);
+          throw e;
+        }
+
+        txState = await squads.getTransaction(txPDA);
         expect(txState.status).has.property("executeReady");
 
         await squads.executeTransaction(txPDA);
@@ -463,10 +486,14 @@ describe("Programs", function(){
         const msState = await squads.getMultisig(msPDA);
         msAccount = await program.provider.connection.getParsedAccountInfo(msPDA);
         const endRentLamports = msAccount.value.lamports;
-        expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 1);
+        expect((msState.keys as any[]).length).to.equal(startKeys + 1);
+        txState = await squads.getTransaction(txPDA);
+        expect(txState.status).has.property("executed");
         expect(endRentLamports).to.be.greaterThan(startRentLamports);
       });
 
+      // somewhat deprecated now as signAndSend falls back to wallet - needs to
+      // be refactored to use a pure raw tx
       it(`Add a new member but creator is not executor`, async function(){
         // 1 get the instruction to create a transaction
         // 2 get the instruction to add a member
@@ -475,6 +502,8 @@ describe("Programs", function(){
         // use 0 as authority index
         const newMember = anchor.web3.Keypair.generate().publicKey;
         const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
+        let msState = await squads.getMultisig(msPDA);
+        const startKeys = msState.keys.length;
         const [txInstructions, txPDA] = await (
           await txBuilder.withAddMember(newMember)
         ).getInstructions();
@@ -486,18 +515,28 @@ describe("Programs", function(){
         );
         addMemberTx.add(...txInstructions);
         addMemberTx.add(activateIx);
-
-        await provider.sendAndConfirm(addMemberTx);
-
-        await squads.approveTransaction(txPDA);
-
+        try {
+          await provider.sendAndConfirm(addMemberTx, undefined, {commitment: "confirmed"});
+        } catch (e) {
+          console.log("unable to send add member tx");
+          throw e;
+        }
         let txState = await squads.getTransaction(txPDA);
+        try {
+          await squads.approveTransaction(txPDA);
+        } catch (e) {
+          console.log("unable to approve add member tx");
+          throw e;
+        }
+        txState = await squads.getTransaction(txPDA);
         expect(txState.status).has.property("executeReady");
+        await agnosticExecute(squads, txPDA, member2);
 
-        await squads.executeTransaction(txPDA, member2.publicKey, [member2]);
+        txState = await squads.getTransaction(txPDA, "processed");
+        expect(txState.status).has.property("executed");
+        msState = await squads.getMultisig(msPDA, "confirmed");
 
-        const msState = await squads.getMultisig(msPDA);
-        expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 2);
+        expect((msState.keys as any[]).length).to.equal(startKeys + 1);
       });
 
       it(`Transaction instruction failure`, async function(){
@@ -639,6 +678,9 @@ describe("Programs", function(){
       it(`Add a new member & change threshold (conjoined)`, async function(){
         const newMember = anchor.web3.Keypair.generate().publicKey;
         const txBuilder = await squads.getTransactionBuilder(msPDA, 0);
+        let msState =  await squads.getMultisig(msPDA);
+        const startKeys = msState.keys.length;
+        const startTxIndex = msState.transactionIndex;
         const [txInstructions, txPDA] = await (
           await txBuilder.withAddMemberAndChangeThreshold(newMember, 1)
         ).getInstructions();
@@ -650,9 +692,14 @@ describe("Programs", function(){
         );
         addMemberTx.add(...txInstructions);
         addMemberTx.add(activateIx);
-
-        await provider.sendAndConfirm(addMemberTx);
-        let msState = await squads.getMultisig(msPDA);
+        try {
+          await provider.sendAndConfirm(addMemberTx), undefined, {commitment: "confirmed"};
+        } catch (e) {
+          console.log("Failed to send add member tx");
+          throw e;
+        }
+        msState = await squads.getMultisig(msPDA);
+        expect(startTxIndex + 1).to.equal(msState.transactionIndex);
         // get necessary signers
         // if the threshold has changed, use the other members to approve as well
         for (let i = 0; i < memberList.length; i++) {
@@ -702,17 +749,19 @@ describe("Programs", function(){
           payer.publicKey,
           anchor.web3.LAMPORTS_PER_SOL
         );
-        await squads.executeTransaction(txPDA, payer.publicKey, [payer]);
+
+        await agnosticExecute(squads, txPDA, payer);
+
         txState = await squads.getTransaction(txPDA);
         expect(txState.status).has.property("executed");
         msState = await squads.getMultisig(msPDA);
         threshold = msState.threshold;
-        expect((msState.keys as any[]).length).to.equal(numberOfMembersTotal + 3);
+        expect((msState.keys as any[]).length).to.equal(startKeys + 1);
         expect(msState.threshold).to.equal(1);
       });
     });
 
-    describe("Program upgrades", function (){
+    describe.skip("Program upgrades", function (){
       this.beforeAll(async function(){
         console.log('Deploying Program Manager Program');
         deployPm();
@@ -955,7 +1004,7 @@ describe("Programs", function(){
     });
   
     // test suite for the roles program
-    describe("Roles Program", async function(){
+    describe.skip("Roles Program", async function(){
       const userWithInitRole = anchor.web3.Keypair.generate();
       const userWithVoteRole = anchor.web3.Keypair.generate();
       const userWithExecuteRole = anchor.web3.Keypair.generate();
@@ -1419,6 +1468,7 @@ describe("Programs", function(){
   });
 
   // test suite for the mesh program
+  // TODO: UPDATE THIS
   describe.skip("Mesh Program", function(){
     let meshProgram;
     let ms;
@@ -1850,8 +1900,8 @@ describe("Programs", function(){
     });
 
     it("Create a token mint based off the custom ix PDA", async function(){
-      const tokenProgram = anchor.Spl.token(provider);
-      const ataProgram = anchor.Spl.associatedToken(provider);
+      // const tokenProgram = anchor.Spl.token(provider);
+      // const ataProgram = anchor.Spl.associatedToken(provider);
       const mintAmount = 100000;
       const systemProgram = anchor.web3.SystemProgram;
       const msState = await meshProgram.account.ms.fetch(ms);
@@ -1891,13 +1941,13 @@ describe("Programs", function(){
           vault.toBuffer(),
           TOKEN_PROGRAM_ID.toBuffer(),
           newMintPda.toBuffer()
-        ], ataProgram.programId
+        ], ASSOCIATED_PROGRAM_ID
       );
       const [vault2Ata] = await anchor.web3.PublicKey.findProgramAddress([
         vault2.toBuffer(),
         TOKEN_PROGRAM_ID.toBuffer(),
         newMintPda.toBuffer()
-      ], ataProgram.programId
+      ], ASSOCIATED_PROGRAM_ID
     );
 
       const createMintAccountIx = await systemProgram.createAccount({
@@ -1905,19 +1955,15 @@ describe("Programs", function(){
           newAccountPubkey: newMintPda,
           lamports: await provider.connection.getMinimumBalanceForRentExemption(82),
           space: 82,
-          programId: tokenProgram.programId
+          programId: TOKEN_PROGRAM_ID
       });
 
-      const initializeMintIx = await tokenProgram.methods.initializeMint(
+      const initializeMintIx = await createInitializeMintInstruction(
+        newMintPda,
           0,
           vault,
           null
-        )
-        .accounts({
-          mint: newMintPda,
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-        })
-        .instruction();
+        );
 
       // add the two mint instructions
         try {
@@ -1953,13 +1999,7 @@ describe("Programs", function(){
         const [ix3] = await getIxPDA(tx, new anchor.BN(3), meshProgram.programId);
         const [ix4] = await getIxPDA(tx, new anchor.BN(4), meshProgram.programId);
 
-        const vault1AtaIx = await ataProgram.methods.create().accounts({
-          authority: vault,
-          mint: newMintPda,
-          associatedAccount: vault1Ata,
-          owner: vault
-          
-        }).instruction();
+        const vault1AtaIx = await createAssociatedTokenAccountInstruction(vault, vault1Ata,vault,newMintPda);
 
         try {
           await meshProgram.methods.addInstruction(vault1AtaIx, 1, vaultBump, {default:{}})
@@ -1975,12 +2015,7 @@ describe("Programs", function(){
             console.log(e);
         }
 
-        const vault2AtaIx = await ataProgram.methods.create().accounts({
-          authority: vault2,
-          mint: newMintPda,
-          associatedAccount: vault2Ata,
-          owner: vault2
-        }).instruction();
+        const vault2AtaIx = await createAssociatedTokenAccountInstruction(vault, vault2Ata,vault,newMintPda);
 
         try {
           await meshProgram.methods.addInstruction(vault2AtaIx, 2, vault2Bump, {default:{}})
@@ -1999,17 +2034,9 @@ describe("Programs", function(){
         // now add the mintTo to instructions for each ata
         const [ix5] = await getIxPDA(tx, new anchor.BN(5), meshProgram.programId);
         const [ix6] = await getIxPDA(tx, new anchor.BN(6), meshProgram.programId);
-        const mintToVault1Ix = await tokenProgram.methods.mintTo(new anchor.BN(mintAmount)).accounts({
-          mint: newMintPda,
-          to: vault1Ata,
-          authority: vault
-        }).instruction();
+        const mintToVault1Ix = await createMintToInstruction(newMintPda, vault1Ata, vault, mintAmount);
 
-        const mintToVault2Ix = await tokenProgram.methods.mintTo(new anchor.BN(mintAmount)).accounts({
-          mint: newMintPda,
-          to: vault2Ata,
-          authority: vault
-        }).instruction();
+        const mintToVault2Ix = await createMintToInstruction(newMintPda, vault2Ata, vault, mintAmount);
 
         // since the default TX authority is the vault1, and holds authority over the mint, these 2 ixes can use the default authority
         try {

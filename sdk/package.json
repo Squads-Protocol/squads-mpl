@@ -11,8 +11,8 @@
     "build": "./build.sh"
   },
   "dependencies": {
-    "@project-serum/anchor": "^0.25.0",
-    "@solana/web3.js": "^1.53.0",
+    "@coral-xyz/anchor": "^0.26.0",
+    "@solana/web3.js": "^1.73.2",
     "bn.js": "^5.2.1"
   },
   "devDependencies": {

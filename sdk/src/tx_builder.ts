@@ -6,8 +6,8 @@ import {
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { getAuthorityPDA, getIxPDA, getTxPDA } from "./address";
 import BN from "bn.js";
-import { AnchorProvider } from "@project-serum/anchor";
-import * as anchor from "@project-serum/anchor";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import * as anchor from "@coral-xyz/anchor";
 
 export class TransactionBuilder {
   multisig: MultisigAccount;
