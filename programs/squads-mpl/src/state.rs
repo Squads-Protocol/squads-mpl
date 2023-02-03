@@ -20,6 +20,8 @@ pub struct Ms {
     pub ms_change_index: u32,           // the last executed/closed transaction
                                         // this is needed to deprecate any active transactions
                                         // if the multisig is changed, helps prevent gaming.
+                                        // this will automatically be increased when the multisig
+                                        // is changed, ie. change of members or threshold.
 
     pub bump: u8,                       // bump for the multisig seed.
 
@@ -122,15 +124,16 @@ pub struct MsTransaction {
     pub creator: Pubkey,                // creator, used to seed pda
     pub ms: Pubkey,                     // the multisig this belongs to
     pub transaction_index: u32,         // used for seed
-    pub authority_index: u32,           // index to use for other pdas (?)
-    pub authority_bump: u8,             // the bump corresponding to the bespoke authority
+    pub authority_index: u32,           // index to use for the cpi signing PDA (authority)
+    pub authority_bump: u8,             // the bump corresponding to the PDA (authority)
     pub status: MsTransactionStatus,    // the status of the transaction
     pub instruction_index: u8,          // index of this instruction
     pub bump: u8,                       // bump for the seed
     pub approved: Vec<Pubkey>,          // keys that have approved/signed
     pub rejected: Vec<Pubkey>,          // keys that have rejected
     pub cancelled: Vec<Pubkey>,         // keys that have cancelled (ExecuteReady only)
-    pub executed_index: u8              // if Tx is executed sequentially, track latest
+    pub executed_index: u8              // if Tx is executed sequentially, tracks which ix
+                                        // has been executed so far.
 }
 
 impl MsTransaction {
@@ -256,8 +259,8 @@ impl MsTransaction {
 
 }
 
-/// The state account for an instruction that is attached to an instruction.
-/// Almost analagous to the native Instruction struct for solana, but with extra
+/// The state account for an instruction that is attached to a transaction.
+/// Almost analagous to the native Instruction struct for solana, but with an extra
 /// field for the bump.
 #[account]
 pub struct MsInstruction {
@@ -266,7 +269,7 @@ pub struct MsInstruction {
     pub data: Vec<u8>,
     pub instruction_index: u8,
     pub bump: u8,
-    pub executed: bool, // deprecated in favor for executed index in the MsTransaction
+    pub executed: bool, // deprecated in favor for executed_index in the MsTransaction
 }
 
 impl MsInstruction {
@@ -310,7 +313,8 @@ impl From<MsInstruction> for Instruction {
 }
 
 /// Wrapper for our internal MsInstruction key serialization schema
-// internal AccountMeta serialization schema
+/// MsAccount meta is identical to the AccountMeta struct, but defined
+/// here for serialization purposes.
 #[derive(AnchorSerialize,AnchorDeserialize, Copy, Clone)]
 pub struct MsAccountMeta {
     pub pubkey: Pubkey,
@@ -319,7 +323,8 @@ pub struct MsAccountMeta {
 }
 
 /// Incoming instruction schema, used as an argument in the attach_instruction.
-// serialization schema for incoming instructions to be attached to transaction
+/// Identical to the solana struct for Instruction, but uses the MsAccountMeta.
+/// Provided for de/serialization purposes.
 #[derive(AnchorSerialize,AnchorDeserialize, Clone)]
 pub struct IncomingInstruction {
     pub program_id: Pubkey,
