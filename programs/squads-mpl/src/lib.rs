@@ -451,10 +451,8 @@ pub mod squads_mpl {
             let ix_keys = ms_ix.keys.clone();
             // create the instruction to invoke from the saved ms ix account
             let ix: Instruction = Instruction::from(ms_ix);
+            // the instruction account vec, with the program account first
             let mut ix_account_infos: Vec<AccountInfo> = vec![ix_program_info.clone()];
-
-            // add the program account needed for the ix
-            // ix_account_infos.push(ix_program_info.clone());
 
             // loop through the provided remaining accounts
             for account_index in 0..ix_keys.len() {
