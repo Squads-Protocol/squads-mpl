@@ -215,15 +215,6 @@ pub mod squads_mpl {
         ctx.accounts.multisig.add_authority()
     }
 
-    /// DEPRECATED - constraint has been removed in favor of the roles program
-    // instruction to change the external execute setting, which allows
-    // non-members or programs to execute a transaction.
-    pub fn set_external_execute(_ctx: Context<MsAuth>, _setting: bool) -> Result<()> {
-        // let _ms = &mut ctx.accounts.multisig;
-        // ms.allow_external_execute = setting;  // no op
-        Ok(())
-    }
-
     /// Instruction to create a multisig transaction.
     /// Each transaction is tied to a single authority, and must be specified when
     /// creating the instruction below. authority 0 is reserved for internal
