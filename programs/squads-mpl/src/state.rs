@@ -285,12 +285,6 @@ impl MsInstruction {
         self.executed = false;
         Ok(())
     }
-
-    /// DEPRECATED: sequential execution now relies on the executed_index in the MsTransaction
-    pub fn set_executed(&mut self) -> Result<()> {
-        self.executed = true;
-        Ok(())
-    }
 }
 
 impl From<MsInstruction> for Instruction {
