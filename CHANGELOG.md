@@ -2,7 +2,6 @@
 
 ## [1.3.0](https://github.com/Squads-Protocol/squads-mpl/compare/v1.2.0...v1.3.0) (2023-02-13)
 
-
 ### Features
 
 * **programs:** Add close function for program and upgrades ([0674ed8](https://github.com/Squads-Protocol/squads-mpl/commit/0674ed82ba3a5c5171dc5d008b1f8d4905887610))
