@@ -364,13 +364,13 @@ class Squads {
                 const ixKeys = ixItem.keys;
                 const addSig = anchor.utils.sha256.hash("global:add_member");
                 const ixDiscriminator = Buffer.from(addSig, "hex");
-                const addData = Buffer.concat([ixDiscriminator.slice(0, 8)]);
+                const addData = Buffer.concat([ixDiscriminator.subarray(0, 8)]);
                 const addAndThreshSig = anchor.utils.sha256.hash("global:add_member_and_change_threshold");
                 const ixAndThreshDiscriminator = Buffer.from(addAndThreshSig, "hex");
                 const addAndThreshData = Buffer.concat([
-                    ixAndThreshDiscriminator.slice(0, 8),
+                    ixAndThreshDiscriminator.subarray(0, 8),
                 ]);
-                const ixData = ixItem.data;
+                const ixData = Buffer.from(ixItem.data);
                 const formattedKeys = ixKeys.map((ixKey, keyInd) => {
                     if ((ixData.includes(addData) || ixData.includes(addAndThreshData)) &&
                         keyInd === 2) {
