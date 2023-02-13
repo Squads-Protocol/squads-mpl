@@ -36,7 +36,7 @@ security_txt! {
     auditors: "OtterSec, Neodyme"
 }
 
-declare_id!("84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW");
+declare_id!("SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu");
 
 #[program]
 pub mod squads_mpl {
