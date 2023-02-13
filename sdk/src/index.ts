@@ -620,7 +620,6 @@ class Squads {
         .map(({pubkey, ixItem}) => {
           const ixKeys: anchor.web3.AccountMeta[] =
               ixItem.keys as anchor.web3.AccountMeta[];
-          const ixData = ixItem.data as any;
 
           const formattedKeys = ixKeys.map((ixKey, keyInd) => {
             return {

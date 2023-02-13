@@ -42,10 +42,10 @@ const web3_js_1 = require("@solana/web3.js");
 const constants_1 = require("./constants");
 const squads_mpl_json_1 = __importDefault(require("../../target/idl/squads_mpl.json"));
 const program_manager_json_1 = __importDefault(require("../../target/idl/program_manager.json"));
-const anchor_1 = require("@project-serum/anchor");
+const anchor_1 = require("@coral-xyz/anchor");
 const address_1 = require("./address");
 const bn_js_1 = __importDefault(require("bn.js"));
-const anchor = __importStar(require("@project-serum/anchor"));
+const anchor = __importStar(require("@coral-xyz/anchor"));
 const tx_builder_1 = require("./tx_builder");
 class Squads {
     constructor({ connection, wallet, multisigProgramId, programManagerProgramId, }) {
@@ -79,21 +79,21 @@ class Squads {
             return new tx_builder_1.TransactionBuilder(this.multisig.methods, this.programManager.methods, this.provider, multisig, authorityIndex, this.multisigProgramId);
         });
     }
-    getMultisig(address) {
+    getMultisig(address, commitment = "processed") {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.multisig.account.ms.fetch(address, "processed");
+            const accountData = yield this.multisig.account.ms.fetch(address, commitment);
             return Object.assign(Object.assign({}, accountData), { publicKey: address });
         });
     }
-    getMultisigs(addresses) {
+    getMultisigs(addresses, commitment = "processed") {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.multisig.account.ms.fetchMultiple(addresses, "processed");
+            const accountData = yield this.multisig.account.ms.fetchMultiple(addresses, commitment);
             return this._addPublicKeys(accountData, addresses);
         });
     }
-    getTransaction(address) {
+    getTransaction(address, commitment = "processed") {
         return __awaiter(this, void 0, void 0, function* () {
-            const accountData = yield this.multisig.account.msTransaction.fetch(address, "processed");
+            const accountData = yield this.multisig.account.msTransaction.fetch(address, commitment);
             return Object.assign(Object.assign({}, accountData), { publicKey: address });
         });
     }
@@ -362,24 +362,8 @@ class Squads {
             const ixKeysList = ixList
                 .map(({ pubkey, ixItem }) => {
                 const ixKeys = ixItem.keys;
-                const addSig = anchor.utils.sha256.hash("global:add_member");
-                const ixDiscriminator = Buffer.from(addSig, "hex");
-                const addData = Buffer.concat([ixDiscriminator.slice(0, 8)]);
-                const addAndThreshSig = anchor.utils.sha256.hash("global:add_member_and_change_threshold");
-                const ixAndThreshDiscriminator = Buffer.from(addAndThreshSig, "hex");
-                const addAndThreshData = Buffer.concat([
-                    ixAndThreshDiscriminator.slice(0, 8),
-                ]);
                 const ixData = ixItem.data;
                 const formattedKeys = ixKeys.map((ixKey, keyInd) => {
-                    if ((ixData.includes(addData) || ixData.includes(addAndThreshData)) &&
-                        keyInd === 2) {
-                        return {
-                            pubkey: feePayer,
-                            isSigner: false,
-                            isWritable: ixKey.isWritable,
-                        };
-                    }
                     return {
                         pubkey: ixKey.pubkey,
                         isSigner: false,

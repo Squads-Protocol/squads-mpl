@@ -1,5 +1,5 @@
 import { Connection, PublicKey, Commitment, ConnectionConfig, TransactionInstruction, Signer } from "@solana/web3.js";
-import { Wallet } from "@project-serum/anchor/dist/cjs/provider";
+import { Wallet } from "@coral-xyz/anchor/dist/cjs/provider";
 import { InstructionAccount, ManagedProgramAccount, MultisigAccount, ProgramManagerAccount, ProgramUpgradeAccount, TransactionAccount } from "./types";
 import { TransactionBuilder } from "./tx_builder";
 declare class Squads {
@@ -38,9 +38,9 @@ declare class Squads {
     }): Squads;
     private _addPublicKeys;
     getTransactionBuilder(multisigPDA: PublicKey, authorityIndex: number): Promise<TransactionBuilder>;
-    getMultisig(address: PublicKey): Promise<MultisigAccount>;
-    getMultisigs(addresses: PublicKey[]): Promise<(MultisigAccount | null)[]>;
-    getTransaction(address: PublicKey): Promise<TransactionAccount>;
+    getMultisig(address: PublicKey, commitment?: string): Promise<MultisigAccount>;
+    getMultisigs(addresses: PublicKey[], commitment?: string): Promise<(MultisigAccount | null)[]>;
+    getTransaction(address: PublicKey, commitment?: string): Promise<TransactionAccount>;
     getTransactions(addresses: PublicKey[]): Promise<(TransactionAccount | null)[]>;
     getInstruction(address: PublicKey): Promise<InstructionAccount>;
     getInstructions(addresses: PublicKey[]): Promise<(InstructionAccount | null)[]>;

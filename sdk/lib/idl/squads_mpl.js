@@ -1,4 +1,7 @@
-{
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.IDL = void 0;
+exports.IDL = {
     "version": "1.3.0",
     "name": "squads_mpl",
     "instructions": [
@@ -190,6 +193,25 @@
             "args": []
         },
         {
+            "name": "setExternalExecute",
+            "docs": [
+                "DEPRECATED - constraint has been removed in favor of the roles program"
+            ],
+            "accounts": [
+                {
+                    "name": "multisig",
+                    "isMut": true,
+                    "isSigner": true
+                }
+            ],
+            "args": [
+                {
+                    "name": "setting",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
             "name": "createTransaction",
             "docs": [
                 "Instruction to create a multisig transaction.",
@@ -257,8 +279,8 @@
             "docs": [
                 "Instruction to attach an instruction to a transaction.",
                 "Transactions must be in the \"draft\" status, and any",
-                "signer (aside from execution payer) specified in an instruction",
-                "must match the authority PDA specified during the transaction creation."
+                "signer (aside from execution payer) must match the",
+                "authority specified during the transaction creation."
             ],
             "accounts": [
                 {
@@ -352,8 +374,7 @@
                 "Instruction to cancel a transaction.",
                 "Transactions must be in the \"executeReady\" status.",
                 "Transaction will only be cancelled if the number of",
-                "cancellations reaches the threshold. A cancelled",
-                "transaction will no longer be able to be executed."
+                "cancellations reaches the threshold."
             ],
             "accounts": [
                 {
@@ -416,19 +437,17 @@
         {
             "name": "executeInstruction",
             "docs": [
-                "Instruction to sequentially execute attached instructions.",
-                "Instructions executed in this matter must be executed in order,",
+                "instruction to sequentially execute parts of a transaction",
+                "instructions executed in this matter must be executed in order",
                 "this may be helpful for processing large batch transfers.",
-                "This instruction can only be used for transactions with an authority",
-                "index of 1 or greater.",
                 "",
                 "NOTE - do not use this instruction if there is not total clarity around",
                 "potential side effects, as this instruction implies that the approved",
                 "transaction will be executed partially, and potentially spread out over",
                 "a period of time. This could introduce problems with state and failed",
                 "transactions. For example: a program invoked in one of these instructions",
-                "may be upgraded between executions and potentially leave one of the",
-                "necessary accounts in an invalid state."
+                "may be upgraded between executions and potentially make one of the",
+                "necessary accounts invalid."
             ],
             "accounts": [
                 {
@@ -457,7 +476,7 @@
     ],
     "accounts": [
         {
-            "name": "Ms",
+            "name": "ms",
             "docs": [
                 "Ms is the basic state account for a multisig."
             ],
@@ -502,7 +521,7 @@
             }
         },
         {
-            "name": "MsTransaction",
+            "name": "msTransaction",
             "docs": [
                 "The MsTransaction is the state account for a multisig transaction"
             ],
@@ -569,10 +588,10 @@
             }
         },
         {
-            "name": "MsInstruction",
+            "name": "msInstruction",
             "docs": [
-                "The state account for an instruction that is attached to a transaction.",
-                "Almost analagous to the native Instruction struct for solana, but with an extra",
+                "The state account for an instruction that is attached to an instruction.",
+                "Almost analagous to the native Instruction struct for solana, but with extra",
                 "field for the bump."
             ],
             "type": {
@@ -614,9 +633,7 @@
         {
             "name": "MsAccountMeta",
             "docs": [
-                "Wrapper for our internal MsInstruction key serialization schema",
-                "MsAccount meta is identical to the AccountMeta struct, but defined",
-                "here for serialization purposes."
+                "Wrapper for our internal MsInstruction key serialization schema"
             ],
             "type": {
                 "kind": "struct",
@@ -639,9 +656,7 @@
         {
             "name": "IncomingInstruction",
             "docs": [
-                "Incoming instruction schema, used as an argument in the attach_instruction.",
-                "Identical to the solana struct for Instruction, but uses the MsAccountMeta.",
-                "Provided for de/serialization purposes."
+                "Incoming instruction schema, used as an argument in the attach_instruction."
             ],
             "type": {
                 "kind": "struct",
@@ -753,4 +768,4 @@
             "name": "NotEnoughLamports"
         }
     ]
-}
+};

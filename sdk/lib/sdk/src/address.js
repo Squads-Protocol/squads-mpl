@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProgramUpgradePDA = exports.getManagedProgramPDA = exports.getProgramManagerPDA = exports.getAuthorityPDA = exports.getIxPDA = exports.getTxPDA = exports.getMsPDA = void 0;
 const web3_js_1 = require("@solana/web3.js");
-const anchor_1 = require("@project-serum/anchor");
+const anchor_1 = require("@coral-xyz/anchor");
 const getMsPDA = (create_key, programId) => web3_js_1.PublicKey.findProgramAddressSync([
     anchor_1.utils.bytes.utf8.encode("squad"),
     create_key.toBuffer(),

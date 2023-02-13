@@ -1,6 +1,6 @@
 import { MultisigAccount, ProgramManagerMethodsNamespace, SquadsMethodsNamespace } from "./types";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
-import { AnchorProvider } from "@project-serum/anchor";
+import { AnchorProvider } from "@coral-xyz/anchor";
 export declare class TransactionBuilder {
     multisig: MultisigAccount;
     authorityIndex: number;

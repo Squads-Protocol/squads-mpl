@@ -8,6 +8,7 @@ import { getAuthorityPDA, getIxPDA, getTxPDA } from "./address";
 import BN from "bn.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import * as anchor from "@coral-xyz/anchor";
+import {createBlankTransaction, createTestTransferTransaction} from "../../helpers/transactions";
 
 export class TransactionBuilder {
   multisig: MultisigAccount;
@@ -89,13 +90,42 @@ export class TransactionBuilder {
     );
   }
   async withAddMember(member: PublicKey): Promise<TransactionBuilder> {
+    const instructions = []
+    let msAccount = await this.provider.connection.getParsedAccountInfo(this.multisig.publicKey) as any;
+    const currDataSize = msAccount.value.data.length;
+    const currNumKeys = this.multisig.keys.length;
+    const SIZE_WITHOUT_MEMBERS = 8 + // Anchor disriminator
+        2 +         // threshold value
+        2 +         // authority index
+        4 +         // transaction index
+        4 +         // processed internal transaction index
+        1 +         // PDA bump
+        32 +        // creator
+        1 +         // allow external execute
+        4;          // for vec length
+
+    const spotsLeft = ((currDataSize - SIZE_WITHOUT_MEMBERS) / 32) - currNumKeys;
+
+    if(spotsLeft < 1){
+      const neededLen = currDataSize + (10 * 32);
+      const rentExemptLamports = await this.provider.connection.getMinimumBalanceForRentExemption(neededLen);
+      const topUpLamports = rentExemptLamports - msAccount.value.lamports;
+      if(topUpLamports > 0){
+        const topUpIx = await createTestTransferTransaction(this.provider.wallet.publicKey, this.multisig.publicKey, topUpLamports);
+        instructions.push(topUpIx)
+      }
+    }
+
     const instruction = await this.methods
       .addMember(member)
       .accounts({
         multisig: this.multisig.publicKey,
       })
       .instruction();
-    return this.withInstruction(instruction);
+    instructions.push(instruction)
+    return this._cloneWithInstructions(
+        this.instructions.concat(instructions)
+    );
   }
   async withAddMemberAndChangeThreshold(
     member: PublicKey,

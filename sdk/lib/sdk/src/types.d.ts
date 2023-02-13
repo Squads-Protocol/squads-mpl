@@ -1,10 +1,10 @@
 import { SquadsMpl } from "../../target/types/squads_mpl";
 import { ProgramManager } from "../../target/types/program_manager";
-import { Idl, IdlTypes, MethodsNamespace } from "@project-serum/anchor";
-import { IdlTypeDef } from "@project-serum/anchor/dist/cjs/idl";
-import { AllInstructions, TypeDef } from "@project-serum/anchor/dist/cjs/program/namespace/types";
+import { Idl, IdlTypes, MethodsNamespace } from "@coral-xyz/anchor";
+import { IdlTypeDef } from "@coral-xyz/anchor/dist/cjs/idl";
+import { AllInstructions, TypeDef } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
 import { PublicKey } from "@solana/web3.js";
-import { MethodsBuilder } from "@project-serum/anchor/dist/cjs/program/namespace/methods";
+import { MethodsBuilder } from "@coral-xyz/anchor/dist/cjs/program/namespace/methods";
 declare type TypeDefDictionary<T extends IdlTypeDef[], Defined> = {
     [K in T[number]["name"]]: TypeDef<T[number] & {
         name: K;

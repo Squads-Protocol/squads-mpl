@@ -38,7 +38,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TransactionBuilder = void 0;
 const address_1 = require("./address");
 const bn_js_1 = __importDefault(require("bn.js"));
-const anchor = __importStar(require("@project-serum/anchor"));
+const anchor = __importStar(require("@coral-xyz/anchor"));
 class TransactionBuilder {
     constructor(methods, managerMethods, provider, multisig, authorityIndex, programId, instructions) {
         this.methods = methods;
@@ -86,8 +86,6 @@ class TransactionBuilder {
                 .addMember(member)
                 .accounts({
                 multisig: this.multisig.publicKey,
-                multisigAuth: this.multisig.publicKey,
-                member,
             })
                 .instruction();
             return this.withInstruction(instruction);
@@ -99,8 +97,6 @@ class TransactionBuilder {
                 .addMemberAndChangeThreshold(member, threshold)
                 .accounts({
                 multisig: this.multisig.publicKey,
-                multisigAuth: this.multisig.publicKey,
-                member,
             })
                 .instruction();
             return this.withInstruction(instruction);
@@ -112,7 +108,6 @@ class TransactionBuilder {
                 .removeMember(member)
                 .accounts({
                 multisig: this.multisig.publicKey,
-                multisigAuth: this.multisig.publicKey,
             })
                 .instruction();
             return this.withInstruction(instruction);
@@ -124,7 +119,6 @@ class TransactionBuilder {
                 .removeMemberAndChangeThreshold(member, threshold)
                 .accounts({
                 multisig: this.multisig.publicKey,
-                multisigAuth: this.multisig.publicKey,
             })
                 .instruction();
             return this.withInstruction(instruction);
@@ -136,7 +130,6 @@ class TransactionBuilder {
                 .changeThreshold(threshold)
                 .accounts({
                 multisig: this.multisig.publicKey,
-                multisigAuth: this.multisig.publicKey,
             })
                 .instruction();
             return this.withInstruction(instruction);
