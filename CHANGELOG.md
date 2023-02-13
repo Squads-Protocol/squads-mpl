@@ -1,5 +1,63 @@
 # Changelog
 
+## [1.3.0](https://github.com/Squads-Protocol/squads-mpl/compare/v1.2.0...v1.3.0) (2023-02-07)
+
+
+### Features
+
+* **programs:** Add close function for program and upgrades ([0674ed8](https://github.com/Squads-Protocol/squads-mpl/commit/0674ed82ba3a5c5171dc5d008b1f8d4905887610))
+* **programs:** Remove unused mut tag on accounts ([5fc1995](https://github.com/Squads-Protocol/squads-mpl/commit/5fc1995c5c09ef79fdc2e8a1278cb571ed1bb21f))
+* **programs:** Use close macro for more security ([6ae68c6](https://github.com/Squads-Protocol/squads-mpl/commit/6ae68c635ce34f6ee167acab67cff04cd606441f))
+* **roles:** added role constraints ([1264d6a](https://github.com/Squads-Protocol/squads-mpl/commit/1264d6a1934d39b3d1b13852747f7fea196ab8b1))
+* **roles:** cpi proxy accounts & fn ([59c6379](https://github.com/Squads-Protocol/squads-mpl/commit/59c6379817b3bce89b66a7cc4e03af6f08bb61d7))
+* **roles:** initial accounts for roles program ([17954f8](https://github.com/Squads-Protocol/squads-mpl/commit/17954f864a180d82630bfbd194bc6a139d5df84a))
+* **sdk:** Update sdk to handle the new meta info at squad create ([f8f5487](https://github.com/Squads-Protocol/squads-mpl/commit/f8f5487f1ad389f9431828b4d87fee820434c9a4))
+* **txmeta:** added simple stub for tx metadata tracking ([ffcb27d](https://github.com/Squads-Protocol/squads-mpl/commit/ffcb27da05360f0d183fef32d8028fc69e7f8ff0))
+* **validator:** added manager stub ([de7f4fe](https://github.com/Squads-Protocol/squads-mpl/commit/de7f4fe5c205c835408d920bf7d6c4261cb357e7))
+
+
+### Bug Fixes
+
+* **Anchor.toml.example:** update for txmeta ([d696640](https://github.com/Squads-Protocol/squads-mpl/commit/d696640429de376d69c06e9f3846dfa63305fd38))
+* **anchor:** update to 0.26.0 ([a593026](https://github.com/Squads-Protocol/squads-mpl/commit/a593026bcaa594d7961e76297507ffc6932d3d8d))
+* **cleanup:** removed deprecated set_executed ([9741fb4](https://github.com/Squads-Protocol/squads-mpl/commit/9741fb40a3b0c6646d564abffd64d4e4c7ce1454))
+* **comments:** added details about _meta, etc ([7838dba](https://github.com/Squads-Protocol/squads-mpl/commit/7838dba24e1ff874f030b4a95d313e89efd9f691))
+* **comments:** noted potential footguns in execute_ix ([31c6bd7](https://github.com/Squads-Protocol/squads-mpl/commit/31c6bd7eba7ade8671c36469cc97d20f76652b0b))
+* **compilation:** Remove warnings of unused & mutability ([92fb21a](https://github.com/Squads-Protocol/squads-mpl/commit/92fb21aa67b05c7a227069025edb0bc75aee5857))
+* **constraint:** consistent pattern for member/creator ([2bdc2b9](https://github.com/Squads-Protocol/squads-mpl/commit/2bdc2b945ef7928df1547b559ed7856a0a06dcb5))
+* **execute_instruction:** Remove writable checks blocking some functionalities ([9910d70](https://github.com/Squads-Protocol/squads-mpl/commit/9910d70a21621b4ebacba6a06f1e45acfec30de6))
+* **execute_instruction:** SQU-681 Prevent execute_instruction for auth 0 ([a2448c5](https://github.com/Squads-Protocol/squads-mpl/commit/a2448c5f830d9ee908e4ba449ad146734036fdf9))
+* **execute_transaction:** SQU-682 Prevent execution of internal execute functions ([0947040](https://github.com/Squads-Protocol/squads-mpl/commit/09470403a684b8d4d83928a46dd76d2173de5c21))
+* **executed-flag:** remove executed flag in MsIx logic ([6094b1d](https://github.com/Squads-Protocol/squads-mpl/commit/6094b1dc744a64b9c303a412cda0f7f135904ed0))
+* **execute:** removed commented code ([f2ba643](https://github.com/Squads-Protocol/squads-mpl/commit/f2ba643daed5f660db02aac548ca6c2022efc507))
+* **external-execute:** enforce member execute, no external ([17f5047](https://github.com/Squads-Protocol/squads-mpl/commit/17f50479c22f3a8f1a17d0585375862a2ea71c66))
+* **external-execute:** removed constraint from pm, no op ([3143f02](https://github.com/Squads-Protocol/squads-mpl/commit/3143f0244c8c73400c46121eca521b8fa036f174))
+* **external-execute:** removed instruction ([0371d93](https://github.com/Squads-Protocol/squads-mpl/commit/0371d936721b14bd0a4a6e42a3104aa9e29e8896))
+* **ix-size:** added note about deprecated MAX_SIZE ([0fa2c49](https://github.com/Squads-Protocol/squads-mpl/commit/0fa2c49302c6de00925f2d8ceea2990411f879b7))
+* **ix-state:** save the ix state for execute-transaction ([ebd8818](https://github.com/Squads-Protocol/squads-mpl/commit/ebd88183371163eb1697a66566f9c019f31270eb))
+* **mesh:** moved mesh to new repo ([c6cb1f2](https://github.com/Squads-Protocol/squads-mpl/commit/c6cb1f2e93b66be7d5413158188e82c6ed825c91))
+* **meta:** added string on create ([0b5ddd0](https://github.com/Squads-Protocol/squads-mpl/commit/0b5ddd04e04cfac97610cbbf9492487348914dcc))
+* **ms-auth:** payer swap index change ([e0d6369](https://github.com/Squads-Protocol/squads-mpl/commit/e0d6369b567d4828d19e10c37c2910ba102f7c7e))
+* **ms-settings:** removed duplicate ms account ([ff11b26](https://github.com/Squads-Protocol/squads-mpl/commit/ff11b26d09890fc45e4ad2cfdd6abaad5328959c))
+* **organize:** added more documentation, reorg files ([61087aa](https://github.com/Squads-Protocol/squads-mpl/commit/61087aa6a305fb62d8a7b6e834f6b5ae105d9bed))
+* **realloc:** removed payer-swap from realloc ([fb7356f](https://github.com/Squads-Protocol/squads-mpl/commit/fb7356f782edb9a99087088316d838ca8696178f))
+* **roles:** added program ids to Anchor.example ([8430b01](https://github.com/Squads-Protocol/squads-mpl/commit/8430b01dd0fc712605ea849986b0a1ba34ae280e))
+* **roles:** added some comments ([aca31d3](https://github.com/Squads-Protocol/squads-mpl/commit/aca31d320a175f5a2a0ffaa51a26e101f2e2f0d9))
+* **roles:** change to delegate, rent update ([e31d405](https://github.com/Squads-Protocol/squads-mpl/commit/e31d405c26ff2cd753ff45f41c0b476b89feb3c1))
+* **roles:** enforce tx authority ([3ef6f4a](https://github.com/Squads-Protocol/squads-mpl/commit/3ef6f4ad262985c8b175f18e2f1e4632b71fce5c))
+* **roles:** more updates and added to test runner ([4adc43b](https://github.com/Squads-Protocol/squads-mpl/commit/4adc43bbeacff1e59569d2515ac1154ba2c76d58))
+* **roles:** moved readme ([67b7cd7](https://github.com/Squads-Protocol/squads-mpl/commit/67b7cd74a0fa4bf00f647772184efc8f5f341486))
+* **roles:** tests updated, delegate for executetxproxy ([d98ff39](https://github.com/Squads-Protocol/squads-mpl/commit/d98ff39bbe437b35efbc8b49f99d755081f1e4e0))
+* **roles:** updated logic and test ([8265257](https://github.com/Squads-Protocol/squads-mpl/commit/8265257d9e77f532bb890123687731bbe408344e))
+* **roles:** updated test ([8deeb5b](https://github.com/Squads-Protocol/squads-mpl/commit/8deeb5bc74b74f7992462537650ff13507629ea4))
+* **roles:** updates ([dfbac0f](https://github.com/Squads-Protocol/squads-mpl/commit/dfbac0fe5f103cbbbc587407ae1036a37405d0db))
+* **sdk:** Fix sdk createSquad metadata wrong params ([7ef3ed2](https://github.com/Squads-Protocol/squads-mpl/commit/7ef3ed2bab2f68fb49d5db327854b2fccc092bb0))
+* **security:** added security.txt macro ([701d929](https://github.com/Squads-Protocol/squads-mpl/commit/701d929ff5f7c260b047d383eef83e4c93b0f2ba))
+* **tests:** updates to test suite and helpers ([ffdbbe5](https://github.com/Squads-Protocol/squads-mpl/commit/ffdbbe5728cb955eee3c1ccf1be97360c5d5a2e9))
+* **txmeta:** output accounts ([1e277f6](https://github.com/Squads-Protocol/squads-mpl/commit/1e277f68ac6ef92f3bc671baaa21a57d4a239bac))
+* **validator:** cleanup unused ([aa189e1](https://github.com/Squads-Protocol/squads-mpl/commit/aa189e167d5b0a0b2805271874677ddf64b48c33))
+* **validator:** idl and new id ([d6fafd5](https://github.com/Squads-Protocol/squads-mpl/commit/d6fafd5916e425171e25c0887f67318fd455dc0f))
+
 ## [1.2.0](https://github.com/Squads-Protocol/squads-mpl/compare/v1.1.1...v1.2.0) (2022-09-28)
 
 
