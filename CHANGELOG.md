@@ -1,7 +1,6 @@
 # Changelog
 
-## [1.3.0](https://github.com/Squads-Protocol/squads-mpl/compare/v1.2.0...v1.3.0) (2023-02-07)
-
+## [1.3.0](https://github.com/Squads-Protocol/squads-mpl/compare/v1.2.0...v1.3.0) (2023-02-13)
 
 ### Features
 
@@ -40,6 +39,7 @@
 * **ms-auth:** payer swap index change ([e0d6369](https://github.com/Squads-Protocol/squads-mpl/commit/e0d6369b567d4828d19e10c37c2910ba102f7c7e))
 * **ms-settings:** removed duplicate ms account ([ff11b26](https://github.com/Squads-Protocol/squads-mpl/commit/ff11b26d09890fc45e4ad2cfdd6abaad5328959c))
 * **organize:** added more documentation, reorg files ([61087aa](https://github.com/Squads-Protocol/squads-mpl/commit/61087aa6a305fb62d8a7b6e834f6b5ae105d9bed))
+* **program-id:** added pId ([a78299d](https://github.com/Squads-Protocol/squads-mpl/commit/a78299dde19e06783a0786bc79460fa4adaae5ca))
 * **realloc:** removed payer-swap from realloc ([fb7356f](https://github.com/Squads-Protocol/squads-mpl/commit/fb7356f782edb9a99087088316d838ca8696178f))
 * **roles:** added program ids to Anchor.example ([8430b01](https://github.com/Squads-Protocol/squads-mpl/commit/8430b01dd0fc712605ea849986b0a1ba34ae280e))
 * **roles:** added some comments ([aca31d3](https://github.com/Squads-Protocol/squads-mpl/commit/aca31d320a175f5a2a0ffaa51a26e101f2e2f0d9))
@@ -52,6 +52,7 @@
 * **roles:** updated test ([8deeb5b](https://github.com/Squads-Protocol/squads-mpl/commit/8deeb5bc74b74f7992462537650ff13507629ea4))
 * **roles:** updates ([dfbac0f](https://github.com/Squads-Protocol/squads-mpl/commit/dfbac0fe5f103cbbbc587407ae1036a37405d0db))
 * **sdk:** Fix sdk createSquad metadata wrong params ([7ef3ed2](https://github.com/Squads-Protocol/squads-mpl/commit/7ef3ed2bab2f68fb49d5db327854b2fccc092bb0))
+* **security-txt:** hash and auditors ([829b79a](https://github.com/Squads-Protocol/squads-mpl/commit/829b79ac1ad2965de5c225732a4bd91d0f324417))
 * **security:** added security.txt macro ([701d929](https://github.com/Squads-Protocol/squads-mpl/commit/701d929ff5f7c260b047d383eef83e4c93b0f2ba))
 * **tests:** updates to test suite and helpers ([ffdbbe5](https://github.com/Squads-Protocol/squads-mpl/commit/ffdbbe5728cb955eee3c1ccf1be97360c5d5a2e9))
 * **txmeta:** output accounts ([1e277f6](https://github.com/Squads-Protocol/squads-mpl/commit/1e277f68ac6ef92f3bc671baaa21a57d4a239bac))
