@@ -276,8 +276,8 @@ export type SquadsMpl = {
       "docs": [
         "Instruction to attach an instruction to a transaction.",
         "Transactions must be in the \"draft\" status, and any",
-        "signer (aside from execution payer) must match the",
-        "authority specified during the transaction creation."
+        "signer (aside from execution payer) specified in an instruction",
+        "must match the authority PDA specified during the transaction creation."
       ],
       "accounts": [
         {
@@ -371,7 +371,8 @@ export type SquadsMpl = {
         "Instruction to cancel a transaction.",
         "Transactions must be in the \"executeReady\" status.",
         "Transaction will only be cancelled if the number of",
-        "cancellations reaches the threshold."
+        "cancellations reaches the threshold. A cancelled",
+        "transaction will no longer be able to be executed."
       ],
       "accounts": [
         {
@@ -434,17 +435,19 @@ export type SquadsMpl = {
     {
       "name": "executeInstruction",
       "docs": [
-        "instruction to sequentially execute parts of a transaction",
-        "instructions executed in this matter must be executed in order",
+        "Instruction to sequentially execute attached instructions.",
+        "Instructions executed in this matter must be executed in order,",
         "this may be helpful for processing large batch transfers.",
+        "This instruction can only be used for transactions with an authority",
+        "index of 1 or greater.",
         "",
         "NOTE - do not use this instruction if there is not total clarity around",
         "potential side effects, as this instruction implies that the approved",
         "transaction will be executed partially, and potentially spread out over",
         "a period of time. This could introduce problems with state and failed",
         "transactions. For example: a program invoked in one of these instructions",
-        "may be upgraded between executions and potentially make one of the",
-        "necessary accounts invalid."
+        "may be upgraded between executions and potentially leave one of the",
+        "necessary accounts in an invalid state."
       ],
       "accounts": [
         {
@@ -587,8 +590,8 @@ export type SquadsMpl = {
     {
       "name": "msInstruction",
       "docs": [
-        "The state account for an instruction that is attached to an instruction.",
-        "Almost analagous to the native Instruction struct for solana, but with extra",
+        "The state account for an instruction that is attached to a transaction.",
+        "Almost analagous to the native Instruction struct for solana, but with an extra",
         "field for the bump."
       ],
       "type": {
@@ -630,7 +633,9 @@ export type SquadsMpl = {
     {
       "name": "MsAccountMeta",
       "docs": [
-        "Wrapper for our internal MsInstruction key serialization schema"
+        "Wrapper for our internal MsInstruction key serialization schema",
+        "MsAccount meta is identical to the AccountMeta struct, but defined",
+        "here for serialization purposes."
       ],
       "type": {
         "kind": "struct",
@@ -653,7 +658,9 @@ export type SquadsMpl = {
     {
       "name": "IncomingInstruction",
       "docs": [
-        "Incoming instruction schema, used as an argument in the attach_instruction."
+        "Incoming instruction schema, used as an argument in the attach_instruction.",
+        "Identical to the solana struct for Instruction, but uses the MsAccountMeta.",
+        "Provided for de/serialization purposes."
       ],
       "type": {
         "kind": "struct",
@@ -1045,8 +1052,8 @@ export const IDL: SquadsMpl = {
       "docs": [
         "Instruction to attach an instruction to a transaction.",
         "Transactions must be in the \"draft\" status, and any",
-        "signer (aside from execution payer) must match the",
-        "authority specified during the transaction creation."
+        "signer (aside from execution payer) specified in an instruction",
+        "must match the authority PDA specified during the transaction creation."
       ],
       "accounts": [
         {
@@ -1140,7 +1147,8 @@ export const IDL: SquadsMpl = {
         "Instruction to cancel a transaction.",
         "Transactions must be in the \"executeReady\" status.",
         "Transaction will only be cancelled if the number of",
-        "cancellations reaches the threshold."
+        "cancellations reaches the threshold. A cancelled",
+        "transaction will no longer be able to be executed."
       ],
       "accounts": [
         {
@@ -1203,17 +1211,19 @@ export const IDL: SquadsMpl = {
     {
       "name": "executeInstruction",
       "docs": [
-        "instruction to sequentially execute parts of a transaction",
-        "instructions executed in this matter must be executed in order",
+        "Instruction to sequentially execute attached instructions.",
+        "Instructions executed in this matter must be executed in order,",
         "this may be helpful for processing large batch transfers.",
+        "This instruction can only be used for transactions with an authority",
+        "index of 1 or greater.",
         "",
         "NOTE - do not use this instruction if there is not total clarity around",
         "potential side effects, as this instruction implies that the approved",
         "transaction will be executed partially, and potentially spread out over",
         "a period of time. This could introduce problems with state and failed",
         "transactions. For example: a program invoked in one of these instructions",
-        "may be upgraded between executions and potentially make one of the",
-        "necessary accounts invalid."
+        "may be upgraded between executions and potentially leave one of the",
+        "necessary accounts in an invalid state."
       ],
       "accounts": [
         {
@@ -1356,8 +1366,8 @@ export const IDL: SquadsMpl = {
     {
       "name": "msInstruction",
       "docs": [
-        "The state account for an instruction that is attached to an instruction.",
-        "Almost analagous to the native Instruction struct for solana, but with extra",
+        "The state account for an instruction that is attached to a transaction.",
+        "Almost analagous to the native Instruction struct for solana, but with an extra",
         "field for the bump."
       ],
       "type": {
@@ -1399,7 +1409,9 @@ export const IDL: SquadsMpl = {
     {
       "name": "MsAccountMeta",
       "docs": [
-        "Wrapper for our internal MsInstruction key serialization schema"
+        "Wrapper for our internal MsInstruction key serialization schema",
+        "MsAccount meta is identical to the AccountMeta struct, but defined",
+        "here for serialization purposes."
       ],
       "type": {
         "kind": "struct",
@@ -1422,7 +1434,9 @@ export const IDL: SquadsMpl = {
     {
       "name": "IncomingInstruction",
       "docs": [
-        "Incoming instruction schema, used as an argument in the attach_instruction."
+        "Incoming instruction schema, used as an argument in the attach_instruction.",
+        "Identical to the solana struct for Instruction, but uses the MsAccountMeta.",
+        "Provided for de/serialization purposes."
       ],
       "type": {
         "kind": "struct",

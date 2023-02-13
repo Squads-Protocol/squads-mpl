@@ -32,11 +32,11 @@ security_txt! {
     policy: "https://github.com/Squads-Protocol/squads-mpl/blob/main/SECURITY.md",
     preferred_languages: "en",
     source_code: "https://github.com/squads-protocol/squads-mpl",
-    source_revision: default_env!("GITHUB_SHA", ""),
-    auditors: "OtterSec"
+    source_revision: default_env!("GITHUB_SHA", "f2ba643daed5f660db02aac548ca6c2022efc507"),
+    auditors: "OtterSec, Neodyme"
 }
 
-declare_id!("SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu");
+declare_id!("84Ue9gKQUsStFJQCNQpsqvbceo7fKYSSCCMXxMZ5PkiW");
 
 #[program]
 pub mod squads_mpl {
