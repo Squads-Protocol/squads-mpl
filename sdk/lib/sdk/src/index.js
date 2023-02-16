@@ -362,7 +362,6 @@ class Squads {
             const ixKeysList = ixList
                 .map(({ pubkey, ixItem }) => {
                 const ixKeys = ixItem.keys;
-                const ixData = ixItem.data;
                 const formattedKeys = ixKeys.map((ixKey, keyInd) => {
                     return {
                         pubkey: ixKey.pubkey,

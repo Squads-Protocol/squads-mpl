@@ -190,25 +190,6 @@ export type SquadsMpl = {
       "args": []
     },
     {
-      "name": "setExternalExecute",
-      "docs": [
-        "DEPRECATED - constraint has been removed in favor of the roles program"
-      ],
-      "accounts": [
-        {
-          "name": "multisig",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "setting",
-          "type": "bool"
-        }
-      ]
-    },
-    {
       "name": "createTransaction",
       "docs": [
         "Instruction to create a multisig transaction.",
@@ -964,25 +945,6 @@ export const IDL: SquadsMpl = {
         }
       ],
       "args": []
-    },
-    {
-      "name": "setExternalExecute",
-      "docs": [
-        "DEPRECATED - constraint has been removed in favor of the roles program"
-      ],
-      "accounts": [
-        {
-          "name": "multisig",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "setting",
-          "type": "bool"
-        }
-      ]
     },
     {
       "name": "createTransaction",

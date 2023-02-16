@@ -1,5 +1,5 @@
 import * as anchor from "@coral-xyz/anchor";
-import { getIxPDA } from "@sqds/sdk";
+import { getIxPDA } from "../sdk";
 import { SquadsMpl } from "../idl/squads_mpl";
 import { Roles } from "../idl/roles";
 

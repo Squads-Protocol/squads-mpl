@@ -2,7 +2,6 @@ import { expect } from "chai";
 import fs from "fs";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { createAssociatedTokenAccountInstruction, createInitializeMintInstruction, createMintToInstruction } from "@solana/spl-token";
 import { SquadsMpl } from "../idl/squads_mpl";
 import { ProgramManager } from "../idl/program_manager";
 import { Roles } from "../idl/roles";
@@ -10,10 +9,9 @@ import { Roles } from "../idl/roles";
 import {
   createBlankTransaction,
   createTestTransferTransaction,
-  executeTransaction,
 } from "../helpers/transactions";
 import { execSync } from "child_process";
-import { LAMPORTS_PER_SOL, ParsedAccountData, PublicKey, SystemProgram } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, ParsedAccountData, SystemProgram } from "@solana/web3.js";
 import Squads, {
   getMsPDA,
   getIxPDA,
@@ -22,7 +20,6 @@ import Squads, {
   getTxPDA,
 } from "../sdk/src/index";
 import BN from "bn.js";
-import { ASSOCIATED_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 import { getExecuteProxyInstruction, getUserRolePDA, getUserDelegatePDA, getRolesManager } from "../helpers/roles";
 import { agnosticExecute } from "../helpers/sdkExecute";
 

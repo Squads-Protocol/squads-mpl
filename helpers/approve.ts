@@ -1,7 +1,7 @@
 // approve helper for test suite
 // runs through a multisig we pre-specified member list to approve a transaction
 
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 
 
 export const memberListApprove = async (memberList, msPDA, txPDA, squads, provider, program ) => {
