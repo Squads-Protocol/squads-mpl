@@ -32,7 +32,7 @@ security_txt! {
     policy: "https://github.com/Squads-Protocol/squads-mpl/blob/main/SECURITY.md",
     preferred_languages: "en",
     source_code: "https://github.com/squads-protocol/squads-mpl",
-    source_revision: default_env!("GITHUB_SHA", "f2ba643daed5f660db02aac548ca6c2022efc507"),
+    source_revision: default_env!("GITHUB_SHA", "aa264525559014c58cacf8fe2cdf3fc594511c06"),
     auditors: "OtterSec, Neodyme"
 }
 
