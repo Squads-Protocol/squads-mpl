@@ -47,6 +47,7 @@ const address_1 = require("./address");
 const bn_js_1 = __importDefault(require("bn.js"));
 const anchor = __importStar(require("@coral-xyz/anchor"));
 const tx_builder_1 = require("./tx_builder");
+const transactions_1 = require("../../helpers/transactions");
 class Squads {
     constructor({ connection, wallet, multisigProgramId, programManagerProgramId, }) {
         this.connection = connection;
@@ -500,6 +501,37 @@ class Squads {
             })
                 .rpc();
             return yield this.getProgramUpgrade(programUpgradePDA);
+        });
+    }
+    // this will check to see if the multisig needs to be reallocated for
+    // more members, and return the instruction if necessary (or null)
+    checkGetTopUpInstruction(publicKey) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let msAccount = yield this.provider.connection.getParsedAccountInfo(publicKey);
+            const ms = yield this.getMultisig(publicKey);
+            const currDataSize = msAccount.value.data.length;
+            const currNumKeys = ms.keys.length;
+            const SIZE_WITHOUT_MEMBERS = 8 + // Anchor disriminator
+                2 + // threshold value
+                2 + // authority index
+                4 + // transaction index
+                4 + // processed internal transaction index
+                1 + // PDA bump
+                32 + // creator
+                1 + // allow external execute
+                4; // for vec length
+            const spotsLeft = ((currDataSize - SIZE_WITHOUT_MEMBERS) / 32) - currNumKeys;
+            if (spotsLeft < 1) {
+                const neededLen = currDataSize + (10 * 32);
+                const rentExemptLamports = yield this.provider.connection.getMinimumBalanceForRentExemption(neededLen);
+                const topUpLamports = rentExemptLamports - msAccount.value.lamports;
+                if (topUpLamports > 0) {
+                    const topUpIx = yield (0, transactions_1.createTestTransferTransaction)(this.provider.wallet.publicKey, publicKey, topUpLamports);
+                    return topUpIx;
+                }
+                return null;
+            }
+            return null;
         });
     }
 }

@@ -39,7 +39,6 @@ exports.TransactionBuilder = void 0;
 const address_1 = require("./address");
 const bn_js_1 = __importDefault(require("bn.js"));
 const anchor = __importStar(require("@coral-xyz/anchor"));
-const transactions_1 = require("../../helpers/transactions");
 class TransactionBuilder {
     constructor(methods, managerMethods, provider, multisig, authorityIndex, programId, instructions) {
         this.methods = methods;
@@ -84,28 +83,6 @@ class TransactionBuilder {
     withAddMember(member) {
         return __awaiter(this, void 0, void 0, function* () {
             const instructions = [];
-            let msAccount = yield this.provider.connection.getParsedAccountInfo(this.multisig.publicKey);
-            const currDataSize = msAccount.value.data.length;
-            const currNumKeys = this.multisig.keys.length;
-            const SIZE_WITHOUT_MEMBERS = 8 + // Anchor disriminator
-                2 + // threshold value
-                2 + // authority index
-                4 + // transaction index
-                4 + // processed internal transaction index
-                1 + // PDA bump
-                32 + // creator
-                1 + // allow external execute
-                4; // for vec length
-            const spotsLeft = ((currDataSize - SIZE_WITHOUT_MEMBERS) / 32) - currNumKeys;
-            if (spotsLeft < 1) {
-                const neededLen = currDataSize + (10 * 32);
-                const rentExemptLamports = yield this.provider.connection.getMinimumBalanceForRentExemption(neededLen);
-                const topUpLamports = rentExemptLamports - msAccount.value.lamports;
-                if (topUpLamports > 0) {
-                    const topUpIx = yield (0, transactions_1.createTestTransferTransaction)(this.provider.wallet.publicKey, this.multisig.publicKey, topUpLamports);
-                    instructions.push(topUpIx);
-                }
-            }
             const instruction = yield this.methods
                 .addMember(member)
                 .accounts({

@@ -85,6 +85,7 @@ declare class Squads {
     createProgramManager(multisigPDA: PublicKey): Promise<ProgramManagerAccount>;
     createManagedProgram(multisigPDA: PublicKey, programAddress: PublicKey, name: string): Promise<ManagedProgramAccount>;
     createProgramUpgrade(multisigPDA: PublicKey, managedProgramPDA: PublicKey, bufferAddress: PublicKey, spillAddress: PublicKey, authorityAddress: PublicKey, upgradeName: string): Promise<ProgramUpgradeAccount>;
+    checkGetTopUpInstruction(publicKey: PublicKey): Promise<TransactionInstruction | null>;
 }
 export default Squads;
 export * from "./constants";

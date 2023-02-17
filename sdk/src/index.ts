@@ -38,6 +38,7 @@ import BN from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
 import {TransactionBuilder} from "./tx_builder";
 import { program } from "@coral-xyz/anchor/dist/cjs/native/system";
+import { createTestTransferTransaction } from "../../helpers/transactions";
 
 class Squads {
   readonly connection: Connection;
@@ -825,6 +826,38 @@ class Squads {
         })
         .rpc();
     return await this.getProgramUpgrade(programUpgradePDA);
+  }
+
+  // this will check to see if the multisig needs to be reallocated for
+  // more members, and return the instruction if necessary (or null)
+  async checkGetTopUpInstruction(publicKey: PublicKey): Promise<TransactionInstruction | null> {
+    let msAccount = await this.provider.connection.getParsedAccountInfo(publicKey) as any;
+    const ms = await this.getMultisig(publicKey);
+    const currDataSize = msAccount.value.data.length;
+    const currNumKeys = ms.keys.length;
+    const SIZE_WITHOUT_MEMBERS = 8 + // Anchor disriminator
+        2 +         // threshold value
+        2 +         // authority index
+        4 +         // transaction index
+        4 +         // processed internal transaction index
+        1 +         // PDA bump
+        32 +        // creator
+        1 +         // allow external execute
+        4;          // for vec length
+
+    const spotsLeft = ((currDataSize - SIZE_WITHOUT_MEMBERS) / 32) - currNumKeys;
+
+    if(spotsLeft < 1){
+      const neededLen = currDataSize + (10 * 32);
+      const rentExemptLamports = await this.provider.connection.getMinimumBalanceForRentExemption(neededLen);
+      const topUpLamports = rentExemptLamports - msAccount.value.lamports;
+      if(topUpLamports > 0){
+        const topUpIx = await createTestTransferTransaction(this.provider.wallet.publicKey, publicKey, topUpLamports);
+        return topUpIx;
+      }
+      return null;
+    }
+    return null;
   }
 }
 
