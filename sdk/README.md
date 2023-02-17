@@ -2,12 +2,18 @@
 This package provides classes and utilities to make it easier to interact with Squads programs.
 
 ## Contents
-* [Get Started](#get-started)
-* [Important Classes](#important-classes)
-  * [Squads](#squads)
-  * [TransactionBuilder](#transactionbuilder)
-* [Contributing](#contributing)
-  * [Building & Testing](#building--testing)
+- [Squads SDK](#squads-sdk)
+  - [Contents](#contents)
+  - [Get started](#get-started)
+  - [Important Classes](#important-classes)
+    - [Squads](#squads)
+      - [Getters](#getters)
+      - [Immediate Instructions](#immediate-instructions)
+      - [Built Instructions](#built-instructions)
+    - [TransactionBuilder](#transactionbuilder)
+    - [Adding Members](#adding-members)
+  - [Contributing](#contributing)
+    - [Building \& Testing](#building--testing)
 
 ## Get started
 
@@ -77,6 +83,18 @@ txBuilder = await txBuilder.withRemoveMember(...);
 const [_txInstructions, txPDA] = await txBuilder.executeInstructions();
 ```
 
+### Adding Members
+For existing multisigs, space may need to be reallocated if adding new members. The multisig account will need to be funded in order to execute the instruction properly. 
+This will most likely happen the first time an increase in members is requested, but very rarely after that as the space needed for 10 additional members is always allocated
+when needed. We've provided a simple instruction `checkGetTopUpInstruction` that you can attach or execute whenever you wish (as long as it happens before the MsTransaction execution).
+```typescript
+...
+const allocationCheckIx = await squads.checkGetTopUpInstruction(msPDA); // the multisig account address
+if (allocationCheckIx) {
+  someTx.add(allocationCheckIx);
+}
+...
+```
 
 ## Contributing
 
