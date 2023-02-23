@@ -15,6 +15,7 @@ The program facilitates signing and executing transactions on behalf of a multis
   * [Activating a MsTransaction](#activating-a-mstransaction)
 * [Approve or Reject a MsTransaction](#approve-or-reject-a-mstransaction)
 * [Execute a MsTransaction](#execute-a-mstransaction)
+* [Verifying](#verifying)
 * [Contributing](#contributing)
 * [Other Tools and Programs](#other-tools-and-programs)
 
@@ -86,6 +87,11 @@ Second MsInstruction (`instruction_index of 2`)
 * A list of all other accounts referenced by the attached MsInstruction
 
 The accounts needed for execution can be derived by the MsTransaction account itself, as the MsTransaction account contains an instruction_index, which when attaching an MsInstruction needs to be incremented sequentially. To execute, first you can fetch the MsTransaction account, and then derive all MsInstruction accounts by working backwards from the instruction_index in the MsTransaction and derive the MsInstruction PDAs, fetch the MsInstruction accounts, and then format the ExecuteInstruction for the multisig as explained above. See how this can be accomplished you can [take a look here at one of the test helper functions](https://github.com/squads-dapp/squads-mpl/blob/main/helpers/transactions.ts#L29). The accounts sent to the ExecuteTransaction instruction should follow a unique array index pattern, where the array has a total number of items that map to the list of expected accounts, with each item representing the index of the account to use from the `remaining_accounts` field in the Context.
+
+## Verifying
+You can verify the build and on-chain program from commit `c95b7673d616c377a349ca424261872dfcf8b19d` by using the command:
+```anchor verify -p squads_mpl SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu -d projectserum/build:v0.26.0 --provider.cluster {specify-cluster-here}```
+Note: currently due to a quirk, be sure to `avm use 0.24.0` otherwise the IDL won't be verified, only the program itself.
 
 ## Contributing
 The community is encouraged to contribute to the Squads-MPL, either by proposing fixes, updates, or adding more programs. 
