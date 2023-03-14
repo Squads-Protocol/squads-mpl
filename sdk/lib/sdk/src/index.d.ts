@@ -1,5 +1,5 @@
 import { Connection, PublicKey, Commitment, ConnectionConfig, TransactionInstruction, Signer } from "@solana/web3.js";
-import { Wallet } from "@coral-xyz/anchor/dist/cjs/provider";
+import { Wallet } from "@coral-xyz/anchor";
 import { InstructionAccount, ManagedProgramAccount, MultisigAccount, ProgramManagerAccount, ProgramUpgradeAccount, TransactionAccount } from "./types";
 import { TransactionBuilder } from "./tx_builder";
 declare class Squads {
@@ -88,5 +88,7 @@ declare class Squads {
     checkGetTopUpInstruction(publicKey: PublicKey): Promise<TransactionInstruction | null>;
 }
 export default Squads;
+export { Wallet };
 export * from "./constants";
 export * from "./address";
+export * from "./types";

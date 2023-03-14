@@ -38,11 +38,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.Wallet = void 0;
 const web3_js_1 = require("@solana/web3.js");
 const constants_1 = require("./constants");
 const squads_mpl_json_1 = __importDefault(require("../../target/idl/squads_mpl.json"));
 const program_manager_json_1 = __importDefault(require("../../target/idl/program_manager.json"));
 const anchor_1 = require("@coral-xyz/anchor");
+Object.defineProperty(exports, "Wallet", { enumerable: true, get: function () { return anchor_1.Wallet; } });
+const anchor_2 = require("@coral-xyz/anchor");
 const address_1 = require("./address");
 const bn_js_1 = __importDefault(require("bn.js"));
 const anchor = __importStar(require("@coral-xyz/anchor"));
@@ -53,11 +56,11 @@ class Squads {
         this.connection = connection;
         this.wallet = wallet;
         this.multisigProgramId = multisigProgramId !== null && multisigProgramId !== void 0 ? multisigProgramId : constants_1.DEFAULT_MULTISIG_PROGRAM_ID;
-        this.provider = new anchor_1.AnchorProvider(this.connection, this.wallet, Object.assign(Object.assign({}, anchor_1.AnchorProvider.defaultOptions()), { commitment: "confirmed", preflightCommitment: "confirmed" }));
-        this.multisig = new anchor_1.Program(squads_mpl_json_1.default, this.multisigProgramId, this.provider);
+        this.provider = new anchor_2.AnchorProvider(this.connection, this.wallet, Object.assign(Object.assign({}, anchor_2.AnchorProvider.defaultOptions()), { commitment: "confirmed", preflightCommitment: "confirmed" }));
+        this.multisig = new anchor_2.Program(squads_mpl_json_1.default, this.multisigProgramId, this.provider);
         this.programManagerProgramId =
             programManagerProgramId !== null && programManagerProgramId !== void 0 ? programManagerProgramId : constants_1.DEFAULT_PROGRAM_MANAGER_PROGRAM_ID;
-        this.programManager = new anchor_1.Program(program_manager_json_1.default, this.programManagerProgramId, this.provider);
+        this.programManager = new anchor_2.Program(program_manager_json_1.default, this.programManagerProgramId, this.provider);
     }
     static endpoint(endpoint, wallet, options) {
         return new Squads(Object.assign({ connection: new web3_js_1.Connection(endpoint, options === null || options === void 0 ? void 0 : options.commitmentOrConfig), wallet }, options));
@@ -538,3 +541,4 @@ class Squads {
 exports.default = Squads;
 __exportStar(require("./constants"), exports);
 __exportStar(require("./address"), exports);
+__exportStar(require("./types"), exports);
