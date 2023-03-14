@@ -14,7 +14,7 @@ import squadsMplJSON from "../../target/idl/squads_mpl.json";
 import {SquadsMpl} from "../../idl/squads_mpl";
 import programManagerJSON from "../../target/idl/program_manager.json";
 import {ProgramManager} from "../../idl/program_manager";
-import {Wallet} from "@coral-xyz/anchor/dist/cjs/provider";
+import {Wallet} from "@coral-xyz/anchor";
 import {AnchorProvider, Program} from "@coral-xyz/anchor";
 import {
   InstructionAccount,
@@ -863,5 +863,7 @@ class Squads {
 
 export default Squads;
 
+export {Wallet};
 export * from "./constants";
 export * from "./address";
+export * from "./types";
