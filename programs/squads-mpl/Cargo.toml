@@ -23,5 +23,4 @@ default = []
 [dependencies]
 anchor-lang = "0.26.0"
 default-env = "0.1.1"
-hex = "0.3.1"
 solana-security-txt = "1.0.1"
