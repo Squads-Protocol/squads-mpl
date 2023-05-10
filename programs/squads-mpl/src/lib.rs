@@ -6,6 +6,7 @@
 use anchor_lang::{
     prelude::*,
     solana_program::{instruction::Instruction, program::invoke_signed},
+    Discriminator,
 };
 
 use account::*;
@@ -470,11 +471,8 @@ pub mod squads_mpl {
                     }
                     if let Some(discriminator) = ix.data.get(0..8) {
                         // Prevent recursive call on execute_transaction/instruction that could create issues
-                        let execute_transaction = [0xe7, 0xad, 0x31, 0x5b, 0xeb, 0x18, 0x44, 0x13];
-                        let execute_instruction = [0x30, 0x12, 0x28, 0x28, 0x4b, 0x4a, 0x93, 0x6e];
-
-                        if discriminator == execute_transaction
-                            || discriminator == execute_instruction
+                        if discriminator == &instruction::ExecuteTransaction::DISCRIMINATOR
+                            || discriminator == &instruction::ExecuteInstruction::DISCRIMINATOR
                         {
                             return err!(MsError::InvalidAuthorityIndex);
                         }
