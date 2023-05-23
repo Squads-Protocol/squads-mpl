@@ -17,8 +17,6 @@ Technical information about SMPL [can be found in the program README.md](https:/
   * Squads V3 on-chain program: [SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu](https://explorer.solana.com/address/SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu)
   * Program manager: [SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK](https://explorer.solana.com/address/SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK)
 
-The immutable (non-upgradeable program is located at) [BASEDWVF6xeXTJSrk99cbMCwGFtaUvFLihpg6ki9UWX3](https://explorer.solana.com/address/BASEDWVF6xeXTJSrk99cbMCwGFtaUvFLihpg6ki9UWX3)
-
 Both programs are [Anchor verified](https://www.apr.dev/).
 * [Squads-MPL](https://www.apr.dev/program/SMPLecH534NA9acpos4G6x7uf3LWbCAwZQE9e8ZekMu)
 * [Program Manager](https://www.apr.dev/program/SMPLKTQhrgo22hFCVq2VGX1KAktTWjeizkhrdB1eauK)
@@ -37,8 +35,6 @@ To make sure that Squads V3 is secure we did the following:
   * kept the codebase minimal
   * open sourced the codebase
   * asked a number of established teams in the ecosystem to review the code and give their feedback
-
-Our goal is to make Squads V3 on-chain program non-upgradeable as soon as possible.
  
 # License
 
