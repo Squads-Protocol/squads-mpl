@@ -8,6 +8,8 @@ repository = "https://github.com/squads-dapp/squads-mpl"
 edition = "2018"
 keywords = ["squads", "solana", "program", "smart-contract", "multisig"]
 readme = "README.md"
+license = "AGPL-3.0-or-later"
+documentation = "https://github.com/squads-protocol/squads-mpl"
 
 [lib]
 crate-type = ["cdylib", "lib"]
