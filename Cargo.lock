@@ -1382,6 +1382,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "squads-v3-sdk"
+version = "0.1.2"
+dependencies = [
+ "anchor-lang",
+ "squads-mpl",
+]
+
+[[package]]
 name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
