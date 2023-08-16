@@ -59,7 +59,7 @@ pub mod cpi {
     }
 
 
-    pub fn approove_transaction<'info>(
+    pub fn approve_transaction<'info>(
         ctx: CpiContext<'_, '_, '_, 'info, VoteTransaction<'info>>,
     ) -> Result<()> {
         squads_mpl::cpi::approve_transaction(ctx)
