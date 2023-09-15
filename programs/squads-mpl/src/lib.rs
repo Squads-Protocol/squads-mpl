@@ -5,21 +5,17 @@
 
 use anchor_lang::{
     prelude::*,
-    solana_program::{
-        instruction::Instruction,
-        program::invoke_signed
-    }
+    solana_program::{instruction::Instruction, program::invoke_signed},
+    Discriminator,
 };
 
-use hex::FromHex;
-
-use state::*;
-use errors::*;
 use account::*;
+use errors::*;
+use state::*;
 
-pub mod state;
 pub mod account;
 pub mod errors;
+pub mod state;
 
 #[cfg(not(feature = "no-entrypoint"))]
 use {default_env::default_env, solana_security_txt::security_txt};
@@ -257,7 +253,7 @@ pub mod squads_mpl {
 
     /// Instruction to attach an instruction to a transaction.
     /// Transactions must be in the "draft" status, and any
-    /// signer (aside from execution payer) specified in an instruction 
+    /// signer (aside from execution payer) specified in an instruction
     /// must match the authority PDA specified during the transaction creation.
     pub fn add_instruction(
         ctx: Context<AddInstruction>,
@@ -368,9 +364,9 @@ pub mod squads_mpl {
 
     /// Instruction to execute a transaction.
     /// Transaction status must be "executeReady", and the account list must match
-    /// the unique indexed accounts in the following manner: 
+    /// the unique indexed accounts in the following manner:
     /// [ix_1_account, ix_1_program_account, ix_1_remaining_account_1, ix_1_remaining_account_2, ...]
-    /// 
+    ///
     /// Refer to the README for more information on how to construct the account list.
     pub fn execute_transaction<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteTransaction<'info>>,
@@ -473,12 +469,13 @@ pub mod squads_mpl {
                     if &ix.program_id != ctx.program_id {
                         return err!(MsError::InvalidAuthorityIndex);
                     }
-                    // Prevent recursive call on execute_transaction/instruction that could create issues
-                    let execute_transaction = Vec::from_hex("e7ad315beb184413").unwrap();
-                    let execute_instruction = Vec::from_hex("301228284b4a936e").unwrap();
-                    if Some(execute_transaction.as_slice()) == ix.data.get(0..8) ||
-                        Some(execute_instruction.as_slice()) == ix.data.get(0..8) {
-                        return err!(MsError::InvalidAuthorityIndex);
+                    if let Some(discriminator) = ix.data.get(0..8) {
+                        // Prevent recursive call on execute_transaction/instruction that could create issues
+                        if discriminator == &instruction::ExecuteTransaction::DISCRIMINATOR
+                            || discriminator == &instruction::ExecuteInstruction::DISCRIMINATOR
+                        {
+                            return err!(MsError::InvalidAuthorityIndex);
+                        }
                     }
 
                     invoke_signed(&ix, &ix_account_infos, &[&ms_authority_seeds])?;
@@ -504,13 +501,13 @@ pub mod squads_mpl {
     /// this may be helpful for processing large batch transfers.
     /// This instruction can only be used for transactions with an authority
     /// index of 1 or greater.
-    /// 
+    ///
     /// NOTE - do not use this instruction if there is not total clarity around
     /// potential side effects, as this instruction implies that the approved
     /// transaction will be executed partially, and potentially spread out over
     /// a period of time. This could introduce problems with state and failed
     /// transactions. For example: a program invoked in one of these instructions
-    /// may be upgraded between executions and potentially leave one of the 
+    /// may be upgraded between executions and potentially leave one of the
     /// necessary accounts in an invalid state.
     pub fn execute_instruction<'info>(
         ctx: Context<'_, '_, '_, 'info, ExecuteInstruction<'info>>,
