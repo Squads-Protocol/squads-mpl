@@ -4,6 +4,9 @@
 /target
 **/*.rs.bk
 node_modules
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
 Anchor.toml
 .idea/
 programs/squads-mpl/target
